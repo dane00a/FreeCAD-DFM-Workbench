@@ -244,14 +244,20 @@ class SharpInternalEdgeCheck(MachiningCheck):
                 continue
 
             angle = math.degrees(edge.dihedral_angle)
+            # Reported as information rather than a warning, deliberately.
+            # These corners are real -- square, unclaimed by any feature --
+            # but the rule fires on the residue every recognizer left, so its
+            # count is a reading of recognition coverage as much as of the
+            # part. Until that coverage closes it should not be outranking
+            # findings that name a specific feature and a specific fix.
             results.append(
                 self.finding(
                     rule,
-                    Severity.WARNING,
+                    Severity.INFO,
                     f"{angle:.0f} deg corner",
                     self.render(
                         feedback,
-                        Severity.WARNING,
+                        Severity.INFO,
                         0.0,
                         limit,
                         limit,
@@ -676,3 +682,74 @@ class CastingDraftAngleCheck(MachiningCheck):
                 unit="deg",
             )
         ]
+
+
+@register_check(Rulebook.SURFACE_FINISH_CONFLICT)
+class SurfaceFinishConflictCheck(MachiningCheck):
+    """A tapped hole breaking into a pocket floor.
+
+    The two surfaces want different finishes -- a thread's flanks are cut to
+    a form, a pocket floor is a milled surface -- so where they meet, one
+    operation cannot serve both and the pocket has to be finished around the
+    hole. It is a setup and a cost rather than a defect, so it is reported as
+    information.
+
+    Only a *tapped* hole counts. A plain drilled or reamed bore in a pocket
+    floor takes the same finishing pass as the floor and there is nothing to
+    reconcile, which is why every other hole type is left out of the pairing
+    entirely rather than filtered later.
+    """
+
+    @property
+    def name(self) -> str:
+        return "Surface Finish Conflict Check"
+
+    def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
+        owner: dict[int, tuple[str, str]] = {}
+        for feature in context.recognition.features:
+            if feature.type not in (FeatureType.THREADED_HOLE, FeatureType.POCKET):
+                continue
+            for face_id in feature.faces:
+                owner[face_id] = (feature.type, feature.instance_id)
+
+        results: list[CheckResult] = []
+        reported: set[tuple[str, str]] = set()
+        for edge in context.graph.edges:
+            first = owner.get(edge.face_id_a)
+            second = owner.get(edge.face_id_b)
+            if first is None or second is None:
+                continue
+            if {first[0], second[0]} != {FeatureType.THREADED_HOLE, FeatureType.POCKET}:
+                continue
+
+            pair = tuple(sorted((first[1], second[1])))
+            if pair in reported:
+                continue
+            reported.add(pair)
+
+            results.append(
+                self.finding(
+                    rule,
+                    Severity.INFO,
+                    "finish transition",
+                    self.render(
+                        feedback,
+                        Severity.INFO,
+                        0.0,
+                        0.0,
+                        0.0,
+                        "",
+                        "A tapped hole opens into a pocket floor here, and the "
+                        "two want different finishes -- the thread is cut to a "
+                        "form, the floor is a milled surface. One pass cannot "
+                        "serve both, so the floor has to be finished around "
+                        "the hole. Not a defect, but it is an operation and a "
+                        "setup that is easy to leave out of a quote.",
+                    ),
+                    faces=[edge.face_id_a, edge.face_id_b],
+                    value=0.0,
+                    limit=0.0,
+                    comparison="",
+                )
+            )
+        return results

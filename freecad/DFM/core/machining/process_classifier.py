@@ -22,7 +22,7 @@ from enum import Enum
 from typing import Optional
 
 from OCP.Bnd import Bnd_Box
-from OCP.gp import gp_Ax1, gp_Vec
+from OCP.gp import gp_Ax1, gp_Pnt, gp_Vec
 
 from .aag import AagNode, AttributedAdjacencyGraph, Concavity, SurfaceType
 from .config import RuleThresholds
@@ -268,6 +268,16 @@ def classify_part_process(
         result.axis_of_revolution = None  # no meaningful axis on a milled part
     else:
         result.type = PartProcessType.MILL_TURN
+
+        # A profile bar lands here by construction: a significant round body
+        # makes it read as partly turned, but it is not a body of revolution
+        # and never saw a lathe. Re-labelling it milled keeps the turning
+        # rules and the chuck-holding advice off a length of bar in a vise.
+        if result.axis_of_revolution is not None and detect_profile_extrusion(
+            graph, result.axis_of_revolution, limits
+        ):
+            result.type = PartProcessType.MILLED
+            result.blank = "profile_extrusion"
 
     return result
 
@@ -1149,3 +1159,177 @@ def _probe_gauge_skin(node: AagNode, gauge: float, shape) -> Optional[bool]:
     except Exception:
         return None
     return near_inside and not far_inside
+
+
+# =============================================================================
+# Profile-extrusion blanks
+# =============================================================================
+
+
+# Drawn or broached stock is *bar*: longer along its axis than its section is
+# wide. A short part with a swept profile -- a bladed disk with broached
+# dovetails is a perfect constant section -- was turned and then broached,
+# and keeps its turning label.
+_PROFILE_MIN_LENGTH_RATIO = 2.0
+
+# The two ends of a constant section are the same profile. Each may lose the
+# same bore to end-drilling, so a modest difference is allowed.
+_PROFILE_CAP_AREA_TOLERANCE = 0.15
+
+# How close to an axial extreme a face has to sit to be part of that end cap.
+_PROFILE_CAP_BAND_MM = 0.5
+
+# A cap stands square to the axis; an extrusion's flanks run along it.
+_PROFILE_CAP_ALIGNMENT = 0.99
+_PROFILE_FLANK_PLANE_MAX = 0.05
+_PROFILE_FLANK_AXIS_MIN = 0.99
+
+
+def detect_profile_extrusion(
+    graph: AttributedAdjacencyGraph, axis: gp_Ax1, thresholds: RuleThresholds
+) -> bool:
+    """Whether the part was cut from drawn or broached bar.
+
+    Only asked of a part that scored in the mill-turn band, because that is
+    exactly where a profile bar lands: it has a significant round body, so it
+    reads as partly turned, but it is not a body of revolution and was never
+    put on a lathe. A euro lock cylinder is the case -- a round body with a
+    flat stem, drawn as one section and then drilled and milled in a vise.
+
+    Getting it right matters beyond the label. A part called mill-turn gets
+    turning rules, an axis of revolution, and setup advice about holding it
+    in a chuck, none of which applies to a length of bar in a vise.
+    """
+    ratio = getattr(thresholds, "profile_bar_min_length_ratio", _PROFILE_MIN_LENGTH_RATIO)
+    span = _axial_span_and_reach(graph, axis)
+    if span is None:
+        return False
+    low, high, reach = span
+    # Conservative on purpose: a profile cut shorter than its own section is
+    # wide stays mill-turn rather than being called bar.
+    if (high - low) < ratio * reach:
+        return False
+
+    caps = _end_cap_clusters(graph, axis, low, high)
+    if not caps[0] or not caps[1]:
+        return False
+    if not _caps_are_congruent(caps):
+        return False
+    return all(_cap_boundary_is_drawable(graph, cluster, axis) for cluster in caps)
+
+
+def _axial_span_and_reach(graph: AttributedAdjacencyGraph, axis: gp_Ax1):
+    """How far the part runs along an axis, and how far it reaches off it."""
+    direction = gp_Vec(axis.Direction())
+    origin = axis.Location()
+    low, high, reach = math.inf, -math.inf, 0.0
+
+    for node in graph.nodes:
+        if node.bbox.IsVoid():
+            continue
+        xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
+        for x in (xmin, xmax):
+            for y in (ymin, ymax):
+                for z in (zmin, zmax):
+                    offset = gp_Vec(origin, gp_Pnt(x, y, z))
+                    along = offset.Dot(direction)
+                    low = min(low, along)
+                    high = max(high, along)
+                    radial = offset - direction.Multiplied(along)
+                    reach = max(reach, radial.Magnitude())
+
+    if low is math.inf or reach <= 0.0:
+        return None
+    return low, high, reach
+
+
+def _end_cap_clusters(
+    graph: AttributedAdjacencyGraph, axis: gp_Ax1, low: float, high: float
+) -> tuple[list, list]:
+    """The coplanar faces making up each end of the bar.
+
+    A cluster rather than a single face: a boolean fuse leaves the section
+    split into several coplanar pieces -- the euro blank's end is a cylinder
+    cap and a stem cap, never merged -- and the profile boundary is the
+    cluster's edges to everything outside it.
+    """
+    direction = gp_Vec(axis.Direction())
+    origin = axis.Location()
+    caps: tuple[list, list] = ([], [])
+
+    for node in graph.nodes_by_surface_type(SurfaceType.PLANE):
+        normal = node.outward_normal
+        if normal is None or node.centroid is None:
+            continue
+        if abs(normal.Dot(axis.Direction())) < _PROFILE_CAP_ALIGNMENT:
+            continue
+        along = gp_Vec(origin, node.centroid).Dot(direction)
+        if abs(along - low) < _PROFILE_CAP_BAND_MM:
+            caps[0].append(node)
+        elif abs(along - high) < _PROFILE_CAP_BAND_MM:
+            caps[1].append(node)
+    return caps
+
+
+def _caps_are_congruent(caps) -> bool:
+    areas = [sum(node.area for node in cluster) for cluster in caps]
+    largest = max(areas)
+    if largest <= 0.0:
+        return False
+    return abs(areas[0] - areas[1]) <= _PROFILE_CAP_AREA_TOLERANCE * largest
+
+
+def _cap_boundary_is_drawable(
+    graph: AttributedAdjacencyGraph, cluster, axis: gp_Ax1
+) -> bool:
+    """Whether an end cap's outline is a section a die could draw.
+
+    Every edge of the outline has to be a line or an arc -- a spline or an
+    ellipse is not a die profile -- and every face across it has to be a
+    flank running along the axis. A cone is deliberately refused: a taper
+    changes the cross-section, and no die draws that.
+
+    Inner-wire edges are skipped. They are bores drilled into the end, which
+    are machined features rather than part of the section.
+
+    The section must mix arcs and lines. All arcs is round bar, which is
+    turning; all lines is rectangular bar, which is milling and sawing.
+    Neither needs this label.
+    """
+    members = {node.face_id for node in cluster}
+    arcs = lines = 0
+
+    for node in cluster:
+        for edge in graph.edges_of(node.face_id):
+            if edge.is_inner_wire_edge:
+                continue
+            other_id = edge.other_face(node.face_id)
+            if other_id in members or not graph.has_node(other_id):
+                continue
+
+            if edge.edge_curve_type == "circle":
+                arcs += 1
+            elif edge.edge_curve_type == "line":
+                lines += 1
+            else:
+                return False
+
+            if not _is_extrusion_flank(graph.node(other_id), axis):
+                return False
+
+    return arcs >= 1 and lines >= 1
+
+
+def _is_extrusion_flank(node: AagNode, axis: gp_Ax1) -> bool:
+    """Whether a face is a side of the extrusion rather than something cut."""
+    if node.surface_type is SurfaceType.PLANE:
+        normal = node.outward_normal
+        if normal is None:
+            return False
+        return abs(normal.Dot(axis.Direction())) < _PROFILE_FLANK_PLANE_MAX
+    if node.surface_type is SurfaceType.CYLINDER and node.cyl_cone_axis is not None:
+        return (
+            abs(node.cyl_cone_axis.Direction().Dot(axis.Direction()))
+            > _PROFILE_FLANK_AXIS_MIN
+        )
+    return False

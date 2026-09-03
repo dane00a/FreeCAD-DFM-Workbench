@@ -44,6 +44,7 @@ active_rules:
 - CASTING_DRAFT_ANGLE
 - SETUP_COUNT_HIGH
 - TOOL_ACCESS_SPECIAL_SETUP
+- SURFACE_FINISH_CONFLICT
 rule_feedback:
   UNDERCUT_PRESENT:
     warning_msg: ''
@@ -159,6 +160,9 @@ rule_feedback:
   TOOL_ACCESS_SPECIAL_SETUP:
     warning_msg: ''
     error_msg: ''
+  SURFACE_FINISH_CONFLICT:
+    warning_msg: ''
+    error_msg: ''
 rule_criticality:
   UNDERCUT_PRESENT: HIGH
   TOOL_ACCESS_BLOCKED: CRITICAL
@@ -191,13 +195,14 @@ rule_criticality:
   HOLE_MULTI_PASS: LOW
   HOLE_INTERSECTS_CAVITY: MEDIUM
   MINIMUM_FEATURE_SIZE: HIGH
-  SHARP_INTERNAL_EDGE: MEDIUM
+  SHARP_INTERNAL_EDGE: LOW
   PART_MARKING: LOW
   RAISED_TEXT_MACHINED_FACE: MEDIUM
   FEATURE_COMPLEXITY: LOW
   CASTING_DRAFT_ANGLE: MEDIUM
   SETUP_COUNT_HIGH: MEDIUM
   TOOL_ACCESS_SPECIAL_SETUP: MEDIUM
+  SURFACE_FINISH_CONFLICT: LOW
 materials:
   Default:
     category: Default
@@ -299,6 +304,8 @@ materials:
         limit: '4'
       TOOL_ACCESS_SPECIAL_SETUP:
         binary_severity: WARNING
+      SURFACE_FINISH_CONFLICT:
+        binary_severity: INFO
   Aluminum (Soft Wrought Alloy):
     category: Aluminium
     is_active: true

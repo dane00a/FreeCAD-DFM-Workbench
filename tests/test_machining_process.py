@@ -82,10 +82,16 @@ def make_shaft_with_flats() -> TopoDS_Shape:
 
     Enough milled area to pull the turned fraction out of the TURNED band
     without losing the dominant axis: live-tool territory.
+
+    The flats stop short of both ends deliberately. Run end to end they
+    would make the shaft a constant cross-section -- which is drawn or
+    broached bar, not turned work, and the classifier is right to say so.
+    A wrench flat is local, and that is what makes this a turned part with
+    milled features rather than a length of profile.
     """
     shaft = make_shaft()
-    left = BRepPrimAPI_MakeBox(gp_Pnt(4, -20, -1), gp_Pnt(20, 20, 91)).Shape()
-    right = BRepPrimAPI_MakeBox(gp_Pnt(-20, -20, -1), gp_Pnt(-4, 20, 91)).Shape()
+    left = BRepPrimAPI_MakeBox(gp_Pnt(4, -20, 25), gp_Pnt(20, 20, 65)).Shape()
+    right = BRepPrimAPI_MakeBox(gp_Pnt(-20, -20, 25), gp_Pnt(-4, 20, 65)).Shape()
     cross = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(-20, 0, 45), gp_Dir(1, 0, 0)), 4.0, 40.0)
     return _cut(_cut(_cut(shaft, left), right), cross.Shape())
 

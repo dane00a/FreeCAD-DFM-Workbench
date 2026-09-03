@@ -529,6 +529,16 @@ class Rulebook(Enum):
         description="How many distinct features the part carries, as a cost signal.",
         family=RuleFamily.PART,
     )
+    SURFACE_FINISH_CONFLICT = RuleType(
+        "Surface Finish Conflict",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description=(
+            "A tapped hole opening into a pocket floor, where the two "
+            "want different finishes."
+        ),
+        family=RuleFamily.PART,
+    )
     CASTING_DRAFT_ANGLE = RuleType(
         "Casting Draft Angle",
         shape=RuleShape.LIMIT_ONLY,

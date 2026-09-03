@@ -16,7 +16,16 @@ bounding box for each, measured from the originals. A builder that drifts by
 a millimetre fails against the recorded volume, and one that fuses its tools
 in a way that leaves a seam fails against the face count.
 
+There are two baselines, and they answer different questions.
+`geometry_oracle.json` was measured from the original parts, under the
+OpenCascade build that produced them, so agreeing with it means these really
+are those parts. `local_baseline.json` is measured from these recipes under
+the kernel FreeCAD actually ships, so disagreeing with it means something
+here changed. The first tolerates a handful of sliver-edge differences that
+are a kernel-version artefact; the second tolerates nothing at all.
+
     python tests/fixtures/generate_fixtures.py --verify
+    python tests/fixtures/generate_fixtures.py --record-baseline
     python tests/fixtures/generate_fixtures.py --out build/fixtures
     python tests/fixtures/generate_fixtures.py --verify simple_box deep_hole
 
@@ -49,6 +58,7 @@ from builders import load_all  # noqa: E402
 
 
 ORACLE = os.path.join(_HERE, "geometry_oracle.json")
+BASELINE = os.path.join(_HERE, "local_baseline.json")
 
 # How far a rebuilt part may differ from the recorded one. Counts must match
 # exactly -- a different face count is a different topology, and the
@@ -163,6 +173,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument(
         "--list", action="store_true", help="list the registered fixtures and stop"
     )
+    parser.add_argument(
+        "--record-baseline",
+        action="store_true",
+        help="rewrite local_baseline.json from the recipes as they build today",
+    )
     args = parser.parse_args(argv)
 
     registry = load_all()
@@ -171,16 +186,24 @@ def main(argv: Optional[list[str]] = None) -> int:
             print(name)
         return 0
 
-    oracle = {}
+    oracle: dict = {}
+    baseline: dict = {}
     if args.verify:
         with open(ORACLE, encoding="utf-8") as handle:
             oracle = json.load(handle)
+    if args.verify or args.record_baseline:
+        if os.path.exists(BASELINE):
+            with open(BASELINE, encoding="utf-8") as handle:
+                baseline = json.load(handle)
+        elif args.verify:
+            print("  -  no local baseline yet; run --record-baseline")
 
     names = args.names or sorted(registry)
     if args.out:
         os.makedirs(args.out, exist_ok=True)
 
-    built = failed = unverified = tolerated = 0
+    built = failed = unverified = tolerated = drifted = 0
+    recorded_now: dict = {}
     for name in names:
         builder = registry.get(name)
         if builder is None:
@@ -197,6 +220,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         built += 1
         if args.out:
             write_step(shape, os.path.join(args.out, name + ".step"))
+        if args.record_baseline:
+            recorded_now[name] = measure(shape)
 
         if not args.verify:
             continue
@@ -205,13 +230,35 @@ def main(argv: Optional[list[str]] = None) -> int:
             unverified += 1
             print(f"  -  {name}: not in the oracle")
             continue
-        problems, known = compare(measure(shape), recorded, name)
+        measured = measure(shape)
+        problems, known = compare(measured, recorded, name)
         if problems:
             failed += 1
             print(f"  X  {name}: {'; '.join(problems)}")
         elif known:
             tolerated += 1
             print(f"  ~  {name}: {'; '.join(known)} (known kernel difference)")
+
+        # The local baseline allows nothing. Anything moving against it is a
+        # change made here, in this repository, today -- which is the whole
+        # point of keeping it separate from the reference recording.
+        was = baseline.get(name)
+        if was is not None and measured != was:
+            drifted += 1
+            print(f"  !  {name}: drifted from the local baseline")
+            for key in sorted(set(measured) | set(was)):
+                if measured.get(key) != was.get(key):
+                    print(f"        {key}: {was.get(key)} -> {measured.get(key)}")
+
+    if args.record_baseline:
+        # Merged rather than replaced, so recording a single fixture after
+        # editing its recipe does not silently drop the other 212.
+        merged = dict(baseline)
+        merged.update(recorded_now)
+        with open(BASELINE, "w", encoding="utf-8") as handle:
+            json.dump(merged, handle, indent=1, sort_keys=True)
+            handle.write("\n")
+        print(f"\nrecorded {len(recorded_now)} of {len(merged)} to local_baseline.json")
 
     print(f"\nbuilt {built} of {len(names)}")
     if args.verify:
@@ -220,7 +267,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         if tolerated:
             print(f"   known differences: {tolerated}", end="")
         print(f"   not recorded: {unverified}" if unverified else "")
-    return 1 if failed else 0
+        if baseline:
+            print(f"local baseline: {drifted} drifted of {len(baseline)} recorded")
+    return 1 if (failed or drifted) else 0
 
 
 if __name__ == "__main__":

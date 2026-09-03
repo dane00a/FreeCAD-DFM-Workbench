@@ -430,14 +430,36 @@ class PocketRecognizer(FeatureRecognizer):
     def _corner_radius(
         graph: AttributedAdjacencyGraph, faces: list[int], floor_normal: gp_Dir
     ) -> float:
-        """Smallest corner fillet radius in the cavity, or zero if sharp."""
-        radii = [
-            node.cyl_radius
-            for node in (graph.node(face_id) for face_id in faces)
-            if node.surface_type is SurfaceType.CYLINDER
-            and node.cyl_cone_axis is not None
-            and abs(node.cyl_cone_axis.Direction().Dot(floor_normal)) >= 0.95
-        ]
+        """Smallest corner fillet radius in the cavity, or zero if sharp.
+
+        Looks one hop past the cavity's own faces as well as through them. A
+        corner fillet meets the walls it blends tangentially, and the cavity
+        grows over concave edges, so the fillets are never absorbed into the
+        pocket -- which would have this report every generously radiused
+        pocket in the world as square-cornered.
+
+        A corner radius stands parallel to the floor normal. A fillet along
+        the floor is a different thing entirely, cut by the bull nose that
+        cleared the pocket, and it does not limit the cutter diameter.
+        """
+        collected = set(faces)
+        candidates = set(collected)
+        for face_id in faces:
+            for edge in graph.edges_of(face_id):
+                candidates.add(edge.other_face(face_id))
+
+        radii = []
+        for face_id in sorted(candidates):
+            if not graph.has_node(face_id):
+                continue
+            node = graph.node(face_id)
+            if node.surface_type is not SurfaceType.CYLINDER:
+                continue
+            if node.cyl_cone_axis is None or not node.is_internal:
+                continue
+            if abs(node.cyl_cone_axis.Direction().Dot(floor_normal)) < 0.95:
+                continue
+            radii.append(node.cyl_radius)
         return min(radii) if radii else 0.0
 
 

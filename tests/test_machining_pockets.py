@@ -20,7 +20,8 @@ from OCP.TopoDS import TopoDS_Shape
 from freecad.DFM.core.machining import AagBuilder
 from freecad.DFM.core.machining.features import FeatureType
 from freecad.DFM.core.machining.recognizers import PocketRecognizer
-from freecad.DFM.core.utils.geometry import FaceIndex
+from freecad.DFM.core.analyzers.machining_analyzer import MachiningAnalyzer
+from freecad.DFM.core.utils.geometry import EdgeIndex, FaceIndex
 
 
 # =============================================================================
@@ -241,3 +242,71 @@ class TestSlotRecognition(unittest.TestCase):
         # from a measured radius of nothing.
         slot = slots_in(make_through_slot())[0]
         self.assertFalse(slot.has("corner_radius_mm"))
+
+
+class TestPocketCornerRadiusMeasurement(unittest.TestCase):
+    """A radiused pocket must not read as square-cornered.
+
+    Corner fillets meet the walls they blend tangentially, and a cavity grows
+    over concave edges, so the fillets are never absorbed into the pocket.
+    Measuring only the pocket's own faces therefore reports every generously
+    radiused pocket in the world as having square corners -- which is the
+    single most common shape in machining.
+    """
+
+    @staticmethod
+    def _rounded_pocket(radius: float):
+        from OCP.BRepAdaptor import BRepAdaptor_Curve
+        from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet
+        from OCP.GeomAbs import GeomAbs_CurveType
+        from OCP.TopAbs import TopAbs_EDGE
+        from OCP.TopExp import TopExp
+        from OCP.TopoDS import TopoDS
+        from OCP.TopTools import TopTools_IndexedMapOfShape
+
+        shape = _cut(
+            BRepPrimAPI_MakeBox(80.0, 80.0, 40.0).Shape(),
+            BRepPrimAPI_MakeBox(gp_Pnt(20, 20, 25), gp_Pnt(60, 60, 41)).Shape(),
+        )
+        edges = TopTools_IndexedMapOfShape()
+        TopExp.MapShapes_s(shape, TopAbs_EDGE, edges)
+        maker = BRepFilletAPI_MakeFillet(shape)
+        for index in range(1, edges.Extent() + 1):
+            edge = TopoDS.Edge_s(edges.FindKey(index))
+            curve = BRepAdaptor_Curve(edge)
+            if curve.GetType() != GeomAbs_CurveType.GeomAbs_Line:
+                continue
+            start = curve.Value(curve.FirstParameter())
+            end = curve.Value(curve.LastParameter())
+            if abs(start.Z() - end.Z()) < 1e-6:
+                continue  # not a vertical corner
+            if not (19.9 <= start.X() <= 60.1 and 19.9 <= start.Y() <= 60.1):
+                continue  # not inside the pocket
+            maker.Add(radius, edge)
+        maker.Build()
+        return maker.Shape() if maker.IsDone() else shape
+
+    def _pocket(self, shape):
+        context = list(
+            MachiningAnalyzer()
+            .execute(shape, FaceIndex(shape), EdgeIndex(shape), prefs={})
+            .values()
+        )[0]
+        pockets = context.recognition.of_type(FeatureType.POCKET)
+        self.assertEqual(len(pockets), 1)
+        return pockets[0]
+
+    def test_a_generous_corner_radius_is_measured(self):
+        pocket = self._pocket(self._rounded_pocket(5.0))
+        self.assertAlmostEqual(pocket.number("corner_radius_mm"), 5.0, places=3)
+
+    def test_a_tight_corner_radius_is_measured(self):
+        pocket = self._pocket(self._rounded_pocket(0.3))
+        self.assertAlmostEqual(pocket.number("corner_radius_mm"), 0.3, places=3)
+
+    def test_a_square_pocket_still_reads_as_square(self):
+        shape = _cut(
+            BRepPrimAPI_MakeBox(80.0, 80.0, 40.0).Shape(),
+            BRepPrimAPI_MakeBox(gp_Pnt(20, 20, 25), gp_Pnt(60, 60, 41)).Shape(),
+        )
+        self.assertEqual(self._pocket(shape).number("corner_radius_mm"), 0.0)

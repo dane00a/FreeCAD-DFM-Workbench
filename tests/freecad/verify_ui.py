@@ -566,6 +566,87 @@ def verify_ignore(view, presenter, model_obj, doc, part):
               " (%r)" % view.form.leVerdict.text())
 
 
+def verify_repetition_is_folded_away(view, presenter, doc, model_obj):
+    """A part with N identical features must not cost the reader N rows.
+
+    A bolt circle of eight holes is eight findings, and it should be: each
+    one is a real hole that a machinist may want to click. What it must not
+    be is eight lines of the same sentence in front of somebody who has not
+    asked to see them.
+
+    The tree does that by construction -- findings hang under the rule that
+    made them, collapsed, with the count on the parent -- and this checks it
+    rather than trusting it. It also checks the thing that would undo it: a
+    floating 3D label per finding. The panel never places more than one,
+    which is why a part with fifty findings does not turn its own model into
+    a wall of overlapping text.
+    """
+    section("Repetition")
+    from PySide6 import QtCore
+
+    rule_rows = [i for i in walk(view.model) if kind_of(i) == "rule" and payload_of(i)]
+    findings = [i for i in walk(view.model) if kind_of(i) == "finding"]
+    check("there are more findings than rules to file them under",
+          len(findings) > len(rule_rows),
+          " (%d findings, %d rule rows)" % (len(findings), len(rule_rows)))
+
+    busiest = max(rule_rows, key=lambda i: len(payload_of(i)), default=None)
+    if busiest is None:
+        return
+    repeated = payload_of(busiest)
+    say("  %r fired %d times" % (label_of(busiest), len(repeated)))
+
+    # Collapsed, the repetition is one line with a number on it.
+    tree = view.form.tvResults
+    index = view.model.indexFromItem(busiest)
+    tree.collapse(index)
+    pump()
+    check("a rule that fired many times is one collapsed row",
+          not tree.isExpanded(index))
+    errors = busiest.data(QtCore.Qt.ItemDataRole.UserRole + 6) or 0
+    warnings = busiest.data(QtCore.Qt.ItemDataRole.UserRole + 7) or 0
+    active = len([f for f in repeated if not f.ignore])
+    check("and carries the count, so the multiplicity is visible unexpanded",
+          errors + warnings == active,
+          " (badge %d, %d active findings)" % (errors + warnings, active))
+
+    # Expanded, every occurrence is still individually reachable.
+    tree.expand(index)
+    pump()
+    check("expanding still gives every occurrence its own row",
+          busiest.rowCount() == len(repeated),
+          " (%d rows, %d findings)" % (busiest.rowCount(), len(repeated)))
+
+    def annotations():
+        return [o for o in doc.Objects if "Annotation" in o.Name]
+
+    select(view, busiest)
+    doc.recompute()
+    pump()
+    check("selecting the whole rule places no floating labels at all",
+          not annotations(), " (%s)" % [o.Name for o in annotations()])
+
+    # One finding at a time gets a label, and only ever one.
+    for item in [busiest.child(row) for row in range(busiest.rowCount())]:
+        select(view, item)
+        doc.recompute()
+        pump()
+        if len(annotations()) > 1:
+            break
+    check("and stepping through them never leaves more than one behind",
+          len(annotations()) <= 1, " (%d)" % len(annotations()))
+
+    # The whole part, in one row, is what the reader meets first.
+    top = find_item(view.model, "all")
+    if top is not None:
+        top_errors = top.data(QtCore.Qt.ItemDataRole.UserRole + 6) or 0
+        top_warnings = top.data(QtCore.Qt.ItemDataRole.UserRole + 7) or 0
+        check("the top row totals the part in one line",
+              top_errors + top_warnings == len(model_obj.active_results),
+              " (%d, %d active)"
+              % (top_errors + top_warnings, len(model_obj.active_results)))
+
+
 def verify_zoom(view, presenter, doc, part):
     """Zoom must move the camera and must not disturb the highlight."""
     section("Zoom")
@@ -1427,6 +1508,7 @@ def run():
     verify_tree(view, model_obj, results)
     verify_selection(view, presenter, doc, part, results)
     verify_ignore(view, presenter, model_obj, doc, part)
+    verify_repetition_is_folded_away(view, presenter, doc, model_obj)
     verify_zoom(view, presenter, doc, part)
     verify_export(view, model_obj, part)
     verify_features_tab(view, presenter, context, doc, part)

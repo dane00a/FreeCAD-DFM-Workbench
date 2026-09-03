@@ -568,9 +568,15 @@ class MaterialEditView(QtCore.QObject):
             card.setVisible(label_match or desc_match)
 
     def _sorted_rules(self, active_rules) -> list:
+        """Active rules first, then grouped by family.
+
+        Grouping matters once machining rules are present: there are far too
+        many to read as one flat list, and hole policy should sit next to hole
+        policy rather than between a draft angle and a bend radius.
+        """
         return sorted(
             Rulebook,
-            key=lambda r: (r not in active_rules, r.label),
+            key=lambda r: (r not in active_rules, r.family.order, r.label),
         )
 
     def _reorder_cards(self) -> None:

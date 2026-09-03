@@ -10,6 +10,7 @@ pattern can group holes that already exist.
 """
 
 from .base import FeatureRecognizer
+from .groove_recognizer import GrooveRecognizer
 from .hole_recognizer import HoleRecognizer
 from .pocket_recognizer import PocketRecognizer
 from .slot_recognizer import SlotRecognizer
@@ -20,6 +21,9 @@ RECOGNIZER_PIPELINE: list[type[FeatureRecognizer]] = [
     HoleRecognizer,
     PocketRecognizer,
     SlotRecognizer,
+    # After the holes, so a bore is never re-read as a groove, and after
+    # the cavities so its shoulders are not already claimed.
+    GrooveRecognizer,
     # Last of the cavity group: it is told which faces the others claimed,
     # so a bore is never reported as unreachable from the side.
     UndercutRecognizer,
@@ -27,6 +31,7 @@ RECOGNIZER_PIPELINE: list[type[FeatureRecognizer]] = [
 
 __all__ = [
     "FeatureRecognizer",
+    "GrooveRecognizer",
     "HoleRecognizer",
     "PocketRecognizer",
     "SlotRecognizer",

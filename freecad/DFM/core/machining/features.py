@@ -24,6 +24,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Optional
 
+from OCP.gp import gp_Dir
+
 
 class FeatureType:
     """The kinds of feature a recognizer can emit.
@@ -138,6 +140,22 @@ class FeatureInstance:
             return float(self.parameters[key])
         except (TypeError, ValueError):
             return default
+
+    def direction(self, key: str) -> Optional[gp_Dir]:
+        """A stored axis, back as a direction.
+
+        Recognizers write axes as plain triples so a feature stays
+        serialisable. Rules that need to do geometry with one want it back as
+        a direction, and a degenerate triple means the axis was never really
+        established.
+        """
+        raw = self.parameters.get(key)
+        if not isinstance(raw, (list, tuple)) or len(raw) != 3:
+            return None
+        try:
+            return gp_Dir(float(raw[0]), float(raw[1]), float(raw[2]))
+        except (TypeError, ValueError, RuntimeError):
+            return None
 
     def has(self, key: str) -> bool:
         """Whether the parameter was measured at all.

@@ -41,6 +41,7 @@ class RuleFamily(Enum):
     THREAD = "thread"
     POCKET = "pocket"
     SLOT = "slot"
+    GROOVE = "groove"
     THIN_FEATURE = "thin_feature"
     BOSS = "boss"
     RIB = "rib"
@@ -71,6 +72,7 @@ _FAMILY_ORDER: list["RuleFamily"] = [
     RuleFamily.THREAD,
     RuleFamily.POCKET,
     RuleFamily.SLOT,
+    RuleFamily.GROOVE,
     RuleFamily.THIN_FEATURE,
     RuleFamily.BOSS,
     RuleFamily.RIB,
@@ -238,6 +240,31 @@ class Rulebook(Enum):
         unit=None,
         description="Long deep slot where the cutter runs at full stickout.",
         family=RuleFamily.SLOT,
+    )
+
+    # -- machining: grooves -------------------------------------------------
+    THREAD_RELIEF_WIDTH = RuleType(
+        "Thread Relief Width",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="mm",
+        comparison="min",
+        description=(
+            "Width of a relief groove at the end of a thread, so the tool "
+            "has somewhere to run out."
+        ),
+        family=RuleFamily.GROOVE,
+    )
+    GROOVE_SQUARE_CORNER = RuleType(
+        "Groove Square Corner",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description=(
+            "Corner radius of a milled gasket-groove loop. A rotating cutter "
+            "cannot produce a square corner."
+        ),
+        family=RuleFamily.GROOVE,
     )
 
     # -- machining: thin features -------------------------------------------

@@ -488,7 +488,65 @@ and threshold boundary pairs.
 
 ---
 
-## 8. Open decisions
+## 8. Phase 0 results
+
+The adjacency graph is built and validated.
+
+**Ground truth.** All four documented conventions hold: box outer edges convex,
+pocket wall-to-floor concave, bore rims convex, boss base junctions concave.
+Bores report `is_reversed`, bosses do not.
+
+**Corpus validation** over the 213 reference fixture STEPs:
+
+| Measure | Result |
+|---|---|
+| Fixtures processed | 213 / 213, no failures |
+| Face count vs the C++ engine | **213 / 213 exact match** |
+| Concavity census vs the physical oracle | 8,862 agreed, **1 disagreed**, 197 undecided |
+| Build time | 56.7 s total — 6,493 faces, 14,567 edges (~8.7 ms/face) |
+| Slowest single part | 0.95 s for 285 faces |
+
+The face-count match is the cross-implementation check that actually works:
+same STEP in, same face enumeration out, independent of either rule engine.
+
+**Performance is not the risk it appeared to be.** The reference's roadmap
+lists optimization as open, and Python was expected to be 30–100x slower. At
+~9 ms/face the AAG is comfortable for parts in the hundreds of faces. Two
+choices bought most of that: dropping the ~1,200 lines of viewer silhouette
+extraction, and taking edge UVs from each face's pcurve instead of a global
+inverse projection per edge.
+
+### The one open discrepancy
+
+`turbo_compressor_housing`, the edge between faces 48 and 50 — a torus (major
+55, minor 12) meeting a plane along a full 285.9 mm circle. The graph reads
+148° convex; the oracle reads concave, stably from 0.5 mm down to 0.01 mm
+probes.
+
+Investigated and **not resolved**:
+
+- Not a tolerance case — 32° from flat, nowhere near tangent.
+- Not a coincident/compound edge: exactly one edge at that location.
+- Not probe-scale dependent.
+- The shape passes `BRepCheck_Analyzer`.
+- Face 48's outward normal is confirmed correct against the solid.
+- Not reproducible: five synthetic torus/plane configurations (groove cut, ring
+  fused, half-torus intersect, bored torus, partial wedge fused) all agree.
+
+The evidence somewhat favours the oracle, which would make this a graph error.
+Worth knowing: the dihedral formula is invariant under flipping *both* normals,
+so an orientation fault inverts the verdict silently rather than failing loudly.
+That is the failure mode to suspect if more of these appear.
+
+Left open deliberately — one edge in 8,863 on a fixture built from six
+deliberately overlapping torus wedges is not worth more time now. The reference
+engine reported the same shape of result (a single disagreement it attributed to
+an overlapping torus-wedge artifact), but that is not proof this is the same
+thing. Revisit if torus-related disagreements multiply once recognizers land.
+
+---
+
+## 9. Open decisions
 
 1. **Thread evidence.** Build a user-confirmation channel for threads, or leave
    the family dead? Recommendation: build it — it is cheap and unlocks four

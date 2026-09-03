@@ -253,7 +253,7 @@ class TestCutterRadiusInfeasible(unittest.TestCase):
         # The smallest end mill in the default library is 1 mm, so R0.5 is the
         # tightest corner it can leave and R0.4 cannot be milled at all.
         findings = rule_check(make_pocket_with_corner_radius(0.4), self.RULE)
-        self.assertEqual(severities(findings), [Severity.ERROR] * 4)
+        self.assertEqual(severities(findings), [Severity.ERROR])
         self.assertAlmostEqual(findings[0].value, 0.4, places=3)
         self.assertAlmostEqual(findings[0].limit, 0.5, places=3)
 
@@ -278,18 +278,31 @@ class TestCutterRadiusInfeasible(unittest.TestCase):
         shape = make_pocket_with_corner_radius(3.0)
         self.assertEqual(rule_check(shape, self.RULE), [])
         findings = rule_check_with_tools(shape, self.RULE, [8.0, 12.0])
-        self.assertEqual(len(findings), 4)
+        self.assertEqual(len(findings), 1)
         self.assertAlmostEqual(findings[0].limit, 4.0, places=3)
 
     def test_the_limit_is_configurable(self):
         shape = make_pocket_with_corner_radius(0.8)
         self.assertEqual(rule_check(shape, self.RULE), [])
-        self.assertEqual(len(rule_check(shape, self.RULE, limit="1.5")), 4)
+        self.assertEqual(len(rule_check(shape, self.RULE, limit="1.5")), 1)
 
-    def test_every_corner_is_reported_with_its_own_face(self):
+    def test_one_finding_carries_every_corner_it_covers(self):
+        """A pocket has four corners and one corner radius.
+
+        The designer chose it once and will change it once, so saying it four
+        times is four readings of the same decision -- and on a plate of
+        pockets it is the difference between a page and a line. Every corner
+        still has to be named, or selecting the finding lights one wall of
+        four and the machinist goes looking for the others.
+        """
         findings = rule_check(make_pocket_with_corner_radius(0.4), self.RULE)
-        faces = sorted(f.failing_geometry[0][1] for f in findings)
-        self.assertEqual(len(set(faces)), 4)
+        self.assertEqual(len(findings), 1)
+        faces = {index for _, index in findings[0].failing_geometry}
+        self.assertEqual(len(faces), 4)
+
+    def test_the_finding_says_how_many_corners_it_speaks_for(self):
+        message = rule_check(make_pocket_with_corner_radius(0.4), self.RULE)[0].message
+        self.assertIn("4 corners", message)
 
 
 class TestCutterRadiusSuboptimal(unittest.TestCase):
@@ -304,7 +317,7 @@ class TestCutterRadiusSuboptimal(unittest.TestCase):
 
     def test_an_odd_radius_is_a_note(self):
         findings = rule_check(make_pocket_with_corner_radius(1.3), self.RULE)
-        self.assertEqual(severities(findings), [Severity.INFO] * 4)
+        self.assertEqual(severities(findings), [Severity.INFO])
         self.assertAlmostEqual(findings[0].value, 1.3, places=3)
 
     def test_the_note_offers_the_sizes_either_side(self):
@@ -326,7 +339,7 @@ class TestCutterRadiusSuboptimal(unittest.TestCase):
         shape = make_pocket_with_corner_radius(5.0)
         self.assertEqual(rule_check(shape, self.RULE), [])
         findings = rule_check_with_tools(shape, self.RULE, [6.0])
-        self.assertEqual(len(findings), 4)
+        self.assertEqual(len(findings), 1)
         self.assertIn("R3.00", findings[0].message)
 
 

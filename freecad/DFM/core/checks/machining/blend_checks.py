@@ -123,6 +123,94 @@ def _owning_cavity(context, fillet):
     return None
 
 
+def _by_cavity(context, fillets):
+    """Group corner fillets under the cavity whose corners they turn.
+
+    A rectangular pocket has four corners and one corner radius. The
+    designer chose it once and will change it once, so saying it four times
+    is four ways of reading the same decision -- and on a plate of pockets
+    it is the difference between a page of findings and a line.
+
+    Each group comes back as the cavity, the tightest radius in it, and how
+    many corners share that reading. A fillet no cavity claims is its own
+    group, because there is still something to say about it and nothing to
+    say it against.
+    """
+    # Where a recognizer claimed the cavity, its identity is the grouping.
+    # Where none did -- and there is always a part where none did -- the
+    # corners of one recess still all touch its floor, so the face they
+    # share stands in for the feature nobody named. Without that fallback
+    # the duplication comes back on exactly the parts recognition is
+    # weakest on, which are the ones a machinist most needs a clear answer
+    # about.
+    unclaimed: dict[int, str] = {}
+    grouped: dict = {}
+    for fillet, radius in fillets:
+        cavity = _owning_cavity(context, fillet)
+        if cavity is not None:
+            key = cavity.instance_id
+        else:
+            key = _shared_neighbour_key(context, fillet, unclaimed)
+        entry = grouped.get(key)
+        if entry is None:
+            grouped[key] = {
+                "cavity": cavity,
+                "radius": radius,
+                "corners": 1,
+                "faces": list(fillet.faces),
+            }
+            continue
+        entry["corners"] += 1
+        entry["faces"].extend(fillet.faces)
+        # The tightest corner is the one that decides: it caps the cutter.
+        if radius < entry["radius"]:
+            entry["radius"] = radius
+    return list(grouped.values())
+
+
+def _shared_neighbour_key(context, fillet, seen: dict) -> str:
+    """A name for the unnamed recess a corner belongs to.
+
+    Two corner fillets of one recess both run into its floor. The first
+    corner to arrive claims every face it touches; a later one that touches
+    any of them is the same recess seen at another corner.
+    """
+    blends = {
+        face_id
+        for blend in context.recognition.of_type(FeatureType.FILLET)
+        for face_id in blend.faces
+    }
+    touching: set[int] = set()
+    for face_id in fillet.faces:
+        touching.update(context.graph.neighbors_of(face_id))
+    touching -= blends
+
+    for face_id in sorted(touching):
+        if face_id in seen:
+            key = seen[face_id]
+            break
+    else:
+        key = f"recess:{fillet.instance_id}"
+    for face_id in touching:
+        seen.setdefault(face_id, key)
+    return key
+
+
+def _corner_phrase(entry) -> str:
+    """How to name what the finding is about."""
+    cavity = entry["cavity"]
+    corners = entry["corners"]
+    where = _readable_type(cavity.type) if cavity is not None else "recess"
+    if corners == 1:
+        return f"this {where} corner" if cavity is not None else "this inside corner"
+    return f"all {corners} corners of this {where}"
+
+
+def _readable_type(feature_type: str) -> str:
+    return str(feature_type).replace("_", " ").lower()
+
+
+
 def _edm_process(cavity) -> str:
     """Which EDM a corner would need if the radius has to stand.
 
@@ -160,7 +248,7 @@ class CutterRadiusInfeasibleCheck(MachiningCheck):
         if limit is None:
             limit = achievable
 
-        results: list[CheckResult] = []
+        tight = []
         for fillet in context.recognition.of_type(FeatureType.FILLET):
             radius = fillet.number("radius_mm") or 0.0
             # A square corner is the cavity rules' business, not this one:
@@ -171,9 +259,14 @@ class CutterRadiusInfeasibleCheck(MachiningCheck):
                 continue
             if radius >= limit - _FEASIBILITY_TOL_MM:
                 continue
+            tight.append((fillet, radius))
 
+        results: list[CheckResult] = []
+        for entry in _by_cavity(context, tight):
+            radius = entry["radius"]
             severity = Severity.ERROR
-            process = _edm_process(_owning_cavity(context, fillet))
+            process = _edm_process(entry["cavity"])
+            subject = _corner_phrase(entry)
             results.append(
                 self.finding(
                     rule,
@@ -186,15 +279,15 @@ class CutterRadiusInfeasibleCheck(MachiningCheck):
                         limit,
                         limit,
                         "mm",
-                        f"This inside corner is R{radius:.2f} mm. The smallest end "
-                        f"mill in the library is {limit * 2.0:.2f} mm across, and a "
-                        "cutter leaves its own radius behind in a corner, so "
-                        f"R{limit:.2f} is the tightest corner the shop can mill. As "
-                        f"drawn this corner needs {process} rather than milling. "
-                        f"Opening it to R{limit:.2f} or more puts it back on the "
-                        "machine.",
+                        f"{subject[0].upper()}{subject[1:]} is R{radius:.2f} mm. "
+                        f"The smallest end mill in the library is "
+                        f"{limit * 2.0:.2f} mm across, and a cutter leaves its own "
+                        f"radius behind in a corner, so R{limit:.2f} is the "
+                        "tightest corner the shop can mill. As drawn this needs "
+                        f"{process} rather than milling. Opening it to R{limit:.2f} "
+                        "or more puts it back on the machine.",
                     ),
-                    faces=fillet.faces,
+                    faces=sorted(set(entry["faces"])),
                     value=radius,
                     limit=limit,
                     comparison="<",
@@ -232,7 +325,7 @@ class CutterRadiusSuboptimalCheck(MachiningCheck):
         if not standard:
             return []
 
-        results: list[CheckResult] = []
+        odd = []
         for fillet in context.recognition.of_type(FeatureType.FILLET):
             radius = fillet.number("radius_mm") or 0.0
             if radius <= 0.0:
@@ -246,6 +339,12 @@ class CutterRadiusSuboptimalCheck(MachiningCheck):
                 continue
             if any(abs(size - radius) <= _STANDARD_MATCH_TOL_MM for size in standard):
                 continue
+            odd.append((fillet, radius))
+
+        results: list[CheckResult] = []
+        for entry in _by_cavity(context, odd):
+            radius = entry["radius"]
+            subject = _corner_phrase(entry)
 
             below = max((s for s in standard if s < radius), default=None)
             above = min((s for s in standard if s > radius), default=None)
@@ -285,14 +384,15 @@ class CutterRadiusSuboptimalCheck(MachiningCheck):
                         floor,
                         floor,
                         "mm",
-                        f"This inside corner is R{radius:.2f} mm, which is not half "
-                        "the diameter of any end mill in the library. It still gets "
-                        f"cut -- {fits} -- but that is a separate contouring pass "
+                        f"{subject[0].upper()}{subject[1:]} is R{radius:.2f} mm, "
+                        "which is not half the diameter of any end mill in the "
+                        f"library. It still gets cut -- {fits} -- but that is a "
+                        "separate contouring pass "
                         "instead of a cutter riding straight through the corner. "
                         f"Rounding to {suggestion} would let a stocked cutter sweep "
                         "it in one go.",
                     ),
-                    faces=fillet.faces,
+                    faces=sorted(set(entry["faces"])),
                     value=radius,
                     limit=above if above is not None else radius,
                     comparison="<",

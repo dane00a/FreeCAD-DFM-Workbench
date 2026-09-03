@@ -19,6 +19,7 @@ from typing import Optional
 from OCP.gp import gp_Dir, gp_Pnt, gp_Vec
 
 from ...machining.context import MachiningContext
+from ...machining.aag import SurfaceType
 from ...machining.features import FeatureInstance, FeatureType
 from ...machining.process_classifier import axes_colinear
 from ...models import CheckResult, Severity
@@ -428,6 +429,13 @@ class HoleWebThicknessCheck(MachiningCheck):
         return None
 
 
+# How finely to walk two bore axes looking for their closest approach.
+_BORE_WALK_STEPS = 12
+
+# Two parallel axes nearer than this are the same axis.
+_COAXIAL_TOL_MM = 0.01
+
+
 @register_check(Rulebook.HOLE_INTERSECTING)
 class HoleIntersectingCheck(MachiningCheck):
     """Holes that break into one another.
@@ -458,12 +466,27 @@ class HoleIntersectingCheck(MachiningCheck):
                 if axis_a is None or axis_b is None:
                     continue
                 if abs(axis_a.Direction().Dot(axis_b.Direction())) > 0.99:
-                    continue  # parallel bores are the web rule's business
+                    # Parallel bores can still break into each other -- two
+                    # dowel holes drilled a little too close is exactly the
+                    # case, and the drill wanders into the first one just as
+                    # readily as a cross bore would. Only two arrangements
+                    # are not a breakthrough: one bore up the middle of the
+                    # other, which is a stepped cavity, and one wholly
+                    # inside the other, which is a counterbore.
+                    if self._coaxial_or_nested(axis_a, axis_b, radius_a, radius_b):
+                        continue
 
-                distance = self._axis_distance(axis_a, axis_b)
+                # Bounded to each bore rather than taken as infinite lines.
+                # Two holes drilled from opposite faces of a block can have
+                # axes that pass within a radius of each other and bores
+                # that stop half the part apart, and an infinite line cannot
+                # tell those from a real crossing.
+                distance = self._bore_gap(context, first, second, axis_a, axis_b)
                 if distance is None or distance > radius_a + radius_b + 0.1:
                     continue
                 if not self._spans_overlap(context, first, second, axis_a, axis_b):
+                    continue
+                if self._one_milled_opening(first, second, context):
                     continue
                 pairs.append((first, second, distance))
 
@@ -530,6 +553,103 @@ class HoleIntersectingCheck(MachiningCheck):
         ]
 
     @staticmethod
+    def _coaxial_or_nested(axis_a, axis_b, radius_a: float, radius_b: float) -> bool:
+        """Whether two parallel bores are one cavity rather than two holes.
+
+        Coaxial is a stepped bore -- a counterbore over its pilot, a reamed
+        section under a drilled one -- and nothing breaks into anything.
+        Nested is the same idea off-centre: the smaller bore lies wholly
+        within the larger, so there is no wall between them to break.
+        """
+        offset = gp_Vec(axis_a.Location(), axis_b.Location())
+        perpendicular = gp_Vec(axis_a.Direction()).Crossed(offset).Magnitude()
+        if perpendicular < _COAXIAL_TOL_MM:
+            return True
+        return perpendicular + min(radius_a, radius_b) < max(radius_a, radius_b)
+
+    @staticmethod
+    def _one_milled_opening(first, second, context) -> bool:
+        """Whether the two bores are really one milled opening.
+
+        A hole shallower than about three quarters of its own diameter was
+        not drilled -- it was contoured, in one pass round the outline. Where
+        both of a pair are that shallow they are a keyhole or an obround cut
+        as a single shape, and there is no drill plunging into a void to
+        worry about. A genuine crossing passage keeps at least one bore
+        deeper than it is wide.
+        """
+        limit = context.config.thresholds.hole_intersecting_thin_plate_dd_max
+        for hole in (first, second):
+            diameter = hole.number("diameter_mm") or 0.0
+            depth = hole.number("depth_mm") or 0.0
+            if diameter <= 0.0 or depth <= 0.0:
+                return False  # nothing measured; not our call to make
+            if depth >= diameter * limit:
+                return False
+        return True
+
+    @classmethod
+    def _bore_gap(cls, context, first, second, axis_a, axis_b):
+        """Closest approach of two bores, each bounded to its own length."""
+        span_a = cls._axis_span(context, first, axis_a)
+        span_b = cls._axis_span(context, second, axis_b)
+        if span_a is None or span_b is None:
+            # Nothing to bound them with; the infinite-line answer is the
+            # honest one and errs toward reporting.
+            return cls._axis_distance(axis_a, axis_b)
+
+        # Walked rather than solved. The closed form for segment-to-segment
+        # distance has several degenerate cases -- parallel, touching,
+        # zero-length -- and this is a gate on a comparison that is already
+        # generous by a tenth of a millimetre, so a coarse walk is accurate
+        # enough and has nothing to get wrong.
+        origin_a, direction_a, low_a, high_a = span_a
+        origin_b, direction_b, low_b, high_b = span_b
+        best = None
+        for i in range(_BORE_WALK_STEPS + 1):
+            point_a = origin_a.Translated(
+                direction_a * (low_a + (high_a - low_a) * i / _BORE_WALK_STEPS)
+            )
+            for j in range(_BORE_WALK_STEPS + 1):
+                point_b = origin_b.Translated(
+                    direction_b * (low_b + (high_b - low_b) * j / _BORE_WALK_STEPS)
+                )
+                gap = point_a.Distance(point_b)
+                if best is None or gap < best:
+                    best = gap
+        return best
+
+    @staticmethod
+    def _axis_span(context, feature, axis):
+        """How far a bore runs along its own axis.
+
+        Measured from the cylindrical and conical faces only. A hole's entry
+        lip or counterbore face is planar and sprawls across the part, and
+        including it would stretch the bore to the width of the block.
+        """
+        origin = axis.Location()
+        direction = gp_Vec(axis.Direction())
+        low, high = None, None
+        for face_id in feature.faces:
+            if not context.graph.has_node(face_id):
+                continue
+            node = context.graph.node(face_id)
+            if node.surface_type not in (SurfaceType.CYLINDER, SurfaceType.CONE):
+                continue
+            if node.bbox.IsVoid():
+                continue
+            xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
+            for x in (xmin, xmax):
+                for y in (ymin, ymax):
+                    for z in (zmin, zmax):
+                        along = gp_Vec(origin, gp_Pnt(x, y, z)).Dot(direction)
+                        low = along if low is None else min(low, along)
+                        high = along if high is None else max(high, along)
+        if low is None:
+            return None
+        return origin, direction, low, high
+
+    @staticmethod
     def _axis_distance(axis_a, axis_b) -> Optional[float]:
         """Shortest distance between two infinite axis lines."""
         da = gp_Vec(axis_a.Direction())
@@ -552,10 +672,19 @@ class HoleIntersectingCheck(MachiningCheck):
         from OCP.Bnd import Bnd_Box
 
         def envelope(feature) -> Optional[Bnd_Box]:
+            """The space the bore itself occupies.
+
+            Built from the round faces only. A counterbore's shoulder and a
+            hole's entry lip are planar and can run right across the part,
+            and a box drawn round those says two holes at opposite corners
+            overlap.
+            """
             box = Bnd_Box()
             found = False
             for face_id in feature.faces:
                 node = context.graph.node(face_id)
+                if node.surface_type not in (SurfaceType.CYLINDER, SurfaceType.CONE):
+                    continue
                 if node.bbox.IsVoid():
                     continue
                 box.Add(node.bbox)

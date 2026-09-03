@@ -340,6 +340,19 @@ class SheetFormedPitchCheck(SheetCheck):
         return poles if found and not poles.IsVoid() else None
 
 
+# A measured distance within a micron of the limit is at the limit.
+#
+# Nothing in sheet metal is controlled to a micron -- a brake holds a bend
+# line to a few hundredths on a good day -- so a comparison decided in the
+# fourth decimal place is not measuring the part, it is measuring the file.
+# The louver fixtures are laid out at exactly three gauges plus the bend
+# radius and arrive as 8.9999305 against a clearance of 9.0000690: a
+# difference of 138 nanometres, split between the modelled radius and the
+# sampled distance. Reporting that tells a designer who followed the rule
+# exactly that following it was not enough.
+_AT_THE_LIMIT_MM = 1.0e-3
+
+
 @register_check(Rulebook.SHEET_FORMED_NEAR_BEND)
 class SheetFormedNearBendCheck(SheetCheck):
     """A formed feature sitting in the metal a fold is going to move.
@@ -391,7 +404,13 @@ class SheetFormedNearBendCheck(SheetCheck):
                     else f"{gauge_phrase(factor)} plus the bend radius"
                 )
                 nearest = self._nearest_along(bend, span, box)
-                if nearest >= clearance:
+                # A feature placed exactly at the clearance has met it. The
+                # distance is sampled along the bend and arrives a few parts
+                # in a billion short of the figure it was drawn to, and
+                # without this slack a part laid out to the rule reports
+                # against it -- which teaches a designer that following the
+                # rule does not help.
+                if nearest >= clearance - _AT_THE_LIMIT_MM:
                     continue
 
                 results.append(

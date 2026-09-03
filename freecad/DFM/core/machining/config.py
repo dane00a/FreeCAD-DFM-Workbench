@@ -272,6 +272,16 @@ TOOL_TYPES = (
     "turning_insert",
 )
 
+# Where the shelf comes from. A shop that programs in FreeCAD's CAM
+# workbench has already entered its real cutters there, and reading them is
+# both less typing and one fewer copy to go stale.
+TOOL_SOURCE_PREF_KEY = "MachiningToolSource"
+
+TOOL_SOURCE_CATALOGUE = "catalogue"
+TOOL_SOURCE_CAM = "cam"
+TOOL_SOURCE_CUSTOM = "custom"
+TOOL_SOURCES = (TOOL_SOURCE_CATALOGUE, TOOL_SOURCE_CAM, TOOL_SOURCE_CUSTOM)
+
 
 def encode_tool_library(tools) -> str:
     return ";".join(tool.to_spec() for tool in tools)
@@ -292,6 +302,45 @@ def decode_tool_library(text: str) -> list[ToolEntry]:
         if tool is not None:
             tools.append(tool)
     return tools
+
+
+def default_tool_source(stored: str) -> str:
+    """Which source an install that predates this choice was already using.
+
+    The choice is new; a hand-edited shelf is not. Tools stored under the
+    library key were typed in by somebody, and an upgrade that never asked
+    the question must not throw them away. Everything else was reading the
+    catalogue and carries on doing so.
+    """
+    return TOOL_SOURCE_CUSTOM if decode_tool_library(stored) else TOOL_SOURCE_CATALOGUE
+
+
+def resolve_tool_library(source: str, stored: str = "", reader=None) -> list[ToolEntry]:
+    """The shelf the rules will actually be judged against.
+
+    Whatever was asked for, the answer is never an empty shelf. Every
+    tool-dependent rule stands down when it finds no tool -- quietly, with
+    nothing in the report to say so -- so a CAM install with nothing in it,
+    or a hand-edited list somebody cleared, has to land back on the catalogue
+    rather than disable half the analysis and look like a clean part.
+
+    ``reader`` is the CAM seam, for tests and for a caller that already has
+    a reading in hand.
+    """
+    if source == TOOL_SOURCE_CAM:
+        # Imported here rather than at module scope: reading CAM needs a live
+        # FreeCAD, and this module is imported by every headless test.
+        from .cam_tools import cam_tool_library
+
+        tools = cam_tool_library(reader)
+        if tools:
+            return tools
+    elif source != TOOL_SOURCE_CATALOGUE:
+        # Custom, or a stale value from a version that spelled it differently.
+        tools = decode_tool_library(stored)
+        if tools:
+            return tools
+    return default_tool_library()
 
 
 def encode_size_list(sizes) -> str:
@@ -595,6 +644,11 @@ class MachiningConfig:
     precision_mode: bool = False
 
     tool_library: list[ToolEntry] = field(default_factory=default_tool_library)
+    # What the shop asked the shelf to come from, kept alongside the shelf
+    # itself. A CAM read that came back empty resolves to the catalogue, and
+    # anything reporting on the analysis needs to be able to tell that apart
+    # from a shop that chose the catalogue outright.
+    tool_source: str = TOOL_SOURCE_CATALOGUE
     drill_sizes_mm: list[float] = field(default_factory=lambda: list(METRIC_DRILL_SIZES_MM))
     # The imperial index is a field rather than the module constant so a shop
     # that stocks an odd set -- or none -- can say so, the same as the metric
@@ -706,9 +760,12 @@ class MachiningConfig:
         # An unset or emptied key means "the catalogue", never "no tooling".
         # A shop that has genuinely thrown its imperial drills out says so by
         # choosing metric-only units, not by clearing the index.
-        tools = decode_tool_library(str(prefs.get(TOOL_LIBRARY_PREF_KEY, "")))
-        if tools:
-            config.tool_library = tools
+        stored = str(prefs.get(TOOL_LIBRARY_PREF_KEY, ""))
+        source = str(prefs.get(TOOL_SOURCE_PREF_KEY, ""))
+        if source not in TOOL_SOURCES:
+            source = default_tool_source(stored)
+        config.tool_source = source
+        config.tool_library = resolve_tool_library(source, stored)
 
         metric = decode_size_list(str(prefs.get(METRIC_DRILL_PREF_KEY, "")))
         if metric:

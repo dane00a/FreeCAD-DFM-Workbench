@@ -91,6 +91,12 @@ _OWNS_ITS_CORNERS = frozenset(
     | BORE_TYPES
 )
 
+# A step is an external terrace, not a cavity. Its edge down into whatever
+# lies below is that thing's opening rim rather than the step's own corner,
+# so a step counts as bulk material for the rim test even though its own
+# rule speaks for its corners.
+_CARRIES_ITS_RIM = _OWNS_ITS_CORNERS - {FeatureType.STEP}
+
 # Cavities whose walls the recognizer may not have fully absorbed. One hop
 # out along a concave edge finds the walls it missed.
 _POCKET_LIKE = frozenset(
@@ -208,6 +214,7 @@ class SharpInternalEdgeCheck(MachiningCheck):
         graph = context.graph
         blends = self._faces_of(context, FeatureType.FILLET, FeatureType.CHAMFER)
         owners = self._face_owners(context, minimum_size)
+        step_only = self._step_only_faces(context, owners)
         covered = self._covered_faces(context, graph, minimum_size)
         axis = self._rotation_axis(context)
         diagonal = self._part_diagonal(context)
@@ -238,9 +245,23 @@ class SharpInternalEdgeCheck(MachiningCheck):
                 continue
             if self._same_feature(owners, edge.face_id_a, edge.face_id_b):
                 continue
-            if edge.face_id_a in covered and edge.face_id_b in covered:
-                continue
             if self._curved_opening(first, second, owners):
+                continue
+
+            # The rim where a feature meets the bulk material around it.
+            # Every cavity has one by construction, and so does every boss
+            # and rib at its base -- it is the outline of the feature, not a
+            # corner anyone chose to leave square, and the rule that owns
+            # the feature is the one that should speak about it.
+            a_rim = edge.face_id_a in covered
+            b_rim = edge.face_id_b in covered
+            a_bulk = edge.face_id_a not in owners or edge.face_id_a in step_only
+            b_bulk = edge.face_id_b not in owners or edge.face_id_b in step_only
+            if (a_rim and b_bulk) or (b_rim and a_bulk):
+                continue
+            # Two cavities meeting each other -- an undercut shoulder against
+            # the slot it overhangs. Different features, but both have rules.
+            if a_rim and b_rim:
                 continue
 
             angle = math.degrees(edge.dihedral_angle)
@@ -330,7 +351,7 @@ class SharpInternalEdgeCheck(MachiningCheck):
         """
         covered: set[int] = set()
         for feature in context.recognition.features:
-            if feature.type not in _OWNS_ITS_CORNERS:
+            if feature.type not in _CARRIES_ITS_RIM:
                 continue
             if self._is_tiny_protrusion(feature, minimum_size):
                 continue
@@ -349,6 +370,22 @@ class SharpInternalEdgeCheck(MachiningCheck):
                 if other not in covered:
                     neighbours.add(other)
         return covered | neighbours
+
+    @staticmethod
+    def _step_only_faces(context, owners) -> set[int]:
+        """Faces whose only claim on them is a step.
+
+        A step recognizer routinely absorbs the top of a box that has a
+        cavity cut into it. Counting that face as "in a feature" would stop
+        the cavity's own opening rim from being recognized as a rim, and the
+        pocket's corners would be reported twice over.
+        """
+        steps: set[int] = set()
+        others: set[int] = set()
+        for feature in context.recognition.features:
+            target = steps if feature.type == FeatureType.STEP else others
+            target.update(feature.faces)
+        return (steps - others) & set(owners)
 
     @staticmethod
     def _same_feature(owners, first_id: int, second_id: int) -> bool:

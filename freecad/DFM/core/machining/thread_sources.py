@@ -20,6 +20,15 @@ the feature is driven. Somebody sat down and said "this one is an M6x1, right
 hand, tapped 12 deep". That is a declaration by the designer and it outranks
 anything geometry could infer, so it is taken as fact with nothing asked.
 
+One Hole feature is rarely one hole. Its profile sketch can hold a dozen
+circles, and a pattern feature can repeat the lot round a bolt circle or down
+a row, so a declaration made once has to be carried to every copy. Where the
+copies land is the awkward part: a pattern almost never states a direction
+outright, it points at an origin axis or a datum or an edge of the solid and
+takes whatever that is aimed at. A pattern whose copies cannot be placed
+takes its hole's declaration down with it. Eleven untapped holes and one
+tapped one reads like an answer, and is worse than saying nothing.
+
 An imported STEP or IGES states nothing at all -- the translator throws the
 feature tree away and leaves a bag of faces. For those the workbench can only
 ask. It picks out the bores whose diameter is a standard tap drill, puts them
@@ -203,6 +212,20 @@ def resolve_declared_size(
 # =============================================================================
 
 
+def _normalised(direction: Sequence[float]) -> Optional[Point]:
+    """A direction as a unit vector, still pointing the way it was given.
+
+    Kept apart from ``_unit`` because a pattern cares which way round its
+    axis is. Turning a bolt circle the wrong way puts every copy but the
+    first somewhere it is not.
+    """
+    x, y, z = float(direction[0]), float(direction[1]), float(direction[2])
+    length = math.sqrt(x * x + y * y + z * z)
+    if length < _MIN_LENGTH:
+        return None
+    return (x / length, y / length, z / length)
+
+
 def _unit(direction: Sequence[float]) -> Optional[Point]:
     """A direction as a unit vector pointing into a fixed half of space.
 
@@ -210,11 +233,10 @@ def _unit(direction: Sequence[float]) -> Optional[Point]:
     face, and it flips between rebuilds. Forcing the sign is what stops the
     same hole being filed twice under opposite signs.
     """
-    x, y, z = float(direction[0]), float(direction[1]), float(direction[2])
-    length = math.sqrt(x * x + y * y + z * z)
-    if length < _MIN_LENGTH:
+    normalised = _normalised(direction)
+    if normalised is None:
         return None
-    x, y, z = x / length, y / length, z / length
+    x, y, z = normalised
     for component in (x, y, z):
         if abs(component) > 1e-9:
             if component < 0.0:
@@ -469,6 +491,61 @@ def _length(obj, name: str) -> Optional[float]:
     return number if number > 0.0 else None
 
 
+def _number(obj, name: str) -> Optional[float]:
+    """A property as a number, zero and negative included.
+
+    ``_length`` reads a diameter, where nothing-or-less means the property
+    was never filled in. A pattern's length, angle and offset are different:
+    a run of zero is a legal way to stack copies on top of each other, and a
+    negative one is a legal way to run the pattern backwards.
+    """
+    try:
+        value = getattr(obj, name)
+    except Exception:
+        return None
+    if value is None:
+        return None
+    if hasattr(value, "Value"):
+        value = value.Value
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _count(obj, name: str) -> Optional[int]:
+    """An occurrence count, or nothing when the property will not read."""
+    try:
+        value = getattr(obj, name)
+    except Exception:
+        return None
+    if value is None:
+        return None
+    if hasattr(value, "Value"):
+        value = value.Value
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _numbers(obj, name: str) -> list[float]:
+    """A float-list property, or nothing at all if any of it will not read."""
+    try:
+        values = getattr(obj, name)
+    except Exception:
+        return []
+    if not values:
+        return []
+    found: list[float] = []
+    for value in values:
+        try:
+            found.append(float(value))
+        except (TypeError, ValueError):
+            return []
+    return found
+
+
 def declaration_from_hole(
     hole, positions: Sequence[Point], direction: Sequence[float]
 ) -> Optional[ThreadDeclaration]:
@@ -529,6 +606,410 @@ def declaration_from_hole(
 
 
 # =============================================================================
+# One hole drilled many times: the transformed features
+# =============================================================================
+#
+# A tapped hole on a bolt circle is drawn once and repeated. FreeCAD keeps
+# the repeat as a feature of its own -- a pattern, a mirror, or a stack of
+# both -- and the copies exist only in the finished solid, with nothing on
+# them to say which feature put them there. So the copies have to be worked
+# out from the pattern's own numbers, and a declaration read off the one Hole
+# feature carried to every place those numbers land.
+#
+# Getting this wrong is not a quiet failure. Every position in a declaration
+# claims a bore, so a direction taken the wrong way round does not lose the
+# copies, it puts the tap callout on whatever bores happen to lie where the
+# copies were expected. That is why everything below refuses rather than
+# guesses, and why a refusal takes the whole declaration with it.
+
+#: The transform features whose copies can be placed.
+_TRANSFORM_TYPES = frozenset(
+    {
+        "PartDesign::LinearPattern",
+        "PartDesign::PolarPattern",
+        "PartDesign::Mirrored",
+        "PartDesign::MultiTransform",
+    }
+)
+
+#: Every feature that repeats another one, the refused ones included.
+#: ``PartDesign::Scaled`` is here to be recognized and turned down: a scaled
+#: copy of an M6 tapped hole is a bore of some other size that no tap fits,
+#: so carrying the declaration onto it would be a callout for a thread that
+#: cannot be cut.
+_REPEATING_TYPES = _TRANSFORM_TYPES | frozenset({"PartDesign::Scaled"})
+
+# How a sketch numbers the axes a pattern can be aimed along. The horizontal
+# and vertical axes and the normal are counted backwards from zero; anything
+# from zero up is a construction line the user drew to aim at.
+_SKETCH_AXES = {"H_Axis": -1, "V_Axis": -2, "N_Axis": -3}
+
+# Only a full turn puts the last copy back on the first, so it is the one
+# case where the sweep is divided by the number of copies rather than by the
+# gaps between them. Half a degree either side is still a full turn.
+_FULL_TURN_DEG = 360.0
+_FULL_TURN_SLACK_DEG = 1e-6
+
+# A custom spacing of less than nothing is FreeCAD's way of saying "no
+# custom spacing here, use the offset".
+_NO_CUSTOM_SPACING = 0.0
+
+# Past this many copies something has gone wrong with the model rather than
+# with the reading, and every position is scanned against every bore.
+_MAX_COPIES = 4096
+
+_IDENTITY_ROWS = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+
+
+@dataclass(frozen=True)
+class Transform:
+    """Where a pattern puts one copy of what it repeats.
+
+    A plain 3x3 and a shift rather than a placement, because a mirror is one
+    of these and no placement can hold one: a reflection turns the part
+    inside out in a way a position and a rotation cannot express.
+    """
+
+    rows: tuple[tuple[float, float, float], ...] = _IDENTITY_ROWS
+    offset: Point = (0.0, 0.0, 0.0)
+
+    def apply_point(self, point: Sequence[float]) -> Point:
+        return tuple(  # type: ignore[return-value]
+            sum(self.rows[i][j] * float(point[j]) for j in range(3)) + self.offset[i]
+            for i in range(3)
+        )
+
+    def apply_direction(self, direction: Sequence[float]) -> Point:
+        # No shift: an axis says which way, not where.
+        return tuple(  # type: ignore[return-value]
+            sum(self.rows[i][j] * float(direction[j]) for j in range(3))
+            for i in range(3)
+        )
+
+    def then(self, later: "Transform") -> "Transform":
+        """This one, and then the other. The order a MultiTransform reads in."""
+        return Transform(
+            rows=tuple(
+                tuple(
+                    sum(later.rows[i][k] * self.rows[k][j] for k in range(3))
+                    for j in range(3)
+                )
+                for i in range(3)
+            ),
+            offset=tuple(  # type: ignore[arg-type]
+                sum(later.rows[i][k] * self.offset[k] for k in range(3))
+                + later.offset[i]
+                for i in range(3)
+            ),
+        )
+
+
+def _about(rows: tuple, point: Sequence[float]) -> Point:
+    """The shift that leaves a chosen point where it was.
+
+    A rotation and a mirror are both written about something -- an axis, a
+    plane -- and turn into a matrix about the origin plus this.
+    """
+    return tuple(  # type: ignore[return-value]
+        float(point[i]) - sum(rows[i][j] * float(point[j]) for j in range(3))
+        for i in range(3)
+    )
+
+
+def _translation(direction: Point, distance: float) -> Transform:
+    return Transform(offset=tuple(value * distance for value in direction))  # type: ignore[arg-type]
+
+
+def _rotation(point: Point, axis: Point, degrees: float) -> Transform:
+    """A turn of so many degrees about a line through a point."""
+    angle = math.radians(degrees)
+    cos, sin = math.cos(angle), math.sin(angle)
+    x, y, z = axis
+    rows = (
+        (
+            cos + x * x * (1.0 - cos),
+            x * y * (1.0 - cos) - z * sin,
+            x * z * (1.0 - cos) + y * sin,
+        ),
+        (
+            y * x * (1.0 - cos) + z * sin,
+            cos + y * y * (1.0 - cos),
+            y * z * (1.0 - cos) - x * sin,
+        ),
+        (
+            z * x * (1.0 - cos) - y * sin,
+            z * y * (1.0 - cos) + x * sin,
+            cos + z * z * (1.0 - cos),
+        ),
+    )
+    return Transform(rows=rows, offset=_about(rows, point))
+
+
+def _reflection(point: Point, normal: Point) -> Transform:
+    """The other side of a plane through a point."""
+    rows = tuple(
+        tuple(
+            (1.0 if i == j else 0.0) - 2.0 * normal[i] * normal[j] for j in range(3)
+        )
+        for i in range(3)
+    )
+    return Transform(rows=rows, offset=_about(rows, point))
+
+
+def _spacings(obj, suffix: str, gaps: int) -> Optional[list[float]]:
+    """The gap between each pair of copies, when the pattern is given by gap.
+
+    A pattern dimensioned by spacing carries one offset for the ordinary case
+    and an optional list for the awkward one, where a value of less than
+    nothing means "this gap is the ordinary one after all".
+    """
+    offset = _number(obj, "Offset" + suffix)
+    if offset is None:
+        return None
+    custom = _numbers(obj, "Spacings" + suffix)
+    return [
+        custom[index]
+        if index < len(custom) and custom[index] >= _NO_CUSTOM_SPACING
+        else offset
+        for index in range(gaps)
+    ]
+
+
+def _steps_along(obj, suffix: str) -> Optional[list[float]]:
+    """How far along its direction a linear pattern puts each copy.
+
+    The first entry is always nothing, which is the original hole standing
+    where it was drawn. A pattern is only ever the copies plus the thing
+    copied, and the feature that made the original is upstream of the
+    pattern, so the pattern's own list has to include it.
+    """
+    count = _count(obj, "Occurrences" + suffix)
+    if count is None or count < 1 or count > _MAX_COPIES:
+        return None
+    if count == 1:
+        return [0.0]
+
+    if any(abs(value) > _MIN_LENGTH for value in _numbers(obj, "SpacingPattern" + suffix)):
+        # A repeating run of uneven gaps. It is experimental, it is off in
+        # the interface unless a hidden preference is set, and how it settles
+        # against the plain spacings list is not written down anywhere. A
+        # pattern using it is refused rather than read half right.
+        return None
+
+    mode = _text(obj, "Mode" + suffix, "Extent")
+    if mode == "Extent":
+        # Dimensioned end to end, so the length is shared between the gaps.
+        total = _number(obj, "Length" + suffix)
+        if total is None:
+            return None
+        gaps = [total / float(count - 1)] * (count - 1)
+    elif mode == "Spacing":
+        gaps = _spacings(obj, suffix, count - 1)  # type: ignore[assignment]
+        if gaps is None:
+            return None
+    else:
+        return None
+
+    way = -1.0 if _flag(obj, "Reversed" + suffix) else 1.0
+    steps, run = [0.0], 0.0
+    for gap in gaps:
+        run += gap * way
+        steps.append(run)
+    return steps
+
+
+def _angles_around(obj) -> Optional[list[float]]:
+    """The angle each copy of a polar pattern is turned to."""
+    count = _count(obj, "Occurrences")
+    if count is None or count < 1 or count > _MAX_COPIES:
+        return None
+    if count == 1:
+        return [0.0]
+
+    if any(abs(value) > _MIN_LENGTH for value in _numbers(obj, "SpacingPattern")):
+        return None
+
+    mode = _text(obj, "Mode", "Extent")
+    if mode == "Extent":
+        sweep = _number(obj, "Angle")
+        if sweep is None:
+            return None
+        whole = abs(abs(sweep) - _FULL_TURN_DEG) < _FULL_TURN_SLACK_DEG
+        gaps = [sweep / float(count if whole else count - 1)] * (count - 1)
+    elif mode == "Spacing":
+        gaps = _spacings(obj, "", count - 1)  # type: ignore[assignment]
+        if gaps is None:
+            return None
+    else:
+        return None
+
+    way = -1.0 if _flag(obj, "Reversed") else 1.0
+    angles, run = [0.0], 0.0
+    for gap in gaps:
+        run += gap * way
+        angles.append(run)
+    return angles
+
+
+def transforms_of(obj, resolver) -> Optional[tuple[Transform, ...]]:
+    """Every place a transform feature puts a copy, or nothing at all.
+
+    Nothing at all is a refusal, and it is returned whenever any part of the
+    feature cannot be read with certainty: an axis that will not resolve, a
+    spacing scheme this does not cover, a scaled copy, a kind of transform
+    that is not on the list. The caller drops the declaration rather than
+    applying what could be worked out, because a declaration that reaches
+    some of a bolt circle is a worse answer than one that reaches none of it.
+
+    ``resolver`` turns the feature's links into plain numbers and is the only
+    part of this that needs a live document.
+    """
+    if _text(obj, "TransformMode", "Features") != "Features":
+        # Set to repeat the whole shape rather than the listed features. The
+        # copies are fused, so a hole in one lands in solid metal in the next
+        # and is filled in by it -- the bores that survive depend on how the
+        # copies overlap, which is not something to work out from properties.
+        return None
+
+    type_id = _text(obj, "TypeId")
+
+    if type_id == "PartDesign::LinearPattern":
+        along = resolver.axis(getattr(obj, "Direction", None))
+        steps = _steps_along(obj, "")
+        if along is None or steps is None:
+            return None
+        copies = [_translation(along[1], step) for step in steps]
+        if (_count(obj, "Occurrences2") or 1) > 1:
+            # A grid. The second direction multiplies the first rather than
+            # continuing it, so every copy of the row is repeated down it.
+            across = resolver.axis(getattr(obj, "Direction2", None))
+            down = _steps_along(obj, "2")
+            if across is None or down is None:
+                return None
+            copies = [
+                first.then(_translation(across[1], step))
+                for step in down
+                for first in copies
+            ]
+        return tuple(copies)
+
+    if type_id == "PartDesign::PolarPattern":
+        around = resolver.axis(getattr(obj, "Axis", None))
+        angles = _angles_around(obj)
+        if around is None or angles is None:
+            return None
+        return tuple(_rotation(around[0], around[1], angle) for angle in angles)
+
+    if type_id == "PartDesign::Mirrored":
+        plane = resolver.plane(getattr(obj, "MirrorPlane", None))
+        if plane is None:
+            return None
+        # A mirror keeps the original and adds one copy, and it is the only
+        # transform that does not turn its hand over: a designer mirrors a
+        # plate to get the far half of a symmetric part, not to specify a
+        # left-hand tap, and the bore itself is a plain drill either way.
+        return (Transform(), _reflection(plane[0], plane[1]))
+
+    if type_id == "PartDesign::MultiTransform":
+        listed = list(getattr(obj, "Transformations", None) or ())
+        if not listed:
+            return (Transform(),)
+        # Each transformation acts on everything the ones before it made, so
+        # a row of two turned three ways is six holes and not five. Refusing
+        # any one of them refuses the lot: a MultiTransform read down to its
+        # first two stages would put copies where the finished feature has
+        # none.
+        stacked = [Transform()]
+        for step in listed:
+            found = transforms_of(step, resolver)
+            if found is None:
+                return None
+            if len(stacked) * len(found) > _MAX_COPIES:
+                return None
+            stacked = [earlier.then(later) for earlier in stacked for later in found]
+        return tuple(stacked)
+
+    return None
+
+
+def _copied_by(obj) -> list:
+    """The features a transform feature repeats.
+
+    A transform set to repeat the whole shape names nothing, so the answer
+    there is everything cut into the part before it. Those declarations are
+    on their way to being dropped rather than expanded, and dropping them
+    means knowing which they are.
+    """
+    if _text(obj, "TransformMode", "Features") == "Features":
+        return list(getattr(obj, "Originals", None) or ())
+
+    chain: list = []
+    step = getattr(obj, "BaseFeature", None)
+    seen: set = set()
+    while step is not None:
+        name = getattr(step, "Name", None) or id(step)
+        if name in seen:
+            break
+        seen.add(name)
+        chain.append(step)
+        step = getattr(step, "BaseFeature", None)
+    return chain
+
+
+def copies_by_feature(objects: Sequence, resolver) -> tuple[dict, set]:
+    """Which features get repeated, where to, and which cannot be worked out.
+
+    Returns the transforms that apply to each feature by name, and the names
+    whose repeats were refused. A feature in the second set has no usable
+    answer at all -- not the copies, and not the original either, since a
+    declaration that covers the hole a pattern started from and none of the
+    ones it made is the shape of answer this is here to stop.
+    """
+    inside: set = set()
+    for obj in objects:
+        for step in getattr(obj, "Transformations", None) or ():
+            name = getattr(step, "Name", None)
+            if name:
+                # A stage of a MultiTransform. It repeats nothing on its own
+                # account, and reading it as though it did would double the
+                # copies it contributes.
+                inside.add(name)
+
+    copies: dict = {}
+    refused: set = set()
+    for obj in objects:
+        if _text(obj, "TypeId") not in _REPEATING_TYPES:
+            continue
+        if (getattr(obj, "Name", None) or "") in inside:
+            continue
+
+        found = transforms_of(obj, resolver)
+        for feature in _copied_by(obj):
+            name = getattr(feature, "Name", None)
+            if not name:
+                continue
+            if found is None or _text(feature, "TypeId") in _REPEATING_TYPES:
+                # The second case is a pattern of a pattern, which is what a
+                # MultiTransform is for. Reached any other way it is a shape
+                # this cannot account for.
+                refused.add(name)
+                _warn(
+                    f"{_text(obj, 'Label') or _text(obj, 'Name') or 'a pattern'} "
+                    f"repeats {_text(feature, 'Label') or name} in a way the "
+                    "copies cannot be placed from; any thread it declares is "
+                    "left off the whole set rather than put on part of it"
+                )
+                continue
+            copies.setdefault(name, []).extend(found)
+
+    for name, found in list(copies.items()):
+        if len(found) > _MAX_COPIES:
+            refused.add(name)
+            copies.pop(name)
+    return copies, refused
+
+
+# =============================================================================
 # Where the declarations come from: the document
 # =============================================================================
 
@@ -551,20 +1032,18 @@ def _walk(root, seen: set) -> Iterator[object]:
         yield from _walk(child, seen)
 
 
-def _sketch_positions(sketch, frame) -> list[Point]:
-    """Where a hole profile puts its holes, in the analysed shape's frame.
+def _sketch_centres(sketch) -> list[Point]:
+    """Where a hole profile puts its holes, in the sketch's own frame.
 
     The circles in the sketch are the holes; the sketch placement is only the
-    plane they sit on. Construction geometry is skipped -- it is there to
-    drive the dimensions, not to be drilled.
+    plane they sit on, and is applied further up. Construction geometry is
+    skipped -- it is there to drive the dimensions, not to be drilled.
 
     A profile that is a datum point or a face selection rather than a sketch
-    leaves nothing to read, and the frame origin stands in. That is right for
+    leaves nothing to read, and the sketch origin stands in. That is right for
     the single-hole case and wrong for nothing, because a datum point profile
     only ever makes one hole.
     """
-    import FreeCAD as App  # type: ignore
-
     centres: list[Point] = []
     facades = getattr(sketch, "GeometryFacadeList", None)
     if facades:
@@ -583,17 +1062,245 @@ def _sketch_positions(sketch, frame) -> list[Point]:
         radius = getattr(geometry, "Radius", None)
         if centre is None or radius is None:
             continue
-        placed = frame.multVec(App.Vector(centre.x, centre.y, centre.z))
-        centres.append((placed.x, placed.y, placed.z))
+        centres.append((centre.x, centre.y, centre.z))
 
     if not centres:
-        base = frame.Base
-        centres.append((base.x, base.y, base.z))
+        centres.append((0.0, 0.0, 0.0))
     return centres
 
 
+def _placement_transform(placement) -> Transform:
+    """A FreeCAD placement as plain numbers this can compose with."""
+    matrix = placement.toMatrix()
+    return Transform(
+        rows=(
+            (matrix.A11, matrix.A12, matrix.A13),
+            (matrix.A21, matrix.A22, matrix.A23),
+            (matrix.A31, matrix.A32, matrix.A33),
+        ),
+        offset=(matrix.A14, matrix.A24, matrix.A34),
+    )
+
+
+def _link_parts(link) -> tuple:
+    """A link property as the object it points at and the subelement named.
+
+    ``App::PropertyLinkSub`` arrives as the object paired with a list of
+    subelement names, but an empty name is common -- an origin axis is the
+    whole object -- and a bare object turns up often enough to be worth
+    forgiving.
+    """
+    if link is None:
+        return None, ""
+    obj, subs = link, ()
+    if isinstance(link, (tuple, list)):
+        if not link:
+            return None, ""
+        obj = link[0]
+        subs = link[1] if len(link) > 1 else ()
+    if isinstance(subs, str):
+        subs = (subs,)
+    for candidate in subs or ():
+        if candidate:
+            return obj, str(candidate)
+    return obj, ""
+
+
+class DocumentResolver:
+    """What a pattern's axis and mirror plane links actually point at.
+
+    A pattern almost never states a direction. It points at something -- an
+    origin axis, one of a sketch's own axes, a datum, an edge or a face of the
+    solid -- and takes whatever that is aimed at when the model rebuilds.
+    Working the direction back out is most of the job, and getting it wrong is
+    worse than not having it: the copies still get declared, just somewhere
+    else, on whatever bores happen to be there. So anything not recognized
+    below comes back as nothing, and the caller drops the declaration.
+
+    Everything is answered in the document's global frame. FreeCAD does this
+    arithmetic in the body's own frame instead, which comes to the same line
+    in space, and the global frame is the one that survives the analysed shape
+    being a body, a boolean of two of them, or a link to either.
+    """
+
+    def _to_global(self, obj):
+        """The placement that lifts an object's own shape into world space.
+
+        A feature's ``Shape`` already carries the feature's placement, so the
+        object's own placement has to come back off before the global one goes
+        on, or it is applied twice.
+        """
+        return obj.getGlobalPlacement().multiply(obj.Placement.inverse())
+
+    def _sketch_axis(self, obj, sub: str) -> Optional[tuple]:
+        """One of a sketch's own axes, named the way a pattern names it."""
+        if not hasattr(obj, "getAxis"):
+            return None
+        code = _SKETCH_AXES.get(sub)
+        if code is None:
+            if not sub.startswith("Axis"):
+                return None
+            try:
+                code = int(sub[4:])
+            except ValueError:
+                return None
+        try:
+            axis = obj.getAxis(code)
+            placed = obj.getGlobalPlacement()
+        except Exception:
+            return None
+        base = placed.multVec(axis.Base)
+        # A construction line is whatever length the user drew it, so the
+        # direction off a sketch axis is not a unit vector to start with.
+        direction = placed.Rotation.multVec(axis.Direction)
+        return ((base.x, base.y, base.z), (direction.x, direction.y, direction.z))
+
+    def _shape_piece(self, obj, sub: str):
+        """The bit of an object's shape a link names, or the whole of it."""
+        shape = getattr(obj, "Shape", None)
+        if shape is None:
+            return None
+        if not sub:
+            return shape
+        try:
+            return shape.getElement(sub)
+        except Exception:
+            return None
+
+    def _shape_plane(self, obj, sub: str) -> Optional[tuple]:
+        """A flat face, as the plane it lies in.
+
+        The underlying surface is read rather than the face, because which
+        way round a face is turned is a fact about how the kernel built it
+        and flips on a rebuild, while the surface it sits on keeps pointing
+        the same way. FreeCAD aims the transform by the surface, so this
+        does too.
+
+        Anything but a flat face is turned down, which is what FreeCAD does
+        as well: there is no sensible mirror plane in a cylinder.
+        """
+        piece = self._shape_piece(obj, sub)
+        if piece is None:
+            return None
+        try:
+            faces = list(getattr(piece, "Faces", ()) or ())
+            if len(faces) != 1:
+                return None
+            surface = faces[0].Surface
+            if surface.__class__.__name__ != "Plane":
+                return None
+            placed = self._to_global(obj)
+            point = placed.multVec(surface.Position)
+            aim = placed.Rotation.multVec(surface.Axis)
+            return ((point.x, point.y, point.z), (aim.x, aim.y, aim.z))
+        except Exception:
+            return None
+
+    def _shape_edge(self, obj, sub: str) -> Optional[tuple]:
+        """A straight edge, as the line it runs along.
+
+        Covers the origin axes, a datum line, and an edge of the solid picked
+        off the model. The curve underneath is read rather than the edge,
+        because an edge carries the direction the kernel happened to walk it
+        in and a straight line does not.
+        """
+        piece = self._shape_piece(obj, sub)
+        if piece is None:
+            return None
+        try:
+            edges = list(getattr(piece, "Edges", ()) or ())
+            if len(edges) != 1:
+                return None
+            curve = edges[0].Curve
+            direction = getattr(curve, "Direction", None)
+            if direction is None or not curve.__class__.__name__.startswith("Line"):
+                return None
+            placed = self._to_global(obj)
+            point = placed.multVec(curve.Location)
+            aim = placed.Rotation.multVec(direction)
+            return ((point.x, point.y, point.z), (aim.x, aim.y, aim.z))
+        except Exception:
+            return None
+
+    def _placement_aim(self, obj, local) -> Optional[tuple]:
+        """The last resort: read the direction off the object's placement.
+
+        An origin axis or plane in a document that has not been recomputed
+        has no shape to read, and the placement is all there is. The local
+        direction differs between the two -- an axis runs along its own X and
+        a plane looks along its own Z -- so the caller says which.
+        """
+        import FreeCAD as App  # type: ignore
+
+        try:
+            placed = obj.getGlobalPlacement()
+        except Exception:
+            return None
+        base = placed.Base
+        aim = placed.Rotation.multVec(App.Vector(*local))
+        return ((base.x, base.y, base.z), (aim.x, aim.y, aim.z))
+
+    def axis(self, link) -> Optional[tuple]:
+        """A line to repeat along or turn about: a point on it and a way."""
+        obj, sub = _link_parts(link)
+        if obj is None:
+            return None
+        # A flat face counts here as well as an edge: picking a face aims the
+        # pattern along its normal, which is how a user says "away from that
+        # wall" without an edge to hand.
+        found = (
+            self._sketch_axis(obj, sub)
+            or self._shape_edge(obj, sub)
+            or self._shape_plane(obj, sub)
+        )
+        if found is None and _text(obj, "TypeId") == "App::Line":
+            found = self._placement_aim(obj, (1.0, 0.0, 0.0))
+        if found is None:
+            return None
+        direction = _normalised(found[1])
+        return None if direction is None else (found[0], direction)
+
+    def plane(self, link) -> Optional[tuple]:
+        """A plane to mirror in: a point on it and its normal."""
+        import FreeCAD as App  # type: ignore
+
+        obj, sub = _link_parts(link)
+        if obj is None:
+            return None
+
+        found = None
+        axis = self._sketch_axis(obj, sub)
+        if axis is not None:
+            # A sketch axis names a plane rather than lying in one, and the
+            # plane it names stands up out of the sketch: it holds the axis
+            # and the sketch's own normal, so mirroring in it swings the
+            # copies across the sketch rather than out of it.
+            try:
+                sheet = obj.getGlobalPlacement().Rotation.multVec(
+                    App.Vector(0.0, 0.0, 1.0)
+                )
+            except Exception:
+                return None
+            along = axis[1]
+            normal = (
+                along[1] * sheet.z - along[2] * sheet.y,
+                along[2] * sheet.x - along[0] * sheet.z,
+                along[0] * sheet.y - along[1] * sheet.x,
+            )
+            found = (axis[0], normal)
+
+        if found is None:
+            found = self._shape_plane(obj, sub)
+        if found is None and _text(obj, "TypeId") == "App::Plane":
+            found = self._placement_aim(obj, (0.0, 0.0, 1.0))
+        if found is None:
+            return None
+        normal = _normalised(found[1])
+        return None if normal is None else (found[0], normal)
+
+
 def _hole_frames(target) -> Iterator[tuple[object, list[Point], Point]]:
-    """Every threaded Hole in the target, with its holes placed and aimed.
+    """Every threaded Hole in the target, with all its holes placed and aimed.
 
     The placement arithmetic is the fiddly part. The shape the analysis runs
     on carries the target's own placement, while the features inside a body
@@ -601,14 +1308,22 @@ def _hole_frames(target) -> Iterator[tuple[object, list[Point], Point]]:
     through the global placement of both to land in the same coordinates the
     bores were measured in. Getting that wrong does not fail loudly -- it
     simply matches nothing, and the declarations go quietly unused.
-    """
-    import FreeCAD as App  # type: ignore
 
-    seen: set = set()
-    for obj in _walk(target, seen):
+    A repeated Hole comes back more than once when its copies do not all point
+    the same way, which a polar pattern about anything but the drilling axis
+    will do. Splitting them is not a nicety: a declaration carries one
+    direction, and a set of positions on axes that disagree would match every
+    bore near any of them.
+    """
+    objects = list(_walk(target, set()))
+    copies, refused = copies_by_feature(objects, DocumentResolver())
+
+    for obj in objects:
         if getattr(obj, "TypeId", "") != "PartDesign::Hole":
             continue
         if not _flag(obj, "Threaded"):
+            continue
+        if (getattr(obj, "Name", None) or "") in refused:
             continue
 
         profile = getattr(obj, "Profile", None)
@@ -616,16 +1331,38 @@ def _hole_frames(target) -> Iterator[tuple[object, list[Point], Point]]:
         if sketch is None:
             continue
 
-        try:
-            inner = target.getGlobalPlacement().inverse().multiply(
-                sketch.getGlobalPlacement()
-            )
-            frame = target.Placement.multiply(inner)
-        except Exception:
-            frame = target.Placement.multiply(sketch.Placement)
+        repeats = tuple(copies.get(getattr(obj, "Name", None) or "", ())) or (Transform(),)
+        centres = _sketch_centres(sketch)
 
-        normal = frame.Rotation.multVec(App.Vector(0.0, 0.0, 1.0))
-        yield obj, _sketch_positions(sketch, frame), (normal.x, normal.y, normal.z)
+        try:
+            outer = _placement_transform(
+                target.Placement.multiply(target.getGlobalPlacement().inverse())
+            )
+            plane = _placement_transform(sketch.getGlobalPlacement())
+        except Exception:
+            if len(repeats) > 1:
+                # No global placements means no way to put the copies in the
+                # frame the bores were measured in, and the original alone is
+                # the half answer this is here not to give.
+                continue
+            outer = Transform()
+            plane = _placement_transform(target.Placement.multiply(sketch.Placement))
+
+        # Grouped by which way the copies point, and keyed on the canonical
+        # direction so that a mirrored copy standing on the same axis the
+        # other way up files with the ones it belongs to.
+        aimed: dict = {}
+        for repeat in repeats:
+            placed = plane.then(repeat).then(outer)
+            aim = _unit(placed.apply_direction((0.0, 0.0, 1.0)))
+            if aim is None:
+                continue
+            aimed.setdefault(tuple(round(value, 9) for value in aim), []).extend(
+                placed.apply_point(centre) for centre in centres
+            )
+
+        for aim, positions in aimed.items():
+            yield obj, positions, aim
 
 
 def native_declarations(target, frames: Optional[Callable] = None) -> list[ThreadDeclaration]:

@@ -39,13 +39,16 @@ from freecad.DFM.core.machining.thread_sources import (
     ThreadDeclaration,
     ThreadEvidence,
     ThreadFact,
+    Transform,
     bore_key,
     candidates_for,
+    copies_by_feature,
     declaration_from_hole,
     native_declarations,
     record_answers,
     resolve_declared_size,
     thread_evidence_for,
+    transforms_of,
 )
 from freecad.DFM.core.utils.geometry import EdgeIndex, FaceIndex
 
@@ -83,6 +86,59 @@ class FakeHole:
         defaults.update(properties)
         for key, value in defaults.items():
             setattr(self, key, value)
+
+
+class FakePattern:
+    """A PartDesign transform feature, reduced to what places its copies.
+
+    Only the properties a given pattern actually reads need setting. What is
+    left off reads back the way FreeCAD's own default does -- no second
+    direction, no custom spacings, dimensioned end to end -- which is how
+    most patterns in most documents are set up.
+    """
+
+    def __init__(self, type_id, name="Pattern", **properties):
+        self.TypeId = type_id
+        self.Name = name
+        self.Label = name
+        self.TransformMode = "Features"
+        self.Originals = []
+        for key, value in properties.items():
+            setattr(self, key, value)
+
+
+class FakeResolver:
+    """The document reading, already done.
+
+    Turning a link into a line in space is the one part of the expansion that
+    needs a live FreeCAD, so here the link is simply the name of an answer.
+    A link with no answer stands for one that could not be resolved, which is
+    what every unsupported datum and every broken reference comes to.
+    """
+
+    AXES = {
+        "x": ((0.0, 0.0, 0.0), (1.0, 0.0, 0.0)),
+        "y": ((0.0, 0.0, 0.0), (0.0, 1.0, 0.0)),
+        "z": ((0.0, 0.0, 0.0), (0.0, 0.0, 1.0)),
+    }
+    PLANES = {
+        "x=0": ((0.0, 0.0, 0.0), (1.0, 0.0, 0.0)),
+        "y=0": ((0.0, 0.0, 0.0), (0.0, 1.0, 0.0)),
+    }
+
+    def axis(self, link):
+        return self.AXES.get(link)
+
+    def plane(self, link):
+        return self.PLANES.get(link)
+
+
+def _places(transforms, point=(10.0, 0.0, 0.0)):
+    """Where a set of transforms puts one hole, ready to compare."""
+    return sorted(
+        tuple(round(value, 6) + 0.0 for value in transform.apply_point(point))
+        for transform in transforms
+    )
 
 
 class FakeStore:
@@ -497,6 +553,543 @@ class TestGatheringTheEvidence(unittest.TestCase):
             confirmations=ConfirmationStore([Confirmation(key, False)]),
         )
         self.assertIsNone(evidence.fact_for(5.0, _BORE_ORIGIN, _BORE_AXIS))
+
+
+class TestPlacingTheCopies(unittest.TestCase):
+    """Where a transform feature puts the copies of what it repeats.
+
+    Every number checked here was read back off FreeCAD 1.1.3, by building
+    the pattern in a document and measuring the bores it left in the solid.
+    A pattern is not a thing to reason out from the property names: whether a
+    sweep is shared between the copies or between the gaps, and which way a
+    reversed one runs, are decisions FreeCAD made and this has to match.
+    """
+
+    def setUp(self):
+        self.resolver = FakeResolver()
+
+    def _linear(self, **properties):
+        return transforms_of(
+            FakePattern("PartDesign::LinearPattern", **properties), self.resolver
+        )
+
+    def _polar(self, **properties):
+        return transforms_of(
+            FakePattern("PartDesign::PolarPattern", **properties), self.resolver
+        )
+
+    # -- a row --------------------------------------------------------------
+
+    def test_a_row_shares_its_length_between_the_gaps(self):
+        # Three holes over 40 mm is 20 mm apart, not 40. The length is
+        # measured first to last, which is how a drawing dimensions a row.
+        found = self._linear(Direction="x", Length=40.0, Occurrences=3)
+        self.assertEqual(
+            _places(found), [(10.0, 0.0, 0.0), (30.0, 0.0, 0.0), (50.0, 0.0, 0.0)]
+        )
+
+    def test_the_original_is_one_of_the_copies(self):
+        # The hole the pattern repeats is already cut by the feature above
+        # it, so the pattern's own list has to start where that one stands or
+        # the declaration would miss the hole it was read off.
+        found = self._linear(Direction="x", Length=40.0, Occurrences=3)
+        self.assertIn((10.0, 0.0, 0.0), _places(found))
+
+    def test_a_reversed_row_runs_the_other_way(self):
+        found = self._linear(
+            Direction="x", Length=40.0, Occurrences=3, Reversed=True
+        )
+        self.assertEqual(
+            _places(found), [(-30.0, 0.0, 0.0), (-10.0, 0.0, 0.0), (10.0, 0.0, 0.0)]
+        )
+
+    def test_a_row_dimensioned_by_gap_uses_the_offset(self):
+        found = self._linear(
+            Direction="x", Mode="Spacing", Offset=15.0, Occurrences=3
+        )
+        self.assertEqual(
+            _places(found), [(10.0, 0.0, 0.0), (25.0, 0.0, 0.0), (40.0, 0.0, 0.0)]
+        )
+
+    def test_a_gap_left_unset_falls_back_to_the_offset(self):
+        # FreeCAD writes -1 into the spacing list for a gap nobody has
+        # touched, and means the ordinary offset by it.
+        found = self._linear(
+            Direction="x",
+            Mode="Spacing",
+            Offset=8.0,
+            Occurrences=3,
+            Spacings=[-1.0, 5.0],
+        )
+        self.assertEqual(
+            _places(found), [(10.0, 0.0, 0.0), (18.0, 0.0, 0.0), (23.0, 0.0, 0.0)]
+        )
+
+    def test_a_repeating_run_of_uneven_gaps_is_refused(self):
+        # An experimental setting, hidden behind a preference, whose reading
+        # against the plain spacing list is not written down. A row placed
+        # by guesswork would put the tap callout on the wrong bores.
+        self.assertIsNone(
+            self._linear(
+                Direction="x",
+                Mode="Spacing",
+                Offset=10.0,
+                Occurrences=4,
+                SpacingPattern=[10.0, 20.0],
+            )
+        )
+
+    def test_a_grid_repeats_the_row_rather_than_continuing_it(self):
+        # Two across and two down is four holes. The second direction
+        # multiplies the first: reading it as another leg of the same row
+        # would leave the far corner undeclared.
+        found = self._linear(
+            Direction="x",
+            Length=10.0,
+            Occurrences=2,
+            Direction2="y",
+            Length2=20.0,
+            Occurrences2=2,
+        )
+        self.assertEqual(
+            _places(found),
+            [
+                (10.0, 0.0, 0.0),
+                (10.0, 20.0, 0.0),
+                (20.0, 0.0, 0.0),
+                (20.0, 20.0, 0.0),
+            ],
+        )
+
+    def test_a_second_direction_that_will_not_resolve_refuses_the_whole_grid(self):
+        self.assertIsNone(
+            self._linear(
+                Direction="x",
+                Length=10.0,
+                Occurrences=2,
+                Direction2="a datum nobody can find",
+                Length2=20.0,
+                Occurrences2=2,
+            )
+        )
+
+    def test_a_row_of_one_is_the_hole_where_it_was_drawn(self):
+        found = self._linear(Direction="x", Length=40.0, Occurrences=1)
+        self.assertEqual(_places(found), [(10.0, 0.0, 0.0)])
+
+    def test_a_direction_that_will_not_resolve_is_refused(self):
+        # The whole reason for refusing: a direction guessed at does not
+        # lose the copies, it puts them on whatever bores lie where they
+        # were expected.
+        self.assertIsNone(self._linear(Direction=None, Length=40.0, Occurrences=3))
+
+    def test_a_way_of_dimensioning_this_does_not_know_is_refused(self):
+        self.assertIsNone(
+            self._linear(Direction="x", Mode="Something New", Occurrences=3)
+        )
+
+    # -- a bolt circle ------------------------------------------------------
+
+    def test_a_full_turn_divides_by_the_holes_and_not_the_gaps(self):
+        # The one case where the last copy would land back on the first.
+        # Four holes round a full turn are 90 apart, not 120.
+        found = self._polar(Axis="z", Angle=360.0, Occurrences=4)
+        self.assertEqual(
+            _places(found),
+            [
+                (-10.0, 0.0, 0.0),
+                (0.0, -10.0, 0.0),
+                (0.0, 10.0, 0.0),
+                (10.0, 0.0, 0.0),
+            ],
+        )
+
+    def test_a_part_turn_divides_by_the_gaps(self):
+        found = self._polar(Axis="z", Angle=180.0, Occurrences=3)
+        self.assertEqual(
+            _places(found),
+            [(-10.0, 0.0, 0.0), (0.0, 10.0, 0.0), (10.0, 0.0, 0.0)],
+        )
+
+    def test_a_reversed_bolt_circle_turns_the_other_way(self):
+        found = self._polar(
+            Axis="z", Angle=180.0, Occurrences=3, Reversed=True
+        )
+        self.assertEqual(
+            _places(found),
+            [(-10.0, 0.0, 0.0), (0.0, -10.0, 0.0), (10.0, 0.0, 0.0)],
+        )
+
+    def test_a_bolt_circle_dimensioned_by_gap_uses_the_offset(self):
+        found = self._polar(
+            Axis="z", Mode="Spacing", Offset=90.0, Occurrences=3
+        )
+        self.assertEqual(
+            _places(found),
+            [(-10.0, 0.0, 0.0), (0.0, 10.0, 0.0), (10.0, 0.0, 0.0)],
+        )
+
+    def test_an_axis_that_will_not_resolve_is_refused(self):
+        self.assertIsNone(self._polar(Axis="a datum nobody can find", Angle=360.0, Occurrences=4))
+
+    def test_a_bolt_circle_about_a_tilted_axis_aims_its_copies_differently(self):
+        # Turning about anything but the drilling axis swings the copies out
+        # of line with the original, which is why the declarations for one
+        # Hole feature cannot always share a direction.
+        found = self._polar(Axis="x", Angle=180.0, Occurrences=2)
+        aims = [
+            tuple(round(v, 6) + 0.0 for v in t.apply_direction((0.0, 0.0, 1.0)))
+            for t in found
+        ]
+        self.assertEqual(aims, [(0.0, 0.0, 1.0), (0.0, 0.0, -1.0)])
+
+    # -- a mirror -----------------------------------------------------------
+
+    def test_a_mirror_keeps_the_original_and_adds_the_far_side(self):
+        found = transforms_of(
+            FakePattern("PartDesign::Mirrored", MirrorPlane="x=0"), self.resolver
+        )
+        self.assertEqual(_places(found), [(-10.0, 0.0, 0.0), (10.0, 0.0, 0.0)])
+
+    def test_a_mirror_plane_that_will_not_resolve_is_refused(self):
+        self.assertIsNone(
+            transforms_of(
+                FakePattern("PartDesign::Mirrored", MirrorPlane="a face that went"),
+                self.resolver,
+            )
+        )
+
+    # -- several at once ----------------------------------------------------
+
+    def test_a_multi_transform_multiplies_its_stages(self):
+        # A row of two turned three ways is six holes, not five. Each stage
+        # acts on everything the ones before it made.
+        row = FakePattern(
+            "PartDesign::LinearPattern", Direction="x", Length=10.0, Occurrences=2
+        )
+        circle = FakePattern(
+            "PartDesign::PolarPattern", Axis="z", Angle=360.0, Occurrences=3
+        )
+        found = transforms_of(
+            FakePattern("PartDesign::MultiTransform", Transformations=[row, circle]),
+            self.resolver,
+        )
+        self.assertEqual(len(found), 6)
+        self.assertEqual(
+            _places(found),
+            [
+                (-10.0, -17.320508, 0.0),
+                (-10.0, 17.320508, 0.0),
+                (-5.0, -8.660254, 0.0),
+                (-5.0, 8.660254, 0.0),
+                (10.0, 0.0, 0.0),
+                (20.0, 0.0, 0.0),
+            ],
+        )
+
+    def test_the_stages_are_applied_in_the_order_they_are_listed(self):
+        # Turning a row is not the same as rowing a turn. Listing them the
+        # other way round moves four of the six holes.
+        row = FakePattern(
+            "PartDesign::LinearPattern", Direction="x", Length=10.0, Occurrences=2
+        )
+        circle = FakePattern(
+            "PartDesign::PolarPattern", Axis="z", Angle=360.0, Occurrences=3
+        )
+        first = transforms_of(
+            FakePattern("PartDesign::MultiTransform", Transformations=[row, circle]),
+            self.resolver,
+        )
+        second = transforms_of(
+            FakePattern("PartDesign::MultiTransform", Transformations=[circle, row]),
+            self.resolver,
+        )
+        self.assertNotEqual(_places(first), _places(second))
+        # Turned first, the copies move out along the row they end up on;
+        # rowed first, the whole row is swung round together.
+        self.assertEqual(
+            _places(second),
+            [
+                (-5.0, -8.660254, 0.0),
+                (-5.0, 8.660254, 0.0),
+                (5.0, -8.660254, 0.0),
+                (5.0, 8.660254, 0.0),
+                (10.0, 0.0, 0.0),
+                (20.0, 0.0, 0.0),
+            ],
+        )
+
+    def test_one_stage_that_cannot_be_read_refuses_all_of_them(self):
+        # Half a MultiTransform is the worst possible answer: it puts real
+        # copies in some of the right places and declares nothing at the
+        # rest, which reads from the outside like a finished analysis.
+        row = FakePattern(
+            "PartDesign::LinearPattern", Direction="x", Length=10.0, Occurrences=2
+        )
+        lost = FakePattern(
+            "PartDesign::PolarPattern", Axis="gone", Angle=360.0, Occurrences=3
+        )
+        self.assertIsNone(
+            transforms_of(
+                FakePattern(
+                    "PartDesign::MultiTransform", Transformations=[row, lost]
+                ),
+                self.resolver,
+            )
+        )
+
+    def test_a_scaled_stage_refuses_the_whole_transform(self):
+        # A scaled copy of an M6 tapped hole is a bore no M6 tap fits. There
+        # is no honest way to carry the callout onto it.
+        row = FakePattern(
+            "PartDesign::LinearPattern", Direction="x", Length=10.0, Occurrences=2
+        )
+        scaled = FakePattern("PartDesign::Scaled", Factor=1.5, Occurrences=2)
+        self.assertIsNone(
+            transforms_of(
+                FakePattern(
+                    "PartDesign::MultiTransform", Transformations=[row, scaled]
+                ),
+                self.resolver,
+            )
+        )
+
+    def test_a_multi_transform_with_no_stages_moves_nothing(self):
+        found = transforms_of(
+            FakePattern("PartDesign::MultiTransform", Transformations=[]),
+            self.resolver,
+        )
+        self.assertEqual(_places(found), [(10.0, 0.0, 0.0)])
+
+    # -- what is not on the list --------------------------------------------
+
+    def test_repeating_the_whole_shape_is_refused(self):
+        # The copies are fused rather than cut, so a hole in one lands in
+        # solid metal in the next and is filled in by it. Which bores come
+        # out the far side depends on how the copies overlap, and that is
+        # not something the properties can be made to say.
+        self.assertIsNone(
+            self._linear(
+                Direction="x",
+                Length=40.0,
+                Occurrences=3,
+                TransformMode="Whole shape",
+            )
+        )
+
+    def test_a_kind_of_transform_this_does_not_know_is_refused(self):
+        self.assertIsNone(
+            transforms_of(
+                FakePattern("PartDesign::Scaled", Factor=2.0, Occurrences=2),
+                self.resolver,
+            )
+        )
+
+
+class TestWhichHolesGetRepeated(unittest.TestCase):
+    """Reading the document's transform features onto the holes they copy."""
+
+    def setUp(self):
+        self.resolver = FakeResolver()
+        self.hole = FakeHole(Name="TappedHole", Label="TappedHole")
+
+    def _row(self, name="Pattern", **properties):
+        fields = {
+            "Direction": "x",
+            "Length": 40.0,
+            "Occurrences": 3,
+            "Originals": [self.hole],
+        }
+        fields.update(properties)
+        return FakePattern("PartDesign::LinearPattern", name, **fields)
+
+    def test_a_patterned_hole_gets_every_copy(self):
+        copies, refused = copies_by_feature([self.hole, self._row()], self.resolver)
+        self.assertEqual(refused, set())
+        self.assertEqual(
+            _places(copies["TappedHole"]),
+            [(10.0, 0.0, 0.0), (30.0, 0.0, 0.0), (50.0, 0.0, 0.0)],
+        )
+
+    def test_an_unpatterned_hole_is_named_by_nothing(self):
+        copies, refused = copies_by_feature([self.hole], self.resolver)
+        self.assertEqual(copies, {})
+        self.assertEqual(refused, set())
+
+    def test_two_patterns_on_one_hole_both_count(self):
+        # Nothing stops a second pattern repeating the same feature, and
+        # both sets of copies are really cut.
+        down = self._row("Down", Direction="y", Length=20.0, Occurrences=2)
+        copies, _ = copies_by_feature(
+            [self.hole, self._row(), down], self.resolver
+        )
+        self.assertIn((50.0, 0.0, 0.0), _places(copies["TappedHole"]))
+        self.assertIn((10.0, 20.0, 0.0), _places(copies["TappedHole"]))
+
+    def test_a_pattern_that_cannot_be_read_takes_the_hole_with_it(self):
+        # The point of the whole exercise. One tapped hole reported out of
+        # twelve is a worse answer than none, because it looks like an
+        # answer.
+        with mock.patch("freecad.DFM.core.machining.thread_sources._warn"):
+            copies, refused = copies_by_feature(
+                [self.hole, self._row(Direction="gone")], self.resolver
+            )
+        self.assertEqual(refused, {"TappedHole"})
+        self.assertNotIn("TappedHole", copies)
+
+    def test_the_refusal_is_said_out_loud(self):
+        with mock.patch(
+            "freecad.DFM.core.machining.thread_sources._warn"
+        ) as warned:
+            copies_by_feature([self.hole, self._row(Direction="gone")], self.resolver)
+        self.assertTrue(warned.called)
+        self.assertIn("TappedHole", warned.call_args[0][0])
+
+    def test_a_stage_of_a_multi_transform_is_not_a_pattern_of_its_own(self):
+        # The stages are linked from the MultiTransform and reachable in the
+        # walk, but they repeat nothing on their own account. Counting them
+        # twice would declare holes the part does not have.
+        row = FakePattern(
+            "PartDesign::LinearPattern",
+            "Row",
+            Direction="x",
+            Length=10.0,
+            Occurrences=2,
+        )
+        multi = FakePattern(
+            "PartDesign::MultiTransform",
+            "Multi",
+            Transformations=[row],
+            Originals=[self.hole],
+        )
+        copies, _ = copies_by_feature([self.hole, multi, row], self.resolver)
+        self.assertEqual(
+            _places(copies["TappedHole"]), [(10.0, 0.0, 0.0), (20.0, 0.0, 0.0)]
+        )
+
+    def test_repeating_the_whole_shape_drops_the_holes_it_would_have_copied(self):
+        # A whole-shape transform names nothing, so the holes it affects are
+        # everything cut before it. All of them lose their declaration
+        # rather than half of them keeping one.
+        whole = FakePattern(
+            "PartDesign::Mirrored",
+            "Halves",
+            TransformMode="Whole shape",
+            MirrorPlane="x=0",
+            BaseFeature=self.hole,
+        )
+        with mock.patch("freecad.DFM.core.machining.thread_sources._warn"):
+            copies, refused = copies_by_feature([self.hole, whole], self.resolver)
+        self.assertEqual(refused, {"TappedHole"})
+        self.assertEqual(copies, {})
+
+    def test_a_scaled_hole_is_dropped_rather_than_declared(self):
+        scaled = FakePattern(
+            "PartDesign::Scaled",
+            "Scaled",
+            Factor=1.5,
+            Occurrences=2,
+            Originals=[self.hole],
+        )
+        with mock.patch("freecad.DFM.core.machining.thread_sources._warn"):
+            _, refused = copies_by_feature([self.hole, scaled], self.resolver)
+        self.assertEqual(refused, {"TappedHole"})
+
+    def test_a_pattern_of_a_pattern_is_refused(self):
+        # Stacking transforms is what a MultiTransform is for. Reached any
+        # other way it is a shape this cannot account for.
+        inner = FakePattern(
+            "PartDesign::LinearPattern",
+            "Inner",
+            Direction="x",
+            Length=10.0,
+            Occurrences=2,
+            Originals=[self.hole],
+        )
+        outer = FakePattern(
+            "PartDesign::PolarPattern",
+            "Outer",
+            Axis="z",
+            Angle=360.0,
+            Occurrences=3,
+            Originals=[inner],
+        )
+        with mock.patch("freecad.DFM.core.machining.thread_sources._warn"):
+            _, refused = copies_by_feature(
+                [self.hole, inner, outer], self.resolver
+            )
+        self.assertIn("Inner", refused)
+
+    def test_an_absurd_number_of_copies_is_refused(self):
+        # Past a few thousand the model is wrong rather than the reading,
+        # and every position gets scanned against every bore on the part.
+        with mock.patch("freecad.DFM.core.machining.thread_sources._warn"):
+            copies, refused = copies_by_feature(
+                [self.hole, self._row(Occurrences=9000)], self.resolver
+            )
+        self.assertEqual(refused, {"TappedHole"})
+        self.assertEqual(copies, {})
+
+
+class TestADeclarationReachesEveryCopy(unittest.TestCase):
+    """The point of it all: one statement, every hole it was made about.
+
+    Composing the copies with the document's own placements is the one part
+    that needs a live FreeCAD, and it is proved in
+    ``tests/freecad/verify_in_freecad.py``. What that composition is handed
+    is checked here.
+    """
+
+    def test_a_bolt_circle_of_tapped_holes_is_declared_all_the_way_round(self):
+        hole = FakeHole(Name="TappedHole")
+        circle = FakePattern(
+            "PartDesign::PolarPattern",
+            "BoltCircle",
+            Axis="z",
+            Angle=360.0,
+            Occurrences=12,
+            Originals=[hole],
+        )
+        copies, refused = copies_by_feature([hole, circle], FakeResolver())
+        self.assertEqual(refused, set())
+
+        # What the frames seam hands over: every copy of the one profile
+        # circle, all on the same drilling axis, under the one declaration.
+        drilled = (25.0, 0.0, 8.0)
+        positions = [t.apply_point(drilled) for t in copies["TappedHole"]]
+        found = native_declarations(
+            FakeTarget(out_list=[hole]),
+            frames=lambda _t: [(hole, positions, _BORE_AXIS)],
+        )
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].designation, "M6x1.0")
+        self.assertEqual(len(found[0].positions), 12)
+        for position in positions:
+            self.assertTrue(
+                found[0].covers(5.0, position, _BORE_AXIS),
+                f"the hole at {position} was left undeclared",
+            )
+
+    def test_a_hole_beside_the_circle_is_still_not_declared(self):
+        # Expanding the copies must not turn the declaration into a blanket
+        # over the whole part.
+        hole = FakeHole(Name="TappedHole")
+        circle = FakePattern(
+            "PartDesign::PolarPattern",
+            "BoltCircle",
+            Axis="z",
+            Angle=360.0,
+            Occurrences=12,
+            Originals=[hole],
+        )
+        copies, _ = copies_by_feature([hole, circle], FakeResolver())
+        positions = [t.apply_point((25.0, 0.0, 8.0)) for t in copies["TappedHole"]]
+        found = native_declarations(
+            FakeTarget(out_list=[hole]),
+            frames=lambda _t: [(hole, positions, _BORE_AXIS)],
+        )
+        self.assertFalse(found[0].covers(5.0, (0.0, 0.0, 8.0), _BORE_AXIS))
+        self.assertFalse(found[0].covers(5.0, (12.0, 0.0, 8.0), _BORE_AXIS))
 
 
 class TestApplyingAFact(unittest.TestCase):

@@ -10,6 +10,7 @@ import Part  # type: ignore
 from OCP.TopoDS import TopoDS_Shape
 from OCP.gp import gp_Dir
 
+from ..core.machining.blank_declaration import apply_declaration
 from ..core.registries.process_registry import ProcessRegistry
 from ..core.registries.checks_registry import get_check_class
 from ..core.registries.analyzers_registry import get_analyzer_class
@@ -42,7 +43,13 @@ class AnalysisRunner:
     ) -> list[CheckResult]:
         """Run all active checks for the given process and material against a shape."""
         self.analyzer_cache.clear()
-        kwargs["prefs"] = self._load_prefs()
+        # The shop's settings, then whatever this part says about itself.
+        # A shop that buys both billet and castings has no single right
+        # answer to give in Preferences, and the part is where the answer
+        # actually lives.
+        kwargs["prefs"] = apply_declaration(
+            self._load_prefs(), kwargs.get("target_object")
+        )
 
         process = ProcessRegistry.get_instance().get_process_by_name(process_name)
         if not process:

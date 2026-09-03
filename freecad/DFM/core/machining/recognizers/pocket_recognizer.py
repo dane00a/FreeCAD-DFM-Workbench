@@ -28,7 +28,7 @@ from OCP.Bnd import Bnd_Box
 from OCP.gp import gp_Dir, gp_Pnt, gp_Vec
 
 from ..aag import AagNode, AttributedAdjacencyGraph, Concavity, SurfaceType
-from ..features import FeatureInstance, FeatureType
+from ..features import BORE_TYPES, FeatureInstance, FeatureType
 from .base import FeatureRecognizer, neighbours
 
 
@@ -79,10 +79,27 @@ class PocketRecognizer(FeatureRecognizer):
         candidate_ids = {node.face_id for node in candidates}
 
         taken: set[int] = set(claimed or ())
+
+        # A bore drilled through a pocket floor claims that floor as its own
+        # opening, which is a true reading of the face and not a rival to
+        # this one. The resolver ranks a hole against a pocket and keeps
+        # both, because neither contains the other -- they share one face
+        # out of several each.
+        #
+        # Standing down on it instead lost the pocket outright, and with it
+        # every pocket rule and the sharp-edge suppression that depends on
+        # the pocket owning its own corners. A hole through a pocket floor
+        # is about as common as machining gets.
+        seedable = taken - {
+            face_id
+            for feature in (prior or ())
+            if feature.type in BORE_TYPES
+            for face_id in feature.faces
+        }
         found: list[FeatureInstance] = []
 
         for floor in candidates:
-            if floor.face_id in taken:
+            if floor.face_id in seedable:
                 continue
             faces = self._grow(graph, floor, candidate_ids, taken, total_area)
             if len(faces) < 3:

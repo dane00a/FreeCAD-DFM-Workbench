@@ -12,6 +12,7 @@ import Part  # type: ignore
 
 from OCP.gp import gp_Dir
 
+from ..core.machining import blank_declaration
 from ..core.registries.analyzers_registry import get_analyzer_class
 from ..core.registries.checks_registry import get_check_class
 from ..core.registries.process_registry import ProcessRegistry
@@ -46,6 +47,17 @@ QPushButton:checked {
 # keeps all the per-requirement branching in one place and makes adding a new
 # requirement a matter of writing one small subclass.
 # =============================================================================
+
+
+# What the blank dropdown offers. The first entry defers to the shop-wide
+# setting, which is the right answer for a shop that buys one kind of stock;
+# the rest are statements about this part in particular.
+BLANK_FORM_LABELS = (
+    ("", "Shop default"),
+    ("billet", "Solid billet"),
+    ("as_cast", "As-cast"),
+    ("profile_extrusion", "Profile extrusion"),
+)
 
 
 class RequirementHandler(QtCore.QObject):
@@ -359,6 +371,8 @@ class TaskSetup:
         self.form.cbMaterial.setPlaceholderText("Select a process first")
         self.form.cbMaterial.setEnabled(False)
 
+        self._populate_blank_forms()
+
         self.form.leSelectModel.setReadOnly(True)
         self.form.leSelectModel.setPlaceholderText("No model selected")
 
@@ -458,6 +472,7 @@ class TaskSetup:
             self.target_object = sel[0]
             self.target_shape = self.target_object.Shape
             self.form.leSelectModel.setText(self.target_object.Label)
+            self._load_blank_declaration()
             return True
         except Exception as e:
             App.Console.PrintError(f"Could not use the selected object. {e}\n")
@@ -541,6 +556,7 @@ class TaskSetup:
         self.form.cbMaterial.setCurrentIndex(-1)
         self.form.cbMaterial.blockSignals(False)
 
+        self._update_blank_visibility()
         self._update_options_visibility()
         self._update_run_button_state()
 
@@ -719,6 +735,7 @@ class TaskSetup:
         # Kept, not discarded: the analyzer cache holds the machining
         # context the feature census is built from, and re-running the
         # recognizers to rebuild it would double the cost of an analysis.
+        self._save_blank_declaration()
         self.runner = AnalysisRunner()
         return self.runner.run_analysis(
             process_name=process_name,
@@ -826,6 +843,68 @@ class TaskSetup:
         except Exception as e:
             App.Console.PrintError(f"Could not confirm tapped holes: {e}\n")
             return False
+
+    # -- blank declaration --------------------------------------------------
+
+    def _populate_blank_forms(self) -> None:
+        """Offer the stock forms, with the shop's own setting first."""
+        combo = self.form.cbBlankForm
+        combo.blockSignals(True)
+        combo.clear()
+        for value, label in BLANK_FORM_LABELS:
+            combo.addItem(label, value)
+        combo.setCurrentIndex(0)
+        combo.blockSignals(False)
+        combo.hide()
+        self.form.lBlankForm.hide()
+
+    def _uses_machining(self) -> bool:
+        """Whether the chosen process actually looks at machined geometry.
+
+        Asked of the rules rather than the process name, so a shop that adds
+        its own milling process to the registry gets the control too.
+        """
+        if self.process is None:
+            return False
+        for rule_id in getattr(self.process, "active_rules", ()):
+            check_class = get_check_class(rule_id)
+            if check_class is None:
+                continue
+            if check_class().required_analyzer_id == "MACHINING_ANALYZER":
+                return True
+        return False
+
+    def _update_blank_visibility(self) -> None:
+        """The blank only means anything to a process that removes material."""
+        visible = self._uses_machining()
+        self.form.cbBlankForm.setVisible(visible)
+        self.form.lBlankForm.setVisible(visible)
+        if visible:
+            self._load_blank_declaration()
+
+    def _load_blank_declaration(self) -> None:
+        """Show what this object was already declared to be cut from."""
+        if self.target_object is None:
+            return
+        declared = blank_declaration.declared_blank(self.target_object) or ""
+        index = self.form.cbBlankForm.findData(declared)
+        self.form.cbBlankForm.setCurrentIndex(index if index >= 0 else 0)
+
+    def _save_blank_declaration(self) -> None:
+        """Keep the answer with the part, so it is given once and not again.
+
+        A declaration is a fact about the part -- this one came from bar,
+        that one from a casting -- and losing it at the end of the dialog
+        would mean re-stating it at every analysis. Written only when it
+        changes, so opening the panel does not dirty a document nobody
+        edited.
+        """
+        if self.target_object is None or not self._uses_machining():
+            return
+        chosen = self.form.cbBlankForm.currentData() or ""
+        if chosen == (blank_declaration.declared_blank(self.target_object) or ""):
+            return
+        blank_declaration.declare_blank(self.target_object, chosen)
 
     def _machining_context(self):
         """The machining analysis, if this process ran one.

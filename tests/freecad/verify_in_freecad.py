@@ -361,6 +361,227 @@ try:
         ),
     )
 
+    # -- the same hole, drilled many times ----------------------------------
+    #
+    # A tapped hole on a bolt circle is drawn once and repeated, and the
+    # copies exist only in the finished solid with nothing on them to say
+    # where they came from. Placing them means reading the pattern's own
+    # numbers and resolving whatever its direction happens to point at, and
+    # neither of those exists outside a live document. The unit tests cover
+    # the arithmetic against stand-ins; this is the only place the reading
+    # itself gets proved.
+    say("")
+    say("A tapped hole repeated")
+    from freecad.DFM.core.machining.features import BORE_TYPES
+
+    def tapped_plate(label, hole_at, half=40.0, thick=20.0):
+        """A plate with one threaded hole in it, ready to be repeated."""
+        plate = doc.addObject("PartDesign::Body", label)
+        outline = doc.addObject("Sketcher::SketchObject", label + "Outline")
+        plate.addObject(outline)
+        corners = [(-half, -half), (half, -half), (half, half), (-half, half)]
+        for index in range(4):
+            here, there = corners[index], corners[(index + 1) % 4]
+            outline.addGeometry(
+                Part.LineSegment(
+                    FreeCAD.Vector(here[0], here[1], 0),
+                    FreeCAD.Vector(there[0], there[1], 0),
+                ),
+                False,
+            )
+        slab = doc.addObject("PartDesign::Pad", label + "Pad")
+        plate.addObject(slab)
+        slab.Profile = outline
+        slab.Length = thick
+        doc.recompute()
+
+        profile = doc.addObject("Sketcher::SketchObject", label + "Profile")
+        plate.addObject(profile)
+        profile.Placement = FreeCAD.Placement(
+            FreeCAD.Vector(0, 0, thick), FreeCAD.Rotation(0, 0, 0, 1)
+        )
+        profile.addGeometry(
+            Part.Circle(
+                FreeCAD.Vector(hole_at[0], hole_at[1], 0),
+                FreeCAD.Vector(0, 0, 1),
+                2.5,
+            ),
+            False,
+        )
+        tapped = doc.addObject("PartDesign::Hole", label + "Hole")
+        plate.addObject(tapped)
+        tapped.Profile = profile
+        tapped.Threaded = True
+        tapped.ThreadType = "ISOMetricProfile"
+        tapped.ThreadSize = "M6x1.0"
+        tapped.ThreadDepthType = "Hole Depth"
+        tapped.DepthType = "Dimension"
+        tapped.Depth = 12.0
+        tapped.ModelThread = False
+        doc.recompute()
+        return plate, outline, tapped
+
+    def check_every_copy(label, plate, expected):
+        """Every hole the pattern cut, tapped, pitched, and nothing asked."""
+        doc.recompute()
+        repeated_occ = freecad_to_ocp(plate.Shape)
+        repeated = list(
+            MachiningAnalyzer()
+            .execute(
+                repeated_occ,
+                FaceIndex(repeated_occ),
+                EdgeIndex(repeated_occ),
+                prefs={},
+                target_object=plate,
+            )
+            .values()
+        )[0]
+        drilled = [f for f in repeated.recognition.features if f.type in BORE_TYPES]
+        tapped = [f for f in drilled if f.param("thread_designation")]
+        say("  %s: %d bores in the solid, %d declared tapped"
+            % (label, len(drilled), len(tapped)))
+        check(
+            "%s: the pattern really cut %d holes" % (label, expected),
+            len(drilled) == expected,
+            " (found %d)" % len(drilled),
+        )
+        check(
+            "%s: every one of them comes back tapped" % label,
+            len(tapped) == expected,
+            " (%d of %d)" % (len(tapped), len(drilled)),
+        )
+        check(
+            "%s: each carries the thread the one Hole declared" % label,
+            bool(tapped)
+            and all(f.param("thread_designation") == "M6x1.0" for f in tapped),
+        )
+        check(
+            "%s: and the pitch with it" % label,
+            bool(tapped)
+            and all(
+                abs((f.number("thread_pitch_mm") or 0.0) - 1.0) < 1e-6 for f in tapped
+            ),
+        )
+        check(
+            "%s: with nothing put to the user" % label,
+            not candidates_for(
+                repeated.recognition.features,
+                repeated.graph,
+                thread_evidence_for(plate),
+            ),
+        )
+
+    from freecad.DFM.core.machining.thread_sources import candidates_for
+
+    # A row of four. The direction is a link to the pad sketch's own
+    # horizontal axis, which is how the interface writes it when a user picks
+    # the axis rather than an edge.
+    row_plate, row_outline, row_hole = tapped_plate("Row", (-30.0, 0.0))
+    row = doc.addObject("PartDesign::LinearPattern", "Row")
+    row_plate.addObject(row)
+    row.Originals = [row_hole]
+    row.BaseFeature = row_hole
+    row_plate.Tip = row
+    row.Direction = (row_outline, ["H_Axis"])
+    row.Mode = "Extent"
+    row.Length = 60.0
+    row.Occurrences = 4
+    doc.recompute()
+    check("the row recomputes", row_plate.Shape.isValid())
+    row_evidence = thread_evidence_for(row_plate)
+    check(
+        "the row's declaration reaches all four holes",
+        sum(len(d.positions) for d in row_evidence.declarations) == 4,
+        " (%s)"
+        % [tuple(round(v, 2) for v in p)
+           for d in row_evidence.declarations for p in d.positions],
+    )
+    check_every_copy("row of four", row_plate, 4)
+
+    # A bolt circle of six about the body's Z axis, which is an origin
+    # feature rather than anything the user drew.
+    circle_plate, circle_outline, circle_hole = tapped_plate("Circle", (25.0, 0.0))
+    z_axis = [
+        o for o in circle_plate.Origin.OutList if getattr(o, "Role", "") == "Z_Axis"
+    ][0]
+    circle = doc.addObject("PartDesign::PolarPattern", "Circle")
+    circle_plate.addObject(circle)
+    circle.Originals = [circle_hole]
+    circle.BaseFeature = circle_hole
+    circle_plate.Tip = circle
+    circle.Axis = (z_axis, [""])
+    circle.Mode = "Extent"
+    circle.Angle = 360.0
+    circle.Occurrences = 6
+    doc.recompute()
+    check("the bolt circle recomputes", circle_plate.Shape.isValid())
+    circle_evidence = thread_evidence_for(circle_plate)
+    check(
+        "the bolt circle's declaration reaches all six holes",
+        sum(len(d.positions) for d in circle_evidence.declarations) == 6,
+        " (%s)"
+        % [tuple(round(v, 2) for v in p)
+           for d in circle_evidence.declarations for p in d.positions],
+    )
+    check_every_copy("bolt circle of six", circle_plate, 6)
+
+    # A row of two turned three ways. Stacking transforms is where the
+    # arithmetic is easiest to get wrong: the stages multiply rather than
+    # add, so this is six holes and not five.
+    stack_plate, stack_outline, stack_hole = tapped_plate("Stack", (12.0, 0.0))
+    stack_row = doc.addObject("PartDesign::LinearPattern", "StackRow")
+    stack_row.Direction = (stack_outline, ["H_Axis"])
+    stack_row.Mode = "Extent"
+    stack_row.Length = 14.0
+    stack_row.Occurrences = 2
+    stack_circle = doc.addObject("PartDesign::PolarPattern", "StackCircle")
+    stack_circle.Axis = (
+        [o for o in stack_plate.Origin.OutList if getattr(o, "Role", "") == "Z_Axis"][0],
+        [""],
+    )
+    stack_circle.Mode = "Extent"
+    stack_circle.Angle = 360.0
+    stack_circle.Occurrences = 3
+    stack = doc.addObject("PartDesign::MultiTransform", "Stack")
+    stack_plate.addObject(stack)
+    stack.Originals = [stack_hole]
+    stack.BaseFeature = stack_hole
+    stack_plate.Tip = stack
+    stack.Transformations = [stack_row, stack_circle]
+    doc.recompute()
+    check("the stacked transform recomputes", stack_plate.Shape.isValid())
+    check_every_copy("row of two turned three ways", stack_plate, 6)
+
+    # -- and what happens when the copies cannot be placed ------------------
+    #
+    # Set to repeat the whole shape, a pattern fuses copies of the solid
+    # rather than cutting copies of the hole, so a hole in one lands in metal
+    # in the next and is filled in by it. There is no honest reading of that
+    # from the properties, and half a bolt circle reported as tapped looks
+    # like an answer. The declaration is dropped instead.
+    say("")
+    say("A repeat that cannot be placed")
+    whole_plate, whole_outline, whole_hole = tapped_plate("Whole", (20.0, 20.0))
+    whole = doc.addObject("PartDesign::LinearPattern", "Whole")
+    whole_plate.addObject(whole)
+    whole.BaseFeature = whole_hole
+    whole_plate.Tip = whole
+    whole.TransformMode = "Whole shape"
+    whole.Direction = (whole_outline, ["H_Axis"])
+    whole.Mode = "Extent"
+    whole.Length = 20.0
+    whole.Occurrences = 2
+    doc.recompute()
+    whole_evidence = thread_evidence_for(whole_plate)
+    say("  bores left after the fuse: %d"
+        % sum(1 for f in whole_plate.Shape.Faces
+              if f.Surface.__class__.__name__ == "Cylinder"))
+    check(
+        "a repeat of the whole shape declares nothing at all",
+        not whole_evidence.declarations,
+        " (declared %d)" % len(whole_evidence.declarations),
+    )
+
     # -- confirming a thread on a part that cannot say ----------------------
     #
     # The same body with the declaration taken off it, which is what an

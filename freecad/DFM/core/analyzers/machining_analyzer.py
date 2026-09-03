@@ -22,7 +22,10 @@ from ...core.machining.aag_builder import AagBuilder
 from ...core.machining.config import MachiningConfig
 from ...core.machining.context import MachiningContext
 from ...core.machining.features import RecognitionResult
-from ...core.machining.process_classifier import classify_part_process
+from ...core.machining.process_classifier import (
+    classify_part_process,
+    refine_part_process_with_features,
+)
 from ...core.machining.recognizers import RECOGNIZER_PIPELINE
 from ...core.machining.resolver import resolve
 from ...core.registries import register_analyzer
@@ -69,6 +72,15 @@ class MachiningAnalyzer(BaseAnalyzer):
 
         part_process = classify_part_process(graph, self.config.thresholds, shape)
         recognition = self._recognize(graph, shape, part_process, check_abort)
+
+        # The classification ran before recognition because the recognizers
+        # need its verdict, so it decided on shape alone. Two of its answers
+        # can only be checked once the features exist: a turned part with a
+        # slot in it is a mill-turn part, and a shell that looked like sheet
+        # is really milled if it holds anything cut into solid stock.
+        part_process = refine_part_process_with_features(
+            part_process, recognition.features, graph
+        )
 
         context = MachiningContext(
             shape=shape,

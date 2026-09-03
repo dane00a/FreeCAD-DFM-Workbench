@@ -21,10 +21,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from OCP.Bnd import Bnd_Box
 from OCP.gp import gp_Ax1, gp_Vec
 
 from .aag import AagNode, AttributedAdjacencyGraph, SurfaceType
 from .config import RuleThresholds
+from .features import FeatureType
 
 
 # Two axes are the same axis when their directions agree within about 3
@@ -38,6 +40,25 @@ _NORMAL_AXIS_DOT_MIN = 0.99
 
 # An end face is at most this many times the dominant cylinder's cross section.
 _END_FACE_AREA_MULTIPLE = 3.0
+
+# Sheet is formable: nearly all of it has to be flat, cylindrical or conical.
+_SHEET_DEVELOPABLE_MIN = 0.90
+
+# Thicker than this and it is plate to be machined, not sheet to be formed.
+_SHEET_MAX_GAUGE_MM = 8.0
+
+# Gauge as a share of the part's largest dimension. A short thick block can
+# pass the absolute gate on its own.
+_SHEET_GAUGE_MAX_REL = 0.15
+
+# How much of the paired area has to sit within 30% of the gauge.
+_SHEET_UNIFORM_MIN = 0.50
+
+# Two faces are back to back when their normals are this opposed.
+_ANTI_PARALLEL_DOT = -0.98
+
+# The two flats a bend joins have to be at a real angle to each other.
+_BEND_NON_PARALLEL_DOT = 0.95
 
 
 class PartProcessType(Enum):
@@ -243,13 +264,493 @@ def classify_part_process(
 
 
 def detect_sheet_metal(
-    graph: AttributedAdjacencyGraph, shape=None  # noqa: ARG001 - hook signature
+    graph: AttributedAdjacencyGraph, shape=None  # noqa: ARG001 - kept for parity
 ) -> Optional[float]:
-    """Detect a constant-gauge formed shell, returning its gauge in mm.
+    """The gauge of a formed sheet part, or nothing if it is not one.
 
-    Not yet implemented. Sheet metal is a distinct process family that mutes
-    the machining rules entirely, and it lands with the sheet rule family in a
-    later phase. Until then a sheet part classifies by its geometry like any
-    other, which means it will attract machining findings that do not apply.
+    Sheet has to be told apart from a thin-walled milled shell, which is also
+    a uniform thin skin with rounded corners. Four things must hold, and the
+    last is what actually does the work.
+
+    The part is developable: nearly all its area is flat, cylindrical or
+    conical, because those are the shapes a brake and a die can make. It has
+    a consistent gauge, taken as the area-weighted median distance between
+    opposed skins. That gauge is small, both absolutely and against the size
+    of the part.
+
+    And it carries at least one real bend. Sheet wraps a fold as *two
+    concentric cylinders* one gauge apart -- the inside and the outside of
+    the same bend, sharing an axis -- joining two flats that are at an angle
+    to each other. A milled fillet has only the inner cylinder; its outside
+    corner is sharp, or some unrelated radius. That concentric pair is the
+    signature, and without demanding it every milled enclosure reads as sheet.
     """
-    return None
+    areas = _area_by_surface_type(graph)
+    total = sum(areas.values())
+    if total < 1e-6:
+        return None
+
+    # Formable on a brake or in a die. Extruded walls are single-curvature
+    # and so stampable, though they are never evidence of a bend.
+    developable = (
+        areas.get(SurfaceType.PLANE, 0.0)
+        + areas.get(SurfaceType.CYLINDER, 0.0)
+        + areas.get(SurfaceType.CONE, 0.0)
+        + areas.get(SurfaceType.EXTRUDED, 0.0)
+    )
+    if developable / total < _SHEET_DEVELOPABLE_MIN:
+        return None
+    if areas.get(SurfaceType.CYLINDER, 0.0) <= 0.0:
+        return None  # no bends and no holes: nothing was formed here
+
+    gauge = _median_gauge(graph)
+    if gauge is None or gauge > _SHEET_MAX_GAUGE_MM:
+        return None
+
+    extents = _part_extents(graph)
+    if extents is not None and gauge > _SHEET_GAUGE_MAX_REL * max(extents):
+        return None
+
+    if not _has_concentric_bend(graph, gauge):
+        return None
+    return gauge
+
+
+def _area_by_surface_type(
+    graph: AttributedAdjacencyGraph,
+) -> dict[SurfaceType, float]:
+    areas: dict[SurfaceType, float] = {}
+    for node in graph.nodes:
+        areas[node.surface_type] = areas.get(node.surface_type, 0.0) + node.area
+    return areas
+
+
+def _part_extents(graph: AttributedAdjacencyGraph) -> Optional[tuple]:
+    box = Bnd_Box()
+    for node in graph.nodes:
+        if not node.bbox.IsVoid():
+            box.Add(node.bbox)
+    if box.IsVoid():
+        return None
+    xmin, ymin, zmin, xmax, ymax, zmax = box.Get()
+    return (xmax - xmin, ymax - ymin, zmax - zmin)
+
+
+class _Skin:
+    """A flat face, reduced to what measuring the gauge needs."""
+
+    __slots__ = ("normal", "centroid", "area", "reach")
+
+    def __init__(self, normal, centroid, area, reach):
+        self.normal = normal
+        self.centroid = centroid
+        self.area = area
+        self.reach = reach
+
+
+def _median_gauge(graph: AttributedAdjacencyGraph) -> Optional[float]:
+    """The part's thickness, as the area-weighted median of the local ones.
+
+    For each flat face the nearest anti-parallel face it overlaps sideways is
+    the skin on the other side, and that gap is the thickness there. Median
+    rather than mean, so a part with one thick boss still reports its gauge
+    instead of an average of the two.
+    """
+    skins: list[_Skin] = []
+    for node in graph.nodes:
+        if node.surface_type is not SurfaceType.PLANE:
+            continue
+        normal = node.outward_normal
+        if normal is None or node.centroid is None or node.bbox.IsVoid():
+            continue
+        xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
+        reach = 0.5 * max(xmax - xmin, ymax - ymin, zmax - zmin)
+        skins.append(_Skin(normal, node.centroid, node.area, reach))
+
+    measured: list[tuple[float, float]] = []
+    for skin in skins:
+        outward = gp_Vec(skin.normal)
+        nearest = math.inf
+        for other in skins:
+            if other is skin:
+                continue
+            if skin.normal.Dot(other.normal) > _ANTI_PARALLEL_DOT:
+                continue
+            offset = gp_Vec(skin.centroid, other.centroid)
+            # Positive when the other face lies on the material side.
+            gap = -offset.Dot(outward)
+            if gap <= 0.01:
+                continue
+            sideways = offset - outward * offset.Dot(outward)
+            if sideways.Magnitude() > skin.reach:
+                continue  # not actually across from one another
+            nearest = min(nearest, gap)
+        if nearest < math.inf:
+            measured.append((nearest, skin.area))
+
+    if not measured:
+        return None
+
+    measured.sort()
+    paired_area = sum(area for _, area in measured)
+    gauge = measured[-1][0]
+    running = 0.0
+    for thickness, area in measured:
+        running += area
+        if running >= 0.5 * paired_area:
+            gauge = thickness
+            break
+    if gauge <= 1e-6:
+        return None
+
+    # Most of the part has to actually be at that gauge. A shell with one
+    # uniform face and a lot of thick section was machined, not formed.
+    at_gauge = sum(
+        area for thickness, area in measured if 0.7 * gauge <= thickness <= 1.3 * gauge
+    )
+    if at_gauge / paired_area < _SHEET_UNIFORM_MIN:
+        return None
+    return gauge
+
+
+def _has_concentric_bend(graph: AttributedAdjacencyGraph, gauge: float) -> bool:
+    """Whether the part carries at least one genuine formed bend.
+
+    The discriminator against a thin milled shell. A bend is two coaxial
+    cylinders one gauge apart -- the inside and outside of the same fold --
+    with two flats among their neighbours that are at an angle to each other.
+    A fillet has one cylinder, so it never matches.
+    """
+    bends: list[tuple] = []
+    for node in graph.nodes:
+        if node.surface_type is not SurfaceType.CYLINDER:
+            continue
+        if node.cyl_cone_axis is None:
+            continue
+        flats = []
+        for edge in graph.edges_of(node.face_id):
+            other_id = edge.other_face(node.face_id)
+            if not graph.has_node(other_id):
+                continue
+            other = graph.node(other_id)
+            if other.surface_type is not SurfaceType.PLANE:
+                continue
+            normal = other.outward_normal
+            if normal is not None:
+                flats.append(normal)
+        bends.append((node.cyl_cone_axis, node.cyl_radius, flats))
+
+    for index, (axis, radius, flats) in enumerate(bends):
+        for other_axis, other_radius, other_flats in bends[index + 1 :]:
+            if not axes_colinear(axis, other_axis):
+                continue
+            separation = abs(radius - other_radius)
+            if not 0.5 * gauge <= separation <= 1.5 * gauge:
+                continue
+            joined = flats + other_flats
+            for position, first in enumerate(joined):
+                for second in joined[position + 1 :]:
+                    if abs(first.Dot(second)) < _BEND_NON_PARALLEL_DOT:
+                        return True
+    return False
+
+
+# =============================================================================
+# Refinement, once the features are known
+# =============================================================================
+
+
+# A turned part cannot have these: nothing on a lathe makes a slot or a
+# pocket. Their presence means the part visits a mill as well.
+_PRISMATIC_TYPES = frozenset(
+    {
+        FeatureType.SLOT,
+        FeatureType.POCKET,
+        FeatureType.SPHERICAL_POCKET,
+        FeatureType.MARKING_TEXT,
+        FeatureType.THROUGH_CAVITY,
+        FeatureType.RIB,
+        FeatureType.FLEXURE_SLIT,
+        FeatureType.BROACHED_SLOT,
+        FeatureType.V_GROOVE,
+    }
+)
+
+# Features that can only be made by cutting into solid stock. Formed sheet
+# cannot contain one, so finding one means the shell was milled from billet.
+_SOLID_STOCK_TYPES = frozenset(
+    {
+        FeatureType.BLIND_HOLE,
+        FeatureType.COUNTERBORE,
+        FeatureType.POCKET,
+        FeatureType.SPHERICAL_POCKET,
+        FeatureType.O_RING_GLAND,
+        FeatureType.RETAINING_RING_GROOVE,
+        FeatureType.GROOVE,
+        FeatureType.THREAD_RELIEF_GROOVE,
+        FeatureType.BOSS,
+        FeatureType.RIB,
+        FeatureType.STEP,
+        FeatureType.V_GROOVE,
+    }
+)
+
+# Types whose sheet reading is a formed feature -- an emboss, a louver, a
+# dimple -- rather than a cut one, if the face carries a gauge-thick skin.
+_FORMABLE_TYPES = frozenset(
+    {
+        FeatureType.BOSS,
+        FeatureType.POCKET,
+        FeatureType.SPHERICAL_POCKET,
+        FeatureType.BLIND_HOLE,
+        FeatureType.STEP,
+        FeatureType.GROOVE,
+        FeatureType.O_RING_GLAND,
+        FeatureType.RETAINING_RING_GROOVE,
+    }
+)
+
+# A boss or step is still lathe work while all its flats are annular and all
+# its curved faces coaxial. Anything off-axis needs a mill.
+_ON_AXIS_DOT = 0.99
+
+
+def refine_part_process_with_features(
+    base: PartProcessResult,
+    features,
+    graph: Optional[AttributedAdjacencyGraph] = None,
+) -> PartProcessResult:
+    """Revisit the classification now that the features are known.
+
+    The geometric pass runs before recognition because the recognizers need
+    its verdict, which means it decides on shape alone. Two of its answers
+    can only be checked once the features exist.
+
+    A turned part with a slot in it is a mill-turn part: the lathe cannot
+    make a slot, so the part visits both machines and the setup rules need to
+    know. And a shell that looked like sheet is really milled if it contains
+    anything that had to be cut into solid stock.
+    """
+    if base.type is PartProcessType.SHEET_METAL:
+        return _confirm_sheet(base, features, graph)
+    if base.type is not PartProcessType.TURNED:
+        return base
+
+    for feature in features:
+        if feature.type in _PRISMATIC_TYPES:
+            base.type = PartProcessType.MILL_TURN
+            return base
+        if _milled_protrusion(feature, base, graph):
+            base.type = PartProcessType.MILL_TURN
+            return base
+    return base
+
+
+def _milled_protrusion(feature, base: PartProcessResult, graph) -> bool:
+    """Whether a boss or step could not have come off a lathe.
+
+    A revolved boss has annular flats and coaxial curves. A chordal shelf, a
+    rectangular pad, an off-axis boss -- any of those needs a mill. Blend
+    faces carry no signal either way and are skipped.
+    """
+    if graph is None or base.axis_of_revolution is None:
+        return False
+    if feature.type not in (FeatureType.BOSS, FeatureType.STEP):
+        return False
+
+    axis = base.axis_of_revolution
+    for face_id in feature.faces:
+        if not graph.has_node(face_id):
+            continue
+        node = graph.node(face_id)
+        if node.surface_type is SurfaceType.PLANE:
+            normal = node.outward_normal
+            if normal is not None and abs(normal.Dot(axis.Direction())) < _ON_AXIS_DOT:
+                return True
+        elif node.surface_type in (SurfaceType.CYLINDER, SurfaceType.CONE):
+            if node.cyl_cone_axis is not None and not axes_colinear(
+                node.cyl_cone_axis, axis
+            ):
+                return True
+    return False
+
+
+def _confirm_sheet(base: PartProcessResult, features, graph) -> PartProcessResult:
+    """Keep the sheet verdict only if nothing had to be cut into solid stock.
+
+    The geometric detector keys on a uniform shell with concentric bends, and
+    a thin-walled enclosure milled from billet shares that signature. What it
+    cannot share is a blind hole or a machined gland: those require solid
+    material to cut into, and formed sheet has none.
+
+    Most of this function is the exemptions, because a formed feature looks
+    like a cut one to a recognizer that is not thinking about gauge. An
+    emboss reads as a boss, its back as a pocket, a louver's hood as a blind
+    hole. What tells them apart is that drawn sheet keeps its thickness: the
+    face of a formed feature has a matching skin exactly one gauge behind it,
+    and a machined face sits on solid stock with nothing behind it at all.
+    """
+    gauge = base.sheet_thickness_mm
+    for feature in features:
+        if feature.type not in _SOLID_STOCK_TYPES:
+            continue
+
+        # A bore that stops in open air and is no deeper than a couple of
+        # gauges is a punched hole, not a drilling. Sheet is too thin to
+        # hold a real blind hole anyway.
+        if (
+            feature.type == FeatureType.BLIND_HOLE
+            and feature.param("terminates_in_cavity", False)
+            and (feature.number("depth_mm") or 1e9) <= 2.0 * gauge
+        ):
+            continue
+
+        if feature.type in _FORMABLE_TYPES and _carries_skin(feature, graph, gauge):
+            continue
+
+        # A rib whose thickness *is* the gauge is the sheet's own wall, seen
+        # by the rib recognizer: a closed sheet profile always presents its
+        # two skins as an opposed thin pair. Only a rib meaningfully off the
+        # gauge is evidence of solid stock.
+        if feature.type == FeatureType.RIB:
+            thickness = feature.number("thickness_mm") or 0.0
+            if thickness > 0.0 and abs(thickness - gauge) < 0.3 * gauge:
+                continue
+
+        # Likewise a step only one gauge wide is a sheared edge -- a flange
+        # ending mid-panel reads as a terrace. A machined shelf is far wider
+        # than the material is thick.
+        if feature.type == FeatureType.STEP:
+            width = feature.number("step_width_mm") or 0.0
+            if width > 0.0 and width <= gauge * 1.3:
+                continue
+
+        base.type = PartProcessType.MILLED
+        base.blank = ""
+        base.sheet_thickness_mm = 0.0
+        return base
+
+    return base
+
+
+def _carries_skin(feature, graph, gauge: float) -> bool:
+    """Whether any face of a feature has material exactly one gauge behind it.
+
+    Any face is enough, not the largest: a step whose shear wall outweighs
+    its skinned terrace would otherwise be missed.
+    """
+    if graph is None or gauge <= 0.0:
+        return False
+    for face_id in feature.faces:
+        if not graph.has_node(face_id):
+            continue
+        node = graph.node(face_id)
+        if node.surface_type not in (
+            SurfaceType.PLANE,
+            SurfaceType.SPHERE,
+            SurfaceType.CYLINDER,
+        ):
+            continue
+        if has_constant_gauge_skin(graph, node, gauge):
+            return True
+    return False
+
+
+def has_constant_gauge_skin(
+    graph: AttributedAdjacencyGraph, node: AagNode, gauge: float
+) -> bool:
+    """Whether a face has material exactly one gauge behind it.
+
+    That is what makes a feature formed rather than cut. Drawn sheet keeps
+    its thickness, so the plateau of an emboss has its own back face one
+    gauge behind it, and a dimple has a matching bulge on the far side. A
+    milled pad sits on solid stock with no partner at any distance.
+
+    Each surface asks the question in its own terms, because "one gauge
+    behind" means something different for each. A flat face steps inward
+    along its normal. A sphere and a cylinder are concentric with their far
+    skin, so the question is whether a second one exists a gauge away -- and
+    those two cases matter: a drawn dimple is a sphere and a swept louver
+    hood is a cylinder, and without them every formed part vetoes to milled.
+    """
+    if gauge <= 0.0:
+        return False
+
+    if node.surface_type is SurfaceType.SPHERE:
+        return _concentric_partner(
+            graph, node, gauge, SurfaceType.SPHERE, node.sphere_center, node.sphere_radius
+        )
+
+    if node.surface_type is SurfaceType.CYLINDER and node.cyl_cone_axis is not None:
+        for other in graph.nodes:
+            if other.face_id == node.face_id:
+                continue
+            if other.surface_type is not SurfaceType.CYLINDER:
+                continue
+            if other.cyl_cone_axis is None:
+                continue
+            if not axes_colinear(other.cyl_cone_axis, node.cyl_cone_axis):
+                continue
+            if _about_one_gauge(abs(other.cyl_radius - node.cyl_radius), gauge):
+                return True
+        return False
+
+    normal = node.outward_normal
+    if normal is None or node.centroid is None:
+        return False
+
+    # One gauge in from the face, which is where the far skin should be.
+    behind = node.centroid.Translated(gp_Vec(normal).Multiplied(-gauge))
+
+    for other in graph.nodes:
+        if other.face_id == node.face_id:
+            continue
+        other_normal = other.outward_normal
+        if other_normal is None or other.bbox.IsVoid():
+            continue
+        if normal.Dot(other_normal) > _ANTI_PARALLEL_DOT:
+            continue
+        # Reached by position, not by comparing centroids: the back of an
+        # emboss is often not a face of its own but part of the large bottom
+        # skin, whose centre is somewhere else entirely.
+        if not other.bbox.IsOut(behind):
+            return True
+        if _distance_to_box(other.bbox, behind) <= 0.35 * gauge:
+            return True
+    return False
+
+
+def _concentric_partner(
+    graph: AttributedAdjacencyGraph,
+    node: AagNode,
+    gauge: float,
+    kind: SurfaceType,
+    centre,
+    radius: float,
+) -> bool:
+    """Whether a concentric surface sits one gauge away."""
+    if centre is None or radius <= 0.0:
+        return False
+    for other in graph.nodes:
+        if other.face_id == node.face_id or other.surface_type is not kind:
+            continue
+        if other.sphere_center is None:
+            continue
+        if other.sphere_center.Distance(centre) > 0.5:
+            continue
+        if _about_one_gauge(abs(other.sphere_radius - radius), gauge):
+            return True
+    return False
+
+
+def _about_one_gauge(separation: float, gauge: float) -> bool:
+    return 0.7 * gauge <= separation <= 1.3 * gauge
+
+
+def _distance_to_box(box, point) -> float:
+    """How far a point lies outside an axis-aligned box."""
+    xmin, ymin, zmin, xmax, ymax, zmax = box.Get()
+    dx = max(xmin - point.X(), 0.0, point.X() - xmax)
+    dy = max(ymin - point.Y(), 0.0, point.Y() - ymax)
+    dz = max(zmin - point.Z(), 0.0, point.Z() - zmax)
+    return math.sqrt(dx * dx + dy * dy + dz * dz)

@@ -267,6 +267,159 @@ class Rulebook(Enum):
         family=RuleFamily.GROOVE,
     )
 
+    # -- machining: blends --------------------------------------------------
+    CUTTER_RADIUS_INFEASIBLE = RuleType(
+        "Cutter Radius Infeasible",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description=(
+            "Internal corner radius smaller than any tool in the library can "
+            "produce."
+        ),
+        family=RuleFamily.BLEND,
+    )
+    CUTTER_RADIUS_SUBOPTIMAL = RuleType(
+        "Cutter Radius Suboptimal",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description=(
+            "Internal corner radius that needs a specialty cutter rather than "
+            "a standard end mill."
+        ),
+        family=RuleFamily.BLEND,
+    )
+    CHAMFER_NONSTANDARD_ANGLE = RuleType(
+        "Chamfer Nonstandard Angle",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Chamfer cut at an angle other than 45 degrees.",
+        family=RuleFamily.BLEND,
+    )
+    METAL_SEAL_WITNESS = RuleType(
+        "Metal Seal Witness Edge",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description=(
+            "Functionally sharp revolved sealing edge, as on a knife-edge "
+            "flange."
+        ),
+        family=RuleFamily.BLEND,
+    )
+
+    # -- machining: bosses --------------------------------------------------
+    BOSS_HEIGHT_RATIO = RuleType(
+        "Boss Height Ratio",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="",
+        comparison="max",
+        description="Boss height as a multiple of its diameter or least side.",
+        family=RuleFamily.BOSS,
+    )
+    BOSS_WALL_THICKNESS = RuleType(
+        "Boss Wall Thickness",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="mm",
+        comparison="min",
+        description="Material left in the wall of a hollow boss.",
+        family=RuleFamily.BOSS,
+    )
+    BOSS_UNDERCUT = RuleType(
+        "Boss Needs Special Fixturing",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Boss standing off an axis the machine cannot reach directly.",
+        family=RuleFamily.BOSS,
+    )
+
+    # -- machining: ribs ----------------------------------------------------
+    RIB_HEIGHT_ASPECT = RuleType(
+        "Rib Height Aspect",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="",
+        comparison="max",
+        description="Rib height as a multiple of its thickness.",
+        family=RuleFamily.RIB,
+    )
+    RIB_DRAFT_ANGLE = RuleType(
+        "Rib Draft Angle",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="deg",
+        comparison="min",
+        field_labels=("At least",),
+        description="Draft on a rib wall, for casting and for tool release.",
+        family=RuleFamily.RIB,
+    )
+
+    # -- machining: sculpted surfaces ---------------------------------------
+    FREEFORM_INTERNAL_RADIUS = RuleType(
+        "Freeform Internal Radius",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="mm",
+        comparison="min",
+        description=(
+            "Tightest concave radius in a sculpted region, against the "
+            "smallest ball nose available."
+        ),
+        family=RuleFamily.FREEFORM,
+    )
+    FREEFORM_FINISHING = RuleType(
+        "Freeform Finishing Burden",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Sculpted area needing a long ball-nose finishing pass.",
+        family=RuleFamily.FREEFORM,
+    )
+    TURNED_PROFILE_RADIUS = RuleType(
+        "Turned Profile Radius",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Concave valley in a turned profile, against the form tool nose.",
+        family=RuleFamily.FREEFORM,
+    )
+
+    # -- machining: spherical pockets ---------------------------------------
+    SPHERICAL_POCKET_UNDERCUT = RuleType(
+        "Spherical Pocket Undercut",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Ball-ended pocket whose opening is narrower than its equator.",
+        family=RuleFamily.TOOL_ACCESS,
+    )
+
+    # -- machining: threads -------------------------------------------------
+    THREAD_RUNOUT = RuleType(
+        "Thread Runout",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Clearance below a tapped blind hole for the tap to run out.",
+        family=RuleFamily.THREAD,
+    )
+    THREAD_SHOULDER_PROXIMITY = RuleType(
+        "Thread Shoulder Proximity",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Room between a thread and the shoulder it runs into.",
+        family=RuleFamily.THREAD,
+    )
+    THREAD_WALL_THICKNESS = RuleType(
+        "Thread Wall Thickness",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="mm",
+        comparison="min",
+        description="Material left around a tapped hole.",
+        family=RuleFamily.THREAD,
+    )
+
     # -- machining: thin features -------------------------------------------
     THIN_WALL = RuleType(
         "Thin Wall",

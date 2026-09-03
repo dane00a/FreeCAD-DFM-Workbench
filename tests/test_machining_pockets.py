@@ -57,8 +57,13 @@ def make_simple_pocket() -> TopoDS_Shape:
     return _cut(block(), _cavity((15, 15, 20), (85, 65, 41)))
 
 
-def make_deep_narrow_pocket() -> TopoDS_Shape:
-    """10mm wide and 30mm deep: a slot-like cavity closed at both ends."""
+def make_deep_narrow_cavity() -> TopoDS_Shape:
+    """10mm wide, 40mm long and 30mm deep, closed at both ends.
+
+    Well enclosed, so the pocket seed accepts it -- but four times longer
+    than it is wide, which makes it a channel to mill along rather than a
+    pocket to clear out.
+    """
     return _cut(block(), _cavity((45, 20, 10), (55, 60, 41)))
 
 
@@ -115,11 +120,22 @@ class TestPocketRecognition(unittest.TestCase):
         pocket = pockets_in(make_simple_pocket())[0]
         self.assertEqual(len(pocket.faces), 5)  # floor plus four walls
 
-    def test_deep_narrow_pocket(self):
-        pockets = pockets_in(make_deep_narrow_pocket())
-        self.assertEqual(len(pockets), 1)
-        self.assertAlmostEqual(pockets[0].number("depth_mm"), 30.0, places=3)
-        self.assertAlmostEqual(pockets[0].number("min_width_mm"), 10.0, places=3)
+    def test_long_narrow_cavity_is_a_channel_not_a_pocket(self):
+        # Milling a channel is a different job from clearing a pocket -- one
+        # pass along its length against a spiral clear-out -- so a cavity
+        # much longer than it is wide is reported as a slot even though its
+        # floor is fully enclosed.
+        found = pockets_in(make_deep_narrow_cavity())
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].type, FeatureType.SLOT)
+        self.assertAlmostEqual(found[0].number("width_mm"), 10.0, places=3)
+        self.assertAlmostEqual(found[0].number("length_mm"), 40.0, places=3)
+        self.assertAlmostEqual(found[0].number("depth_mm"), 30.0, places=3)
+
+    def test_a_squarer_cavity_stays_a_pocket(self):
+        # 50 x 70 is not elongated enough to be a channel.
+        found = pockets_in(make_simple_pocket())
+        self.assertEqual(found[0].type, FeatureType.POCKET)
 
     def test_two_pockets_are_reported_separately(self):
         shape = _cut(
@@ -165,3 +181,63 @@ class TestNotPockets(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# =============================================================================
+
+
+from freecad.DFM.core.machining.recognizers import SlotRecognizer
+
+
+def slots_in(shape: TopoDS_Shape):
+    """Cavities the pocket recognizer declined, plus channels it reclassified."""
+    graph = AagBuilder(shape, FaceIndex(shape)).build()
+    pockets = PocketRecognizer().recognize(graph, shape)
+    claimed = {face for feature in pockets for face in feature.faces}
+    from_pockets = [f for f in pockets if f.type == FeatureType.SLOT]
+    return from_pockets + SlotRecognizer().recognize(graph, shape, claimed)
+
+
+class TestSlotRecognition(unittest.TestCase):
+    def test_through_slot_is_recognized_and_open(self):
+        slots = slots_in(make_through_slot())
+        self.assertEqual(len(slots), 1)
+        self.assertEqual(slots[0].type, FeatureType.SLOT)
+        self.assertTrue(slots[0].param("is_open"))
+
+    def test_through_slot_dimensions(self):
+        slot = slots_in(make_through_slot())[0]
+        self.assertAlmostEqual(slot.number("width_mm"), 20.0, places=3)
+        self.assertAlmostEqual(slot.number("length_mm"), 80.0, places=3)
+        self.assertAlmostEqual(slot.number("depth_mm"), 20.0, places=3)
+
+    def test_narrow_deep_channel(self):
+        shape = _cut(block(), _cavity((48, -1, 10), (52, 81, 41)))
+        slots = slots_in(shape)
+        self.assertEqual(len(slots), 1)
+        self.assertAlmostEqual(slots[0].number("width_mm"), 4.0, places=3)
+        self.assertAlmostEqual(slots[0].number("depth_mm"), 30.0, places=3)
+
+    def test_closed_channel_is_not_open(self):
+        slot = slots_in(make_deep_narrow_cavity())[0]
+        self.assertFalse(slot.param("is_open"))
+
+    def test_square_pocket_is_not_a_slot(self):
+        self.assertEqual(slots_in(make_simple_pocket()), [])
+
+    def test_plain_block_has_no_slot(self):
+        self.assertEqual(slots_in(block()), [])
+
+    def test_a_hole_is_not_a_slot(self):
+        drill = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(50, 40, -1), gp_Dir(0, 0, 1)), 8.0, 50.0)
+        self.assertEqual(slots_in(_cut(block(), drill.Shape())), [])
+
+    def test_a_boss_is_not_a_slot(self):
+        boss = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(50, 40, 40), gp_Dir(0, 0, 1)), 12.0, 20.0)
+        self.assertEqual(slots_in(_fuse(block(), boss.Shape())), [])
+
+    def test_square_corners_record_no_radius(self):
+        # Absent, not zero: a rule must be able to tell an unmeasured radius
+        # from a measured radius of nothing.
+        slot = slots_in(make_through_slot())[0]
+        self.assertFalse(slot.has("corner_radius_mm"))

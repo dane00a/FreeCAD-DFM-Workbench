@@ -12,16 +12,19 @@ pattern can group holes that already exist.
 from .base import FeatureRecognizer
 from .hole_recognizer import HoleRecognizer
 from .pocket_recognizer import PocketRecognizer
+from .slot_recognizer import SlotRecognizer
 
 #: Recognizers in pipeline order.
 RECOGNIZER_PIPELINE: list[type[FeatureRecognizer]] = [
     HoleRecognizer,
     PocketRecognizer,
+    SlotRecognizer,
 ]
 
 __all__ = [
     "FeatureRecognizer",
     "HoleRecognizer",
     "PocketRecognizer",
+    "SlotRecognizer",
     "RECOGNIZER_PIPELINE",
 ]

@@ -329,11 +329,24 @@ class PocketRecognizer(FeatureRecognizer):
             "face_count": len(faces),
         }
 
+        # A cavity much longer than it is wide is a channel, whatever its
+        # enclosure said. Milling one is a different job from clearing a
+        # pocket -- one pass along its length against a spiral or trochoidal
+        # clear-out -- and the rules about each differ accordingly. It must
+        # also be no deeper than it is long, which rejects a narrow shaft
+        # seen end-on.
+        is_channel = (
+            max_width >= min_width * 2.0 and max_width >= depth and min_width > 0.0
+        )
+        if is_channel:
+            parameters["width_mm"] = parameters.pop("min_width_mm")
+            parameters["length_mm"] = parameters.pop("max_width_mm")
+
         # The floor leads the face list; later passes rely on that.
         ordered = [floor.face_id] + [f for f in faces if f != floor.face_id]
         return FeatureInstance(
             instance_id=self.instance_id(0),
-            type=FeatureType.POCKET,
+            type=FeatureType.SLOT if is_channel else FeatureType.POCKET,
             faces=ordered,
             parameters=parameters,
         )

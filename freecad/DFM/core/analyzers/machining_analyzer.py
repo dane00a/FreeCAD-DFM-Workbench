@@ -67,7 +67,7 @@ class MachiningAnalyzer(BaseAnalyzer):
             return {}
 
         part_process = classify_part_process(graph, self.config.thresholds, shape)
-        recognition = self._recognize(graph, shape, check_abort)
+        recognition = self._recognize(graph, shape, part_process, check_abort)
 
         context = MachiningContext(
             shape=shape,
@@ -79,12 +79,17 @@ class MachiningAnalyzer(BaseAnalyzer):
         )
         return {CONTEXT_KEY: context}
 
-    def _recognize(self, graph, shape, check_abort) -> RecognitionResult:
+    def _recognize(self, graph, shape, part_process, check_abort) -> RecognitionResult:
         """Run the recognizers in order, each told what the others claimed.
 
         The order is load-bearing: a later recognizer is given the faces
         already spoken for, so a groove does not re-recognize the bore it
         sits in.
+
+        The shop configuration and the part classification are set on each
+        recognizer rather than passed as arguments. Most recognizers need
+        neither, and threading two more parameters through every signature to
+        serve the two that do would be all cost and no clarity.
         """
         result = RecognitionResult()
         claimed: set[int] = set()
@@ -93,6 +98,8 @@ class MachiningAnalyzer(BaseAnalyzer):
             if check_abort and check_abort():
                 break
             recognizer = recognizer_class()
+            recognizer.config = self.config
+            recognizer.part_process = part_process
             try:
                 found = recognizer.recognize(graph, shape, claimed, result.features)
             except Exception as exc:  # one bad recognizer must not lose the rest

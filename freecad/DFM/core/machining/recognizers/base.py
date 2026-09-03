@@ -31,6 +31,15 @@ class FeatureRecognizer:
     #: Short prefix for generated instance ids, e.g. "h" for holes.
     prefix = "f"
 
+    #: The shop's configuration, set by the analyzer before each run. Only a
+    #: few recognizers care what tools the shop owns; the rest ignore it.
+    config = None
+
+    #: How the analyzer classified the part. A recognizer that reads it is
+    #: asking "is this turned", which changes what a surface of revolution
+    #: means -- a profile on a lathe, sculpture anywhere else.
+    part_process = None
+
     @property
     def name(self) -> str:
         raise NotImplementedError

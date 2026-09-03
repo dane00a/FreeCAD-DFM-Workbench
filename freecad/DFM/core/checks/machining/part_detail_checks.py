@@ -662,39 +662,40 @@ class FeatureComplexityCheck(MachiningCheck):
         if limit is None:
             limit = thresholds.feature_complexity_error
 
-        # Blends and draft faces are consequences of other features rather
-        # than operations of their own, so counting them would make a
-        # well-finished part look complicated.
-        counted = [
-            feature
-            for feature in context.recognition.features
-            if feature.type
-            not in (
-                FeatureType.FILLET,
-                FeatureType.CHAMFER,
-                FeatureType.DRAFT_FACE,
-                FeatureType.PATTERN,
-            )
-        ]
-        count = float(len(counted))
+        census = self._census(context)
+        count = float(census["total"])
+        if count <= 0.0:
+            return []
 
         graded = self.graded(count, target, limit, "max")
-        if graded is None:
-            return []
-        severity, threshold = graded
-
-        kinds = context.recognition.counts()
-        busiest = sorted(kinds.items(), key=lambda item: (-item[1], item[0]))[:3]
-        summary = ", ".join(
-            f"{number} {_readable(name)}{'' if number == 1 else 's'}"
-            for name, number in busiest
-        )
+        if graded is not None:
+            severity, threshold = graded
+            closing = (
+                "Nothing here is individually wrong, which is the point: "
+                "programming time and setup count follow the number of "
+                "features far more closely than any single dimension, so a "
+                "part like this runs long even when every limit passes. "
+                "Worth asking whether any of it can be simplified."
+            )
+        else:
+            # Said on every part, not only complicated ones. This is the
+            # closest thing the model produces to an operation list, and an
+            # estimator wants it whether or not the part is unusual -- a
+            # quote is built from how many things have to be cut, and that
+            # number is only obvious once somebody has counted it.
+            severity = Severity.INFO
+            threshold = target
+            closing = (
+                "Not a fault, and not unusual for a part of this size. It is "
+                "here because the operation count is what a quote is built "
+                "from, and it is easier to read than to count."
+            )
 
         return [
             self.finding(
                 rule,
                 severity,
-                f"{int(count)} features",
+                f"{int(count)} features, about {census['operations']} operations",
                 self.render(
                     feedback,
                     severity,
@@ -702,13 +703,9 @@ class FeatureComplexityCheck(MachiningCheck):
                     target,
                     limit,
                     "",
-                    f"This part carries {int(count)} distinct features -- "
-                    f"mostly {summary}. Nothing here is individually wrong, "
-                    "which is the point: programming time and setup count "
-                    "follow the number of features far more closely than any "
-                    "single dimension, so a part like this runs long even "
-                    "when every limit passes. Worth pricing as such, and "
-                    "worth asking whether any of it can be simplified.",
+                    f"This part carries {int(count)} recognized features "
+                    f"({census['summary']}), which is roughly "
+                    f"{census['operations']} machining operations. {closing}",
                 ),
                 faces=[],
                 value=count,
@@ -716,6 +713,65 @@ class FeatureComplexityCheck(MachiningCheck):
                 comparison=">",
             )
         ]
+
+    @staticmethod
+    def _census(context) -> dict:
+        """What is on the part, and roughly how many operations it takes.
+
+        The operation estimate is deliberately crude, because a precise one
+        would need the toolpath. A hole is a drilling pass -- more than one
+        when it crosses a void wide enough that the drill loses its guidance.
+        A pocket is two, roughing and finishing. A slot and a blend are one
+        each: a chamfer is its own tool and its own contour pass, however
+        trivial it looks on the model.
+
+        Members of a pattern are counted as features but not as operations.
+        Twelve holes on one bolt circle are one drilling cycle, and pricing
+        them as twelve is how a quote comes back double.
+        """
+        patterned: set[str] = set()
+        for feature in context.recognition.of_type(FeatureType.PATTERN):
+            children = feature.parameters.get("child_ids") or ()
+            patterned.update(str(child) for child in children)
+
+        counts = {"hole": 0, "pocket": 0, "slot": 0, "blend": 0,
+                  "pattern": 0, "other": 0}
+        operations = 0
+        for feature in context.recognition.features:
+            own_operation = feature.instance_id not in patterned
+            if feature.type in BORE_TYPES:
+                counts["hole"] += 1
+                if own_operation:
+                    passes = feature.number("drilling_passes")
+                    operations += int(passes) if passes and passes > 0 else 1
+            elif feature.type == FeatureType.POCKET:
+                counts["pocket"] += 1
+                if own_operation:
+                    operations += 2
+            elif feature.type == FeatureType.SLOT:
+                counts["slot"] += 1
+                if own_operation:
+                    operations += 1
+            elif feature.type in (FeatureType.FILLET, FeatureType.CHAMFER):
+                counts["blend"] += 1
+                operations += 1
+            elif feature.type == FeatureType.PATTERN:
+                counts["pattern"] += 1
+                operations += 1
+            else:
+                counts["other"] += 1
+                operations += 1
+
+        spoken = [
+            f"{number} {name}{'' if number == 1 else 's'}"
+            for name, number in counts.items()
+            if number
+        ]
+        return {
+            "total": sum(counts.values()),
+            "operations": operations,
+            "summary": ", ".join(spoken) or "no recognized features",
+        }
 
 
 def _readable(feature_type: str) -> str:

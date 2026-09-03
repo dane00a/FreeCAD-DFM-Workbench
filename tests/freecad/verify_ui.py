@@ -663,10 +663,21 @@ def verify_repetition_is_folded_away(view, presenter, doc, model_obj):
     if top is not None:
         top_errors = top.data(QtCore.Qt.ItemDataRole.UserRole + 6) or 0
         top_warnings = top.data(QtCore.Qt.ItemDataRole.UserRole + 7) or 0
-        check("the top row totals the part in one line",
-              top_errors + top_warnings == len(model_obj.active_results),
-              " (%d, %d active)"
-              % (top_errors + top_warnings, len(model_obj.active_results)))
+        # The badge counts what needs acting on, not everything said. An
+        # informational line -- the feature census, the setup count -- is
+        # there to be read, and putting it in the headline number would tell
+        # a machinist a clean part has findings on it.
+        pressing = len([
+            r for r in model_obj.active_results
+            if r.severity.name in ("ERROR", "WARNING")
+        ])
+        check("the top row totals what needs acting on, in one line",
+              top_errors + top_warnings == pressing,
+              " (badge %d, %d needing action, %d findings in all)"
+              % (top_errors + top_warnings, pressing,
+                 len(model_obj.active_results)))
+        check("and informational findings are still in the tree to read",
+              len(model_obj.active_results) >= pressing)
 
 
 def verify_zoom(view, presenter, doc, part):

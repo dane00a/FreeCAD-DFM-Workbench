@@ -203,10 +203,19 @@ class TestSharpInternalEdge(unittest.TestCase):
 class TestFeatureComplexity(unittest.TestCase):
     RULE = Rulebook.FEATURE_COMPLEXITY
 
-    def test_a_simple_part_is_not_complex(self):
-        self.assertEqual(rule_check(square_pocket(), self.RULE), [])
+    def test_a_simple_part_still_gets_its_census(self):
+        """The rule speaks on every part, because a quote is built from it.
 
-    def test_a_busy_part_is_reported(self):
+        This is not a fault report. It is the closest thing the model
+        produces to an operation list, and an estimator wants it whether or
+        not the part is unusual -- so on an ordinary part it is said at
+        INFO, without alarm.
+        """
+        findings = rule_check(square_pocket(), self.RULE)
+        self.assertTrue(findings)
+        self.assertEqual(findings[0].severity, Severity.INFO)
+
+    def test_a_busy_part_is_escalated(self):
         # Thirty-six drillings: nothing individually wrong, which is the
         # whole point of the rule.
         shape = block()
@@ -220,14 +229,28 @@ class TestFeatureComplexity(unittest.TestCase):
                 shape = _cut(shape, drill)
         findings = rule_check(shape, self.RULE, target="10", limit="60")
         self.assertTrue(findings)
-        self.assertIn("distinct features", findings[0].message)
+        self.assertNotEqual(findings[0].severity, Severity.INFO)
+        self.assertIn("recognized features", findings[0].message)
+
+    def test_it_estimates_the_operations_not_just_the_features(self):
+        """Features are what is on the part; operations are what it costs.
+
+        A pocket is two of them, roughing and finishing, so the operation
+        count runs ahead of the feature count on a part made of pockets.
+        """
+        findings = rule_check(square_pocket(), self.RULE)
+        self.assertIn("operations", findings[0].message)
+        self.assertIn("operations", findings[0].overview)
 
     def test_the_shop_can_set_its_own_threshold(self):
-        # A shop that programs quickly raises the bar and stops hearing
-        # about it.
-        self.assertEqual(
-            rule_check(crossing_slots(), self.RULE, target="500", limit="900"), []
-        )
+        # A shop that programs quickly raises the bar and stops being warned
+        # -- though it still gets the count.
+        findings = rule_check(crossing_slots(), self.RULE, target="500", limit="900")
+        self.assertTrue(findings)
+        self.assertEqual(findings[0].severity, Severity.INFO)
+
+    def test_a_part_with_nothing_on_it_says_nothing(self):
+        self.assertEqual(rule_check(block(), self.RULE), [])
 
 
 class TestMarkingRules(unittest.TestCase):

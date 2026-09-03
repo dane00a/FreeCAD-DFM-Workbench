@@ -107,9 +107,24 @@ class SetupCountCheck(MachiningCheck):
         count = float(setups)
 
         graded = self.graded(count, target, limit, "max")
-        if graded is None:
+        if graded is not None:
+            severity, threshold = graded
+            advice = (
+                "Bringing features onto shared faces, or accepting a fourth "
+                "axis, is what reduces this."
+            )
+        elif setups >= thresholds.setup_count_info_min:
+            # Two setups is routine -- almost every turned part needs a
+            # sub-spindle hand-off and many milled parts need a flip for the
+            # second face. It is still the single biggest thing the geometry
+            # says about what the part costs, and an estimator who has to
+            # count approach directions by eye will get it wrong. Said
+            # plainly, without alarm.
+            severity = Severity.INFO
+            threshold = target
+            advice = "That is ordinary for a part of this shape."
+        else:
             return []
-        severity, threshold = graded
 
         return [
             self.finding(
@@ -127,8 +142,7 @@ class SetupCountCheck(MachiningCheck):
                     "distinct directions, so it has to be refixtured that many "
                     "times. Each pickup is a fixture, an alignment and a "
                     "probing cycle, and every one of them puts the previous "
-                    "setup's tolerances at risk. Bringing features onto shared "
-                    "faces, or accepting a fourth axis, is what reduces this.",
+                    f"setup's tolerances at risk. {advice}",
                 ),
                 faces=[],
                 value=count,

@@ -119,3 +119,39 @@ def apply_declaration(prefs: dict, obj) -> dict:
     updated = dict(prefs)
     updated["MachiningBlankForm"] = form
     return updated
+
+# ---------------------------------------------------------------------------
+# The material family
+# ---------------------------------------------------------------------------
+
+#: Which of the two families a process material's category belongs to. The
+#: sheet gauge rule is the one consumer, and it only distinguishes these two
+#: because they are the two the gauge tables differ on: aluminium is formed
+#: thicker than steel before it stops being sheet.
+_FAMILY_BY_CATEGORY = {
+    "aluminium": "aluminium",
+    "aluminum": "aluminium",
+    "steel": "steel",
+    "cast iron": "steel",
+    "stainless": "steel",
+}
+
+
+def material_family_of(material) -> str:
+    """Which family a chosen process material belongs to.
+
+    Read from the material the machinist already picked rather than asked
+    for again. A shop that has chosen "Aluminum (Soft Wrought Alloy)" has
+    said everything the gauge rule needs to know, and a second dropdown
+    saying "aluminium" would be a question with one possible answer.
+
+    Anything unrecognized comes back empty, which the rules read as
+    undeclared and judge by the stricter of the two figures.
+    """
+    category = str(getattr(material, "category", "") or "").strip().lower()
+    if not category:
+        return ""
+    for key, family in _FAMILY_BY_CATEGORY.items():
+        if key in category:
+            return family
+    return ""

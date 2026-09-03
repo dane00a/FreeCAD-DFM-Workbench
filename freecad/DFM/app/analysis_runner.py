@@ -10,7 +10,10 @@ import Part  # type: ignore
 from OCP.TopoDS import TopoDS_Shape
 from OCP.gp import gp_Dir
 
-from ..core.machining.blank_declaration import apply_declaration
+from ..core.machining.blank_declaration import (
+    apply_declaration,
+    material_family_of,
+)
 from ..core.registries.process_registry import ProcessRegistry
 from ..core.registries.checks_registry import get_check_class
 from ..core.registries.analyzers_registry import get_analyzer_class
@@ -60,6 +63,16 @@ class AnalysisRunner:
         if not target_material and material_name != "Default":
             App.Console.PrintDeveloperError(f"Material '{material_name}' not found.\n")
             return []
+
+        # The chosen material tells the sheet rules which gauge table to
+        # use. Read from the pick the machinist already made rather than
+        # asked for a second time in different words: a shop that has
+        # chosen "Aluminum (Soft Wrought Alloy)" has said everything the
+        # gauge rule needs to know.
+        family = material_family_of(target_material)
+        if family:
+            kwargs["prefs"] = dict(kwargs["prefs"])
+            kwargs["prefs"]["MachiningMaterialFamily"] = family
 
         shape_occ: TopoDS_Shape = freecad_to_ocp(shape)
         pull_direction = kwargs.get(ProcessRequirement.PULL_DIRECTION.name, gp_Dir(0, 0, 1))

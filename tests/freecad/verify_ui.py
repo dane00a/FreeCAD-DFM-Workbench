@@ -1476,6 +1476,31 @@ def verify_runner(part):
     check("a blank declared on the part reaches the analysis",
           context.config.blank_form == "billet",
           " (%r)" % context.config.blank_form)
+
+    # The material the machinist picked has to reach the rules that read it.
+    # Nothing writes the material family down; it is derived from the choice
+    # already made, and if that derivation is not wired the sheet gauge rule
+    # silently judges an aluminium part by the steel figure.
+    from freecad.DFM.core.registries import ProcessRegistry
+
+    milling = ProcessRegistry.get_instance().get_process_by_name("CNC Milling")
+    alloy = next(
+        (name for name in milling.materials if "Alumin" in name), None
+    )
+    check("the milling process offers an aluminium alloy", alloy is not None,
+          " (%s)" % sorted(milling.materials))
+    if alloy is not None:
+        runner = AnalysisRunner()
+        runner.run_analysis(
+            process_name="CNC Milling",
+            material_name=alloy,
+            shape=part.Shape,
+            target_object=part,
+        )
+        chosen = list(runner.analyzer_cache["MACHINING_ANALYZER"].values())[0]
+        check("choosing it tells the rules which gauge table to read",
+              chosen.config.material_family == "aluminium",
+              " (%r)" % chosen.config.material_family)
     blank_declaration.declare_blank(part, "")
 
 

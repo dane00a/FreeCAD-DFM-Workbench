@@ -73,7 +73,20 @@ class TaskShowNormals:
             print("No faces found.")
 
 
-class DfmAnalysisCommand:
+class DfmShowNormalsCommand:
+    """A developer aid, registered but deliberately not on the toolbar.
+
+    Drawing every face normal is how you find out that a face is inside out,
+    which is the single most confusing thing that can happen to a rule that
+    reasons about which side the material is on. Nobody analysing a part
+    wants it, so it stays out of the menu and is run by name from the Python
+    console when something does not add up.
+
+    It was called DfmAnalysisCommand, which is the name of the command that
+    actually runs an analysis, in another module. Renamed so that reading
+    either one tells you which is which.
+    """
+
     def GetResources(self):
         return {
             "Pixmap": "",
@@ -89,4 +102,4 @@ class DfmAnalysisCommand:
 
 
 if FreeCAD.GuiUp:
-    Gui.addCommand("DFM_ShowNormals", DfmAnalysisCommand())
+    Gui.addCommand("DFM_ShowNormals", DfmShowNormalsCommand())

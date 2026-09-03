@@ -493,6 +493,8 @@ class ThinWallCheck(MachiningCheck):
                     continue
                 if plane.centroid.Distance(axis.Location()) > reach:
                     continue
+                if plane.bbox.Distance(primary.bbox) >= target:
+                    continue
 
                 pair = (min(primary.face_id, plane.face_id),
                         max(primary.face_id, plane.face_id))
@@ -712,6 +714,8 @@ class ThinWallCheck(MachiningCheck):
                 span = first.cyl_radius + second.cyl_radius + target * 2.0
                 if first.centroid.Distance(second.centroid) > span:
                     continue
+                if first.bbox.Distance(second.bbox) >= target:
+                    continue
 
                 axis_a = first.cyl_cone_axis.Direction()
                 axis_b = second.cyl_cone_axis.Direction()
@@ -889,6 +893,12 @@ class ThinWallCheck(MachiningCheck):
                 # already measured properly; above it they lean the same way
                 # and enclose nothing.
                 if alignment < _ANTIPARALLEL_DOT_MAX or alignment > _CONVERGING_DOT_MAX:
+                    continue
+                # Cheap first. Two bounding boxes further apart than the wall
+                # we care about cannot have a thin wall between them, and
+                # asking the kernel for an exact surface distance is by far
+                # the most expensive thing in this rule.
+                if first.bbox.Distance(second.bbox) >= target:
                     continue
                 if self._share_an_edge(context, first, second):
                     continue

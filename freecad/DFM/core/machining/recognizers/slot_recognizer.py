@@ -88,12 +88,24 @@ class SlotRecognizer(FeatureRecognizer):
     ) -> list[FeatureInstance]:
         found: list[FeatureInstance] = []
         claimed = set(taken)
+        # Only the walls this pass has already given to a slot. A wall an
+        # earlier recognizer claimed -- a bore breaking through it, say --
+        # says nothing about whether this floor is a channel of its own.
+        walls_seen: set[int] = set()
 
         for floor in self._floor_candidates(graph, claimed, total_area):
             if floor.face_id in claimed:
                 continue
             walls = self._facing_walls(graph, floor)
             if walls is None:
+                continue
+            # A channel of square section has two faces that could each be
+            # read as its floor, and the same pair of walls between them.
+            # Taken at face value that is two slots lying on top of each
+            # other -- and because they share only two faces out of three,
+            # the resolver keeps both. Whichever was found first is the
+            # channel; this is its ceiling.
+            if all(wall.face_id in walls_seen for wall in walls):
                 continue
             if self._has_axial_bore(graph, floor):
                 continue  # a drilled port through the floor, not a channel
@@ -104,6 +116,7 @@ class SlotRecognizer(FeatureRecognizer):
                 continue
             found.append(feature)
             claimed.update(feature.faces)
+            walls_seen.update(wall.face_id for wall in walls)
 
         return found
 

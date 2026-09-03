@@ -154,11 +154,23 @@ try:
             )
 
     fired = {rule.name for rule, _ in findings}
+    # The part is deliberately built so exactly these two apply: a hole a
+    # little deeper than six diameters, and a pocket with square corners.
+    expected = {"HOLE_DEPTH_RATIO", "POCKET_CORNER_RADIUS"}
     check("the deep hole is reported", "HOLE_DEPTH_RATIO" in fired)
+    check("the square-cornered pocket is reported", "POCKET_CORNER_RADIUS" in fired)
     check(
-        "nothing else fires on an otherwise ordinary part",
-        len(findings) == 1,
-        " (%d findings)" % len(findings),
+        "nothing unexpected fires",
+        fired == expected,
+        "" if fired == expected else " (unexpected: %s)" % sorted(fired - expected),
+    )
+    check(
+        "a square corner warns rather than errors",
+        all(
+            result.severity.name == "WARNING"
+            for rule, result in findings
+            if rule.name == "POCKET_CORNER_RADIUS"
+        ),
     )
 
     bad = [

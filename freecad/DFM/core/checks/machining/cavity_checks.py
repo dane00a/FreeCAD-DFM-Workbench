@@ -104,7 +104,6 @@ class PocketCornerRadiusCheck(MachiningCheck):
             limit = context.config.thresholds.pocket_corner_radius_min_mm
 
         achievable = context.config.smallest_internal_corner_radius()
-        severity_setting = self.severity_from_rule_config(rule_config)
         results: list[CheckResult] = []
 
         for cavity in context.recognition.of_type(FeatureType.POCKET, FeatureType.SLOT):
@@ -117,10 +116,13 @@ class PocketCornerRadiusCheck(MachiningCheck):
             if radius > limit:
                 continue
 
-            # A corner tighter than any tool can cut is a harder problem than
-            # one that is merely sharp.
+            # Two different problems share this rule. A square corner is a
+            # request for a second process, which is a cost and a lead time --
+            # a warning. A corner specified with a radius that is real but
+            # tighter than any cutter in the shop cannot be made as drawn at
+            # all, and is an error.
             infeasible = achievable is not None and radius < achievable - 0.01
-            severity = Severity.ERROR if infeasible and radius > 0.0 else severity_setting
+            severity = Severity.ERROR if (infeasible and radius > 0.0) else Severity.WARNING
 
             through = bool(cavity.param("is_through"))
             process = "wire EDM" if through or cavity.param("is_open") else "sinker EDM"

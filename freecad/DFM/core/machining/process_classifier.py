@@ -24,7 +24,7 @@ from typing import Optional
 from OCP.Bnd import Bnd_Box
 from OCP.gp import gp_Ax1, gp_Vec
 
-from .aag import AagNode, AttributedAdjacencyGraph, SurfaceType
+from .aag import AagNode, AttributedAdjacencyGraph, Concavity, SurfaceType
 from .config import RuleThresholds
 from ..utils.geometry import FaceIndex
 from .features import FeatureType
@@ -200,6 +200,14 @@ def classify_part_process(
     result = PartProcessResult()
 
     gauge = detect_sheet_metal(graph, shape)
+    if gauge is None:
+        # Second route: a shell whose folds were modelled square. Somebody
+        # who draws sheet metal without radiusing the folds has still drawn
+        # sheet metal, and reading it as a solid gives the part the wrong
+        # voice -- thin wall firing on its own gauge, corner radius firing on
+        # every fold. Better to recognize the intent and report the sharp
+        # folds as the defect.
+        gauge = detect_sharp_fold_shell(graph)
     if gauge is not None:
         result.type = PartProcessType.SHEET_METAL
         result.blank = "sheet_metal"
@@ -842,3 +850,216 @@ def freeform_skin_area(
             total += node.area
 
     return total
+
+
+# A fold modelled with no radius is still sheet-metal intent, and the gauge
+# it implies has to be plausible for a brake.
+_FOLD_MIN_GAUGE_MM = 0.5
+_FOLD_MAX_GAUGE_MM = 6.0
+
+# The dominant gauge has to account for this much of the paired area before
+# the part counts as one consistent shell rather than an assortment of slabs.
+_FOLD_DOMINANT_SHARE = 0.7
+
+# Two panels are the same orientation within about 25 degrees, and square to
+# each other below 45.
+_FOLD_SAME_ORIENTATION = 0.9
+_FOLD_SQUARE_ORIENTATION = 0.7
+
+
+def detect_sharp_fold_shell(
+    graph: AttributedAdjacencyGraph,
+) -> Optional[float]:
+    """The gauge of a shell whose folds were modelled square.
+
+    Somebody who draws sheet metal without radiusing the folds has still
+    drawn sheet metal, and reading it as a solid gives the part the wrong
+    voice entirely -- thin wall firing on its own gauge, the corner-radius
+    rule firing on every fold. Better to recognize the intent and report the
+    sharp folds as the defect they are.
+
+    The evidence is a consistent gauge across panels that meet at an angle.
+    That alone would also describe a milled box, so the last test is what
+    separates them: a foldable blank has at most two of its panel pairs
+    joined, because a third join is a corner that no single flat blank can
+    make. Three connected pairs means the part was carved, not folded.
+    """
+    planes = graph.nodes_by_surface_type(SurfaceType.PLANE)
+    total_area = sum(node.area for node in planes)
+    if len(planes) < 4 or total_area < 1e-6:
+        return None
+
+    histogram, members, paired_area = _gauge_histogram(planes)
+    gauge = _dominant_gauge(histogram, paired_area)
+    if gauge is None:
+        return None
+
+    panels = _dominant_panels(members, gauge)
+    if not panels:
+        return None
+
+    groups = _orientation_groups(panels, gauge)
+    if len(groups) < 2:
+        return None
+
+    return gauge if _folds_rather_than_carvings(graph, groups) else None
+
+
+def _gauge_histogram(planes):
+    """Every opposed overlapping plane pair, bucketed by the gap between them.
+
+    Credited by the smaller of the two areas, and bucketed rather than
+    assigned to a nearest partner: a shallow pocket floor a millimetre above
+    the bottom skin would otherwise drag that entire panel into the wrong
+    bucket and sink the whole reading.
+    """
+    histogram: dict[int, float] = {}
+    members: dict[int, list] = {}
+    paired_area = 0.0
+
+    for index, first in enumerate(planes):
+        first_normal = first.outward_normal
+        if first_normal is None:
+            continue
+        for second in planes[index + 1 :]:
+            second_normal = second.outward_normal
+            if second_normal is None or second_normal.Dot(first_normal) > -0.999:
+                continue
+            gap = abs(
+                gp_Vec(first.centroid, second.centroid).Dot(gp_Vec(first_normal))
+            )
+            if gap < 0.3 or gap > _FOLD_MAX_GAUGE_MM:
+                continue
+            reach = Bnd_Box()
+            reach.Add(first.bbox)
+            reach.Enlarge(gap + 0.5)
+            if reach.IsOut(second.bbox):
+                continue
+
+            bucket = int(round(gap * 10.0))
+            weight = min(first.area, second.area)
+            histogram[bucket] = histogram.get(bucket, 0.0) + weight
+            paired_area += weight
+
+            # Membership needs a real two-sided skin: both partners must
+            # carry sheet-flat area at this gauge. A block's big outer side
+            # pairing with a small cutout wall is not a panel, and letting it
+            # in fakes a second fold orientation.
+            if weight >= 25.0 * (bucket / 10.0) ** 2:
+                members.setdefault(bucket, []).extend((first, second))
+
+    return histogram, members, paired_area
+
+
+def _dominant_gauge(histogram, paired_area: float) -> Optional[float]:
+    """The one gauge that most of the part is at, if there is one."""
+    if paired_area < 1e-6:
+        return None
+    best_bucket, best_area = None, 0.0
+    for bucket, area in histogram.items():
+        # Neighbouring buckets count: a real gauge spreads across a tenth
+        # either side once booleans have had their way with it.
+        spread = area + histogram.get(bucket - 1, 0.0) + histogram.get(bucket + 1, 0.0)
+        if spread > best_area:
+            best_bucket, best_area = bucket, spread
+    if best_bucket is None:
+        return None
+    if best_area / paired_area < _FOLD_DOMINANT_SHARE:
+        return None
+    gauge = best_bucket / 10.0
+    return gauge if gauge >= _FOLD_MIN_GAUGE_MM else None
+
+
+def _dominant_panels(members, gauge: float) -> list:
+    """The faces at the dominant gauge, with the sheared edge strips dropped.
+
+    A face whose second-smallest extent is about the gauge is the edge of the
+    sheet seen side-on, not a panel of it.
+    """
+    wanted = int(round(gauge * 10.0))
+    panels, seen = [], set()
+    for bucket in (wanted - 1, wanted, wanted + 1):
+        for node in members.get(bucket, ()):
+            if node.face_id in seen:
+                continue
+            extents = sorted(node.bbox_dims())
+            if extents[1] <= gauge * 1.3:
+                continue
+            seen.add(node.face_id)
+            panels.append(node)
+    return panels
+
+
+def _orientation_groups(panels, gauge: float) -> list:
+    """Panels grouped by which way they face, keeping only the substantial ones."""
+    groups: list[tuple] = []
+    for node in panels:
+        normal = node.outward_normal
+        if normal is None:
+            continue
+        for existing in groups:
+            if abs(existing[0].Dot(normal)) > _FOLD_SAME_ORIENTATION:
+                existing[1].add(node.face_id)
+                break
+        else:
+            groups.append((normal, {node.face_id}, [node]))
+            continue
+        for existing in groups:
+            if abs(existing[0].Dot(normal)) > _FOLD_SAME_ORIENTATION:
+                existing[2].append(node)
+                break
+
+    total = sum(node.area for node in panels)
+    floor = max(25.0 * gauge * gauge, 0.05 * total)
+    return [
+        group for group in groups if sum(n.area for n in group[2]) >= floor
+    ]
+
+
+def _folds_rather_than_carvings(graph, groups) -> bool:
+    """Whether the joins between panels look folded rather than carved.
+
+    A sharp join between two panels at an angle is the fold-intent tell. But
+    a milled enclosure also has square wall-to-floor corners, so the count is
+    what separates them: three connected panel pairs is a corner, and no
+    single flat blank folds into a corner. Blend-bridged joins count toward
+    that veto even though they are not sharp, because a carved box's rounded
+    wall-to-wall corners are still corners.
+    """
+    sharp_pairs = connected_pairs = 0
+    for index, first in enumerate(groups):
+        for second in groups[index + 1 :]:
+            if abs(first[0].Dot(second[0])) > _FOLD_SQUARE_ORIENTATION:
+                continue
+            sharp = bridged = False
+            for face_id in sorted(first[1]):
+                for edge in graph.edges_of(face_id):
+                    other = edge.other_face(face_id)
+                    if other in second[1]:
+                        if edge.concavity is Concavity.TANGENT:
+                            bridged = True
+                        else:
+                            sharp = True
+                    elif graph.has_node(other):
+                        middle = graph.node(other)
+                        if middle.surface_type in (
+                            SurfaceType.CYLINDER,
+                            SurfaceType.TORUS,
+                        ):
+                            for hop in graph.edges_of(other):
+                                if hop.other_face(other) in second[1]:
+                                    bridged = True
+                                    break
+                    if sharp:
+                        break
+                if sharp:
+                    break
+            if sharp:
+                sharp_pairs += 1
+            if sharp or bridged:
+                connected_pairs += 1
+
+    if sharp_pairs < 1:
+        return False
+    # Three joined pairs is a carved corner, not a folded blank.
+    return connected_pairs < 3

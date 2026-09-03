@@ -9,6 +9,8 @@ active_rules:
 - PART_ASPECT_RATIO
 - MATERIAL_REMOVAL
 - SEALED_VOID
+- UNDERCUT_PRESENT
+- TOOL_ACCESS_BLOCKED
 - HOLE_DEPTH_RATIO
 - HOLE_EDGE_DISTANCE
 - HOLE_WEB_THICKNESS
@@ -25,6 +27,12 @@ active_rules:
 - THIN_CLAMPING_DIMENSION
 - SMALL_PART_HOLDING
 rule_feedback:
+    UNDERCUT_PRESENT:
+        warning_msg: ''
+        error_msg: ''
+    TOOL_ACCESS_BLOCKED:
+        warning_msg: ''
+        error_msg: ''
     POCKET_DEPTH_RATIO:
         warning_msg: ''
         error_msg: ''
@@ -80,6 +88,8 @@ rule_feedback:
         warning_msg: ''
         error_msg: ''
 rule_criticality:
+    UNDERCUT_PRESENT: HIGH
+    TOOL_ACCESS_BLOCKED: CRITICAL
     POCKET_DEPTH_RATIO: HIGH
     POCKET_CORNER_RADIUS: MEDIUM
     POCKET_NARROW_OPENING: HIGH
@@ -114,6 +124,10 @@ materials:
                 target: '70'
                 limit: '85'
             SEALED_VOID:
+                binary_severity: ERROR
+            UNDERCUT_PRESENT:
+                binary_severity: WARNING
+            TOOL_ACCESS_BLOCKED:
                 binary_severity: ERROR
             HOLE_DEPTH_RATIO:
                 target: '6.0'

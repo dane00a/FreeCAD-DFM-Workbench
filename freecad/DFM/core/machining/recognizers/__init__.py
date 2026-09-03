@@ -13,12 +13,16 @@ from .base import FeatureRecognizer
 from .hole_recognizer import HoleRecognizer
 from .pocket_recognizer import PocketRecognizer
 from .slot_recognizer import SlotRecognizer
+from .undercut_recognizer import UndercutRecognizer
 
 #: Recognizers in pipeline order.
 RECOGNIZER_PIPELINE: list[type[FeatureRecognizer]] = [
     HoleRecognizer,
     PocketRecognizer,
     SlotRecognizer,
+    # Last of the cavity group: it is told which faces the others claimed,
+    # so a bore is never reported as unreachable from the side.
+    UndercutRecognizer,
 ]
 
 __all__ = [
@@ -26,5 +30,6 @@ __all__ = [
     "HoleRecognizer",
     "PocketRecognizer",
     "SlotRecognizer",
+    "UndercutRecognizer",
     "RECOGNIZER_PIPELINE",
 ]

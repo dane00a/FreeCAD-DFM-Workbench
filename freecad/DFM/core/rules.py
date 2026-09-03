@@ -293,6 +293,22 @@ class Rulebook(Enum):
         family=RuleFamily.HOLE,
     )
 
+    # -- machining: tool access ---------------------------------------------
+    UNDERCUT_PRESENT = RuleType(
+        "Undercut",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Surface no straight-down approach can reach.",
+        family=RuleFamily.TOOL_ACCESS,
+    )
+    TOOL_ACCESS_BLOCKED = RuleType(
+        "Unreachable Feature",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Feature with no tool approach at all, from any direction.",
+        family=RuleFamily.TOOL_ACCESS,
+    )
+
     # -- machining: setup and workholding -----------------------------------
     NO_DATUM_FACE = RuleType(
         "Datum Face",

@@ -38,6 +38,7 @@ from .base import (
     bend_axial_span,
     bend_geom,
     bends_of,
+    gauge_phrase,
     hem_min_return_mm,
     max_std_bend_deg,
     panel_away_dir,
@@ -167,9 +168,11 @@ class SheetFlangeShortCheck(SheetCheck):
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
         gauge = self.gauge(context)
-        factor = self.safe_float(rule_config.target)
-        if factor is None:
-            factor = threshold(context, "sheet_min_flange_factor", SHEET_MIN_FLANGE_FACTOR)
+        factor = threshold(context, "sheet_min_flange_factor", SHEET_MIN_FLANGE_FACTOR)
+        # The rule is declared in millimetres, so a configured figure is read
+        # as one: an absolute floor standing in for the gauge-relative answer,
+        # which is what a shop quoting a fixed die grip would enter.
+        configured = self.safe_float(rule_config.limit)
 
         results: list[CheckResult] = []
         for bend in bends_of(context):
@@ -177,7 +180,16 @@ class SheetFlangeShortCheck(SheetCheck):
             # to lose. SHEET_HEM_DIMENSIONS judges its return instead.
             if bend.feature.param("is_hem"):
                 continue
-            minimum = gauge * factor + bend.inner_radius
+            minimum = (
+                configured
+                if configured is not None
+                else gauge * factor + bend.inner_radius
+            )
+            basis = (
+                "the configured minimum"
+                if configured is not None
+                else f"{gauge_phrase(factor)} plus the bend radius"
+            )
             for panel_id in bend.panels:
                 direction = panel_away_dir(context, bend, panel_id)
                 if direction is None:
@@ -203,7 +215,7 @@ class SheetFlangeShortCheck(SheetCheck):
                             "mm",
                             f"This flange stands only {flange:.1f} mm out from the "
                             f"bend line, and the die needs {minimum:.1f} mm -- "
-                            f"{factor:.0f} gauges plus the bend radius -- to hold "
+                            f"{basis} -- to hold "
                             "it. A flange this short slips out of the vee as the "
                             "ram comes down, so the angle wanders and the part "
                             "comes off twisted. Lengthen the flange, or leave it "

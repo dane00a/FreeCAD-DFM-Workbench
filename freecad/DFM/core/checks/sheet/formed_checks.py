@@ -43,6 +43,7 @@ from .base import (
     bends_of,
     box_of_faces,
     distance_to_box,
+    gauge_phrase,
     sorted_features,
     threshold,
 )
@@ -78,7 +79,14 @@ class SheetFormedFeatureCheck(SheetCheck):
         for feature in sorted_features(context, FeatureType.SHEET_FORMED):
             subtype = str(feature.param("subtype", "formed"))
             height = feature.number("height_mm", 0.0) or 0.0
-            open_edges = feature.number("open_edges", 0.0) or 0.0
+            open_edges = int(feature.number("open_edges", 0.0) or 0.0)
+            article = "an" if subtype[:1].lower() in "aeiou" else "a"
+            if open_edges == 1:
+                sheared = ", sheared open along one edge"
+            elif open_edges > 1:
+                sheared = f", sheared open along {open_edges} edges"
+            else:
+                sheared = ", closed all round"
 
             results.append(
                 self.finding(
@@ -92,14 +100,13 @@ class SheetFormedFeatureCheck(SheetCheck):
                         height,
                         height,
                         "mm",
-                        f"This is a formed feature -- a {subtype} standing "
-                        f"{height:.1f} mm proud of the panel, with "
-                        f"{int(open_edges)} sheared edge(s). It needs a dedicated "
-                        "punch and die in the turret; laser cutting and press-brake "
-                        "bending alone will not produce it, and the forming "
-                        "direction is one-sided, so every one of these has to be "
-                        "raised from the same face. Worth confirming the tooling "
-                        "exists before the part is quoted.",
+                        f"This is a formed feature -- {article} {subtype} standing "
+                        f"{height:.1f} mm proud of the panel{sheared}. It needs a "
+                        "dedicated punch and die in the turret; laser cutting and "
+                        "press-brake bending alone will not produce it, and the "
+                        "forming direction is one-sided, so every one of these has "
+                        "to be raised from the same face. Worth confirming the "
+                        "tooling exists before the part is quoted.",
                     ),
                     faces=feature.faces,
                     value=height,
@@ -154,7 +161,7 @@ class SheetEmbossDeepCheck(SheetCheck):
                         factor,
                         "",
                         f"This emboss is drawn {height:.1f} mm deep in "
-                        f"{gauge:.2f} mm material, past the {factor:.0f} gauges a "
+                        f"{gauge:.2f} mm material, past the {gauge_phrase(factor)} a "
                         f"single hit will stretch ({maximum:.1f} mm). The walls "
                         "thin as the metal is pulled in and then split at the "
                         "corners. Reduce the draw, put a larger radius on the "
@@ -254,12 +261,14 @@ class SheetFormedPitchCheck(SheetCheck):
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
         gauge = self.gauge(context)
-        factor = self.safe_float(rule_config.limit)
-        if factor is None:
-            factor = threshold(
-                context, "sheet_formed_min_pitch_factor", SHEET_FORMED_MIN_PITCH_FACTOR
-            )
-        minimum = gauge * factor
+        factor = threshold(
+            context, "sheet_formed_min_pitch_factor", SHEET_FORMED_MIN_PITCH_FACTOR
+        )
+        # Declared in millimetres, so a configured figure is one: an absolute
+        # web replacing the gauge-relative answer.
+        configured = self.safe_float(rule_config.limit)
+        minimum = configured if configured is not None else gauge * factor
+        basis = "the configured web" if configured is not None else gauge_phrase(factor)
 
         formed = []
         for feature in sorted_features(context, FeatureType.SHEET_FORMED):
@@ -288,7 +297,7 @@ class SheetFormedPitchCheck(SheetCheck):
                             "mm",
                             f"These two formed features leave only {gap:.1f} mm of "
                             f"flat between them. Keep at least {minimum:.1f} mm -- "
-                            f"{factor:.0f} gauges -- or forming the first one pulls "
+                            f"{basis} -- or forming the first one pulls "
                             "the web into the second and the panel between them "
                             "ends up dished. Space them further apart, or make them "
                             "smaller.",
@@ -348,13 +357,14 @@ class SheetFormedNearBendCheck(SheetCheck):
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
         gauge = self.gauge(context)
-        factor = self.safe_float(rule_config.limit)
-        if factor is None:
-            factor = threshold(
-                context,
-                "sheet_formed_bend_clearance_factor",
-                SHEET_FORMED_BEND_CLEARANCE_FACTOR,
-            )
+        factor = threshold(
+            context,
+            "sheet_formed_bend_clearance_factor",
+            SHEET_FORMED_BEND_CLEARANCE_FACTOR,
+        )
+        # Declared in millimetres, so a configured figure is one: an absolute
+        # clearance replacing the gauge-relative answer.
+        configured = self.safe_float(rule_config.limit)
 
         bends = bends_of(context)
         if not bends:
@@ -370,7 +380,16 @@ class SheetFormedNearBendCheck(SheetCheck):
                 span = bend_axial_span(context, bend)
                 if span is None:
                     continue
-                clearance = gauge * factor + bend.inner_radius
+                clearance = (
+                    configured
+                    if configured is not None
+                    else gauge * factor + bend.inner_radius
+                )
+                basis = (
+                    "the configured clearance"
+                    if configured is not None
+                    else f"{gauge_phrase(factor)} plus the bend radius"
+                )
                 nearest = self._nearest_along(bend, span, box)
                 if nearest >= clearance:
                     continue
@@ -389,7 +408,7 @@ class SheetFormedNearBendCheck(SheetCheck):
                             "mm",
                             f"This formed feature sits {nearest:.1f} mm from a bend "
                             f"line, inside the {clearance:.1f} mm the fold works "
-                            f"({factor:.0f} gauges plus the bend radius). The metal "
+                            f"({basis}). The metal "
                             "there is already stretched and hardened, so the bend "
                             "comes out uneven and the formed shape distorts with "
                             "it. Move the feature clear of the bend zone, or form "

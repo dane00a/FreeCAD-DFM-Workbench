@@ -29,6 +29,7 @@ from .base import (
     SHEET_TAB_MAX_ASPECT,
     SHEET_TAB_WIDTH_FACTOR,
     SheetCheck,
+    gauge_phrase,
     sorted_features,
     threshold,
 )
@@ -71,8 +72,8 @@ class SheetTabNarrowCheck(SheetCheck):
             if too_narrow:
                 problem = (
                     f"is only {width:.1f} mm wide, under the {minimum:.1f} mm "
-                    f"minimum (the greater of {floor:.1f} mm and {factor:.0f} "
-                    "gauges)"
+                    f"minimum (the greater of {floor:.1f} mm and "
+                    f"{gauge_phrase(factor)})"
                 )
                 overview = f"{width:.1f} mm tab"
                 value, limit = width, minimum
@@ -152,7 +153,7 @@ class SheetNotchNarrowCheck(SheetCheck):
             if too_narrow:
                 problem = (
                     f"is only {width:.2f} mm wide, under the {minimum:.2f} mm "
-                    f"minimum of {factor:.0f} gauge"
+                    f"minimum of {gauge_phrase(factor)}"
                 )
                 overview = f"{width:.2f} mm notch"
                 value, limit, comparison = width, minimum, "<"

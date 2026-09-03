@@ -34,6 +34,7 @@ from .base import (
     SHEET_MIN_HOLE_FACTOR,
     SheetCheck,
     bends_of,
+    gauge_phrase,
     hole_cyl_node,
     hole_in_panel,
     is_hole_type,
@@ -60,13 +61,14 @@ class SheetHoleNearBendCheck(SheetCheck):
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
         gauge = self.gauge(context)
-        factor = self.safe_float(rule_config.limit)
-        if factor is None:
-            factor = threshold(
-                context,
-                "sheet_hole_bend_clearance_factor",
-                SHEET_HOLE_BEND_CLEARANCE_FACTOR,
-            )
+        factor = threshold(
+            context,
+            "sheet_hole_bend_clearance_factor",
+            SHEET_HOLE_BEND_CLEARANCE_FACTOR,
+        )
+        # Declared in millimetres, so a configured figure is one: an absolute
+        # clearance standing in for the gauge-relative answer.
+        configured = self.safe_float(rule_config.limit)
 
         bends = bends_of(context)
         if not bends:
@@ -83,7 +85,16 @@ class SheetHoleNearBendCheck(SheetCheck):
             centre = bore.cyl_cone_axis.Location()
 
             for bend in bends:
-                minimum = gauge * factor + bend.inner_radius
+                minimum = (
+                    configured
+                    if configured is not None
+                    else gauge * factor + bend.inner_radius
+                )
+                basis = (
+                    "the configured clearance"
+                    if configured is not None
+                    else f"{gauge_phrase(factor)} plus the bend radius"
+                )
                 for panel_id in bend.panels:
                     if not hole_in_panel(context, hole, panel_id):
                         continue
@@ -113,7 +124,7 @@ class SheetHoleNearBendCheck(SheetCheck):
                                 f"The edge of this hole sits {clearance:.1f} mm "
                                 "from the bend tangent line, inside the metal the "
                                 f"fold stretches. It needs {minimum:.1f} mm -- "
-                                f"{factor:.1f} gauges plus the bend radius. As "
+                                f"{basis}. As "
                                 "drawn the hole pulls into an oval when the bend "
                                 "is formed. Move it clear of the bend zone, or "
                                 "punch it after forming as a secondary operation.",
@@ -201,10 +212,12 @@ class SheetHolePitchCheck(SheetCheck):
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
         gauge = self.gauge(context)
-        factor = self.safe_float(rule_config.limit)
-        if factor is None:
-            factor = threshold(context, "sheet_hole_pitch_factor", SHEET_HOLE_PITCH_FACTOR)
-        minimum = gauge * factor
+        factor = threshold(context, "sheet_hole_pitch_factor", SHEET_HOLE_PITCH_FACTOR)
+        # Declared in millimetres, so a configured figure replaces the
+        # gauge-relative web outright.
+        configured = self.safe_float(rule_config.limit)
+        minimum = configured if configured is not None else gauge * factor
+        basis = "the configured web" if configured is not None else gauge_phrase(factor)
 
         holes = []
         for hole in sorted_features(context):
@@ -236,7 +249,7 @@ class SheetHolePitchCheck(SheetCheck):
                             "mm",
                             f"These two holes leave only {web:.1f} mm of metal "
                             f"between their edges. Punching needs {minimum:.1f} mm "
-                            f"-- {factor:.0f} gauges -- or the web dishes and tears "
+                            f"-- {basis} -- or the web dishes and tears "
                             "as the second hit goes through, and the first hole "
                             "distorts with it. Space them further apart, or run "
                             "the blank on the laser.",

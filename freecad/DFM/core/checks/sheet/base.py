@@ -572,6 +572,19 @@ def max_thickness_mm(family: str, context) -> float:
 # =============================================================================
 
 
+def gauge_phrase(factor: float) -> str:
+    """A gauge multiple written the way it is said on the floor.
+
+    Findings are read by people, and "1 gauges" is the kind of seam that makes
+    a report look machine-written even when the number behind it is right.
+    """
+    if abs(factor - 1.0) < 1e-9:
+        return "one gauge"
+    if abs(factor - round(factor)) < 1e-9:
+        return f"{int(round(factor))} gauges"
+    return f"{factor:.1f} gauges"
+
+
 def bbox_corners(node: AagNode) -> list[gp_Pnt]:
     """The eight corners of a face's bounding box."""
     if node.bbox.IsVoid():

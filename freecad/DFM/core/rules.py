@@ -724,6 +724,211 @@ class Rulebook(Enum):
         family=RuleFamily.GDT,
     )
 
+
+    # -- sheet metal --------------------------------------------------------
+    #
+    # A formed part is judged against the press and the brake rather than
+    # against a cutter, so almost nothing in the machining families applies
+    # to it. These stand in their place: the die has a minimum bend radius,
+    # the brake needs a flange long enough to grip, a punch breaks below a
+    # certain hole size, and material stretches only so far before it tears.
+    SHEET_BEND_RADIUS_SMALL = RuleType(
+        "Bend Radius Too Small",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="",
+        comparison="min",
+        description="Inside bend radius as a multiple of the material thickness.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_FLANGE_SHORT = RuleType(
+        "Flange Too Short",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="mm",
+        comparison="min",
+        description="Flange length past the bend, for the brake die to grip.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_HOLE_NEAR_BEND = RuleType(
+        "Hole Near a Bend",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Distance from a hole to the bend that would distort it.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_HOLE_SMALL = RuleType(
+        "Hole Too Small to Punch",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="",
+        comparison="min",
+        field_labels=("At least",),
+        description="Hole diameter as a multiple of thickness, before the punch breaks.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_HOLE_PITCH = RuleType(
+        "Hole Pitch Too Close",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Web left between adjacent punched holes.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_COUNTERSINK_DEEP = RuleType(
+        "Countersink Too Deep for the Gauge",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Countersink leaving a knife edge on the far side of the sheet.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_CLOSED_FLANGE_LOOP = RuleType(
+        "Closed Flange Loop",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="A profile that cannot be folded from one flat blank without a seam.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_BEND_ANGLE_EXTREME = RuleType(
+        "Extreme Bend Angle",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="deg",
+        comparison="max",
+        field_labels=("At most",),
+        description="Bend past the point where springback and tooling get awkward.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_BEND_LONGER_THAN_BODY = RuleType(
+        "Bend Longer Than the Brake",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Bend line longer than the press brake can take in one hit.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_THICKNESS_OUT_OF_RANGE = RuleType(
+        "Gauge Out of Range",
+        shape=RuleShape.MIN_AND_MAX,
+        unit="mm",
+        description="Material thickness against the gauges the shop stocks and forms.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_BEND_RELIEF_MISSING = RuleType(
+        "Bend Relief Missing",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="A bend ending mid-panel with no relief cut, so the sheet tears.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_CORNER_RELIEF_MISSING = RuleType(
+        "Corner Relief Missing",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Two bends meeting at a corner whose flanges will collide.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_TAB_NARROW = RuleType(
+        "Tab Too Narrow",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="",
+        comparison="min",
+        field_labels=("At least",),
+        description="Tab width as a multiple of thickness, before it bends in handling.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_NOTCH_NARROW = RuleType(
+        "Notch Too Narrow",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="",
+        comparison="min",
+        field_labels=("At least",),
+        description="Notch width as a multiple of thickness, before the punch will not clear.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_HEM_DIMENSIONS = RuleType(
+        "Hem Dimensions",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Hem return length, and whether the gauge will close flat at all.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_FORMED_FEATURE = RuleType(
+        "Formed Feature",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="An emboss, louver or lance, each needing a die of its own.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_EMBOSS_DEEP = RuleType(
+        "Emboss Too Deep",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="",
+        comparison="max",
+        field_labels=("At most",),
+        description="Draw depth as a multiple of thickness, before the material tears.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_LOUVER_TALL = RuleType(
+        "Louver Too Tall",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="",
+        comparison="max",
+        field_labels=("At most",),
+        description="Louver hood height against the range standard dies cover.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_FORMED_PITCH = RuleType(
+        "Formed Features Too Close",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Spacing between formed features, so the dies do not collide.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_SHARP_FOLD = RuleType(
+        "Sharp Fold",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="A fold modelled with no radius, which no brake produces.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_FORMED_NEAR_BEND = RuleType(
+        "Formed Feature Near a Bend",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="A drawn feature inside the zone a bend deforms.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_FEATURE_COMPLEXITY = RuleType(
+        "Sheet Feature Complexity",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="",
+        comparison="max",
+        description="How many bends and formed features the part carries, as a cost signal.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_INTENT_SHARP_CORNERS = RuleType(
+        "Sheet Intent, Sharp Corners",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description=(
+            "A part shaped like sheet metal but modelled with sharp folds and "
+            "machined features."
+        ),
+        family=RuleFamily.SHEET,
+    )
+    SHEET_MACHINED_FEATURE = RuleType(
+        "Machined Feature on a Formed Part",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="A secondary machining operation on a part that is otherwise formed.",
+        family=RuleFamily.SHEET,
+    )
+
     @property
     def id(self) -> str:
         return self.name

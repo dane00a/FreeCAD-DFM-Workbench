@@ -207,6 +207,49 @@ class Rulebook(Enum):
         family=RuleFamily.THIN_FEATURE,
     )
 
+    # -- machining: holes ---------------------------------------------------
+    HOLE_DEPTH_RATIO = RuleType(
+        "Hole Depth Ratio",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="",
+        comparison="max",
+        field_labels=("Aim under", "At most"),
+        description="Hole depth as a multiple of its diameter.",
+        family=RuleFamily.HOLE,
+    )
+    HOLE_EDGE_DISTANCE = RuleType(
+        "Hole Edge Distance",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Material left between a hole and the outside of the part.",
+        family=RuleFamily.HOLE,
+    )
+    HOLE_WEB_THICKNESS = RuleType(
+        "Hole Web Thickness",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Material left between two parallel holes.",
+        family=RuleFamily.HOLE,
+    )
+    HOLE_FLAT_BOTTOM = RuleType(
+        "Flat-Bottomed Hole",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Blind hole with a flat floor, which a twist drill cannot produce.",
+        family=RuleFamily.HOLE,
+    )
+    HOLE_INTERSECTING = RuleType(
+        "Intersecting Holes",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Holes that break into one another, leaving an interrupted cut.",
+        family=RuleFamily.HOLE,
+    )
+
     # -- machining: setup and workholding -----------------------------------
     NO_DATUM_FACE = RuleType(
         "Datum Face",

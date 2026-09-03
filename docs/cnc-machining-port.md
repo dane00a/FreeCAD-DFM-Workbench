@@ -602,13 +602,115 @@ on top of the graph build.
 **Shipped so far:** 13 rules, 21 Rulebook entries, two CNC process definitions
 whose materials follow FreeCAD's own machining cards, and 170 tests.
 
-### Setup counting, and why it is not here yet
+### Phases 3 to 7 results
 
-The rule was written, measured, and taken out again. Approach directions have
-to come from *features* — a bore's axis is a direction whether or not its entry
-face is external — and the graph-only approximation counted external faces
-instead, which made a plain block report six setups and an ERROR. A rule that
-fires on a cube is worse than a missing rule, so it waits for the recognizers.
+**Everything in scope is ported.** Twenty-one recognizers, ninety-five rules,
+and the process classification, all running over the corpus with no failures.
+
+| Measure | At Phase 2 | Now |
+|---|---|---|
+| Process classification vs the reference | 158 / 211 | **207 / 211 (98.1%)** |
+| Sheet metal identified | 0 / 45 | **44 / 45** |
+| Mill-turn identified | 6 / 13 | **13 / 13** |
+| Feature kinds recognized | 7 | **28** |
+| Rules with a check behind them | 13 | **95** |
+| Tests | 170 | **600+** |
+| Corpus run | 213 parts, 0 errors | 213 parts, 0 errors |
+
+**What closed the classification gap.** Sheet detection was the whole of it,
+and the discriminator turned out to be narrow: a formed bend is *two
+concentric cylinders one gauge apart* joining two flats at an angle, where a
+milled fillet has only the inner cylinder. Without demanding that pair, every
+thin-walled milled enclosure reads as sheet. A second pass asks the material
+rather than the surface type whether a sculpted face is formed -- metal for
+one gauge behind it, air past that -- which is what lets a drawn louver count
+as sheet despite being a spline.
+
+The remaining four are each a single part: one shell whose folds are modelled
+sharp, one enclosure that genuinely looks like sheet, and two on the
+turned/mill-turn boundary.
+
+### The suppression problem, and what it cost to solve
+
+The recurring failure was never a rule being wrong. It was a rule being right
+too often.
+
+`thin_wall` fired 305 times against the reference's 40. Every finding was
+correct in isolation and the rule was useless. Three causes, all of them
+things the reference suppresses:
+
+- **Engraved text.** Every pair of adjacent character strokes is a thin wall.
+  A nameplate produced sixty-nine findings.
+- **Sheet parts.** A constant-gauge shell is thin everywhere, by definition.
+- **Rib fields.** A rib is thin because that is what makes it a rib.
+
+Porting the marking recognizer, sheet detection and the rib recognizer -- and
+then muting the rule on all three -- took it to **42 against the reference's
+40**. None of that work was on the rule itself.
+
+The same shape of problem appeared again with `sharp_internal_edge`, which
+fires on the residue left after every recognizer has taken what it
+understands. Its count is therefore a reading of recognition coverage rather
+than of the part, which is worth remembering when interpreting it: currently
+267 against the reference's 104, and the excess concentrates on parts whose
+cavities are not fully recognized.
+
+### The resolver
+
+The recognizers are deliberately independent and deliberately eager. Each
+answers its own narrow question and none can see the whole part, so the same
+faces get claimed several times over -- correctly each time. A counterbore is
+also a blind hole; a pocket wall is also a step; the strokes of a serial
+number are a dozen tiny slots.
+
+Settling that is a priority question, not a geometry one, and the table in
+`machining/resolver.py` is the whole of the policy. Two kinds of feature are
+exempt: an undercut and a draft are *annotations* that are true as well as
+whatever the face otherwise is, so letting a pocket displace them would erase
+the constraint that was worth finding. Marking text outranks even those,
+because nobody machines a serial number.
+
+The resolver also rejoins bores that a crossing void split in two. Every
+guard there is about the opposite case: two holes drilled toward each other
+from opposite faces are also coaxial and also the same diameter, and welding
+them gives a bore longer than the part.
+
+### Phase 6 -- verified inside FreeCAD
+
+`tests/freecad/verify_in_freecad.py` passes against FreeCAD 1.1.3. It builds
+a document the way a user would and runs the real analysis path over it,
+which is the only way to catch the class of bug described in section 6.1:
+every unit test passed while the hole rules were silently dead on real
+documents.
+
+It now also covers a turned part, the feature census, the preferences page
+reaching the config, and five-axis mode standing the undercut rule down.
+
+### Phase 7 -- the corpus as recipes
+
+`tests/fixtures/generate_fixtures.py` builds the corpus from primitives, and
+checks each part against `geometry_oracle.json` -- face, edge and solid
+counts, volume, area and bounding box, measured from the originals. No CAD
+files are committed.
+
+That check earns its keep immediately. Of the first thirty-two written, the
+nine transcribed dimension-for-dimension matched exactly and every one where
+a dimension was guessed was caught. It is the difference between the same
+parts and merely similar ones.
+
+### Setup counting, and why it took until Phase 5
+
+The rule was written in Phase 1, measured, and taken out again. Approach
+directions have to come from *features* — a bore's axis is a direction whether
+or not its entry face is external — and the graph-only approximation counted
+external faces instead, which made a plain block report six setups and an
+ERROR. A rule that fires on a cube is worse than a missing rule.
+
+It came back once the recognizers could supply real approach directions, and
+now clusters them: features sharing a direction come off in the same setup,
+and what is left is how often the part moves. Directions are compared without
+sign, since which end a hole is drilled from is a fixturing decision rather
+than a property of the hole.
 
 ### The one open discrepancy
 
@@ -640,14 +742,43 @@ thing. Revisit if torus-related disagreements multiply once recognizers land.
 
 ---
 
-## 9. Open decisions
+## 9. Decisions taken, and what is left
 
-1. **Thread evidence.** Build a user-confirmation channel for threads, or leave
-   the family dead? Recommendation: build it — it is cheap and unlocks four
-   rules that matter.
-2. **Process branching.** Per-process threshold blocks (parity with the
-   reference) or split rule IDs (clearer rule cards)?
-3. **Rule-card scale.** 58 rules is a lot of cards in the process library. Does
-   that UI need grouping or filtering work before the rules land?
-4. **Parity vs. correctness** on the four known contract bugs in §6.7 — match
-   the reference so baselines line up, or fix on the way through?
+**Thread evidence.** Settled by measurement rather than by argument. The
+reference retired its diameter-only heuristic as user policy: most bores at a
+tap drill size are clearance, reamed, dowel or pilot holes, and inferring from
+diameter turns a plate of standard drill sizes into a fully tapped part. So
+threads are asserted only from a *modelled helix* -- an edge winding more than
+a full turn at a steady radius, which nothing else on a machined part does.
+That measurement gives the pitch for free, which is what the relief and
+run-out rules need. The tap drill table still names a thread once a helix has
+confirmed one.
+
+**Rule-card scale.** Ninety-five rules would have been unreadable as one flat
+list, so `RuleFamily` groups them and the process library sorts by family.
+
+**GD&T.** Ported and dormant, as decided. The rules are written and tested --
+including tests that supply annotations directly and prove the logic fires --
+but nothing supplies annotations today because a FreeCAD document carries
+none. `machining/annotations.py` is where that would arrive.
+
+### Still open
+
+1. **`sharp_internal_edge` at 2.6x the reference.** Not a rule fault: it
+   reports what no recognizer claimed, so the number tracks coverage. Closing
+   it means improving recognition on specific parts, chiefly cavity
+   recognition on moulded and micro-fluidic geometry.
+2. **The four classification stragglers**, each a single part: a sharp-fold
+   shell needs the second sheet detection route, and the rest sit on the
+   turned/mill-turn boundary.
+3. **The slit family is partly unreachable.** The pocket recognizer runs
+   first and the slit recognizer stands down on claimed faces, so a floored
+   flexure slit is emitted as a slot. The resolver's priority table already
+   ranks slits above slots, so the intent is there; the stand-down defeats it.
+4. **Parity vs. correctness** on the known contract bugs in section 6.7 --
+   still worth a decision, though nothing has depended on it yet.
+5. **`POCKET_ASPECT_RATIO` means two different things.** The rule as defined
+   here is a plan-view aspect; the reference measures depth against the flute
+   length of the longest cutter that fits. The check follows the reference
+   and ignores the configured limits, which is a mismatch worth resolving one
+   way or the other.

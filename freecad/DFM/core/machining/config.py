@@ -317,6 +317,12 @@ class RuleThresholds:
     turn_slender_warn_ratio: float = 4.0  # turned: length along axis / max OD
     turn_slender_error_ratio: float = 8.0
     minimum_feature_size_mm: float = 0.5
+    # How many distinct features before the part is worth pricing as a
+    # complicated one. Not a defect at any count: programming time and setup
+    # count follow feature count more closely than any single dimension, so a
+    # part can pass every other rule and still run long.
+    feature_complexity_warn: float = 40.0
+    feature_complexity_error: float = 80.0
     sharp_edge_min_deviation_deg: float = 30.0
     material_removal_warn_pct: float = 70.0
     material_removal_error_pct: float = 85.0

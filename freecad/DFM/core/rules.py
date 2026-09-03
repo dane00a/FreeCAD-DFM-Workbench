@@ -420,6 +420,149 @@ class Rulebook(Enum):
         family=RuleFamily.THREAD,
     )
 
+    # -- machining: more hole policy ----------------------------------------
+    HOLE_NONSTANDARD_DIAMETER = RuleType(
+        "Hole Nonstandard Diameter",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Bore at a diameter no stock drill in the library produces.",
+        family=RuleFamily.HOLE,
+    )
+    HOLE_PARTIAL_ENTRY = RuleType(
+        "Hole Partial Entry",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Drill entering on a broken or sloped face, so it will wander.",
+        family=RuleFamily.HOLE,
+    )
+    HOLE_COUNTERSINK_ANGLE = RuleType(
+        "Countersink Angle",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Countersink cut at an angle no standard tool produces.",
+        family=RuleFamily.HOLE,
+    )
+    HOLE_MULTI_PASS = RuleType(
+        "Hole Multi Pass",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Bore too deep for one plunge, needing peck or a second tool.",
+        family=RuleFamily.HOLE,
+    )
+    HOLE_INTERSECTS_CAVITY = RuleType(
+        "Hole Intersects Cavity",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Drill breaking into a pocket or slot part way down.",
+        family=RuleFamily.HOLE,
+    )
+
+    # -- machining: more cavity policy --------------------------------------
+    POCKET_ASPECT_RATIO = RuleType(
+        "Pocket Aspect Ratio",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="",
+        comparison="max",
+        description="Pocket length against its width, for a long narrow cavity.",
+        family=RuleFamily.POCKET,
+    )
+    SLOT_NONSTANDARD_WIDTH = RuleType(
+        "Slot Nonstandard Width",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Slot at a width no cutter in the library matches.",
+        family=RuleFamily.SLOT,
+    )
+    FLEXURE_SLIT_PROCESS = RuleType(
+        "Flexure Slit Process",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Slit too narrow to mill, needing wire EDM or a saw.",
+        family=RuleFamily.SLOT,
+    )
+    BROACHED_SLOT_PROCESS = RuleType(
+        "Broached Slot Process",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Square-cornered internal slot that has to be broached.",
+        family=RuleFamily.SLOT,
+    )
+
+    # -- machining: more part policy ----------------------------------------
+    MINIMUM_FEATURE_SIZE = RuleType(
+        "Minimum Feature Size",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Smallest detail the shop's smallest tool can actually cut.",
+        family=RuleFamily.PART,
+    )
+    SHARP_INTERNAL_EDGE = RuleType(
+        "Sharp Internal Edge",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Square inside corner a rotating cutter cannot produce.",
+        family=RuleFamily.PART,
+    )
+    PART_MARKING = RuleType(
+        "Part Marking",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Engraved or embossed text, and how it should be applied.",
+        family=RuleFamily.PART,
+    )
+    RAISED_TEXT_MACHINED_FACE = RuleType(
+        "Raised Text on a Machined Face",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Text left standing proud, so the field around it must be cleared.",
+        family=RuleFamily.PART,
+    )
+    FEATURE_COMPLEXITY = RuleType(
+        "Feature Complexity",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="",
+        comparison="max",
+        description="How many distinct features the part carries, as a cost signal.",
+        family=RuleFamily.PART,
+    )
+    CASTING_DRAFT_ANGLE = RuleType(
+        "Casting Draft Angle",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="deg",
+        comparison="min",
+        field_labels=("At least",),
+        description="Draft on a wall, for a part meant to come out of a mould.",
+        family=RuleFamily.PART,
+    )
+
+    # -- machining: more setup policy ---------------------------------------
+    SETUP_COUNT_HIGH = RuleType(
+        "Setup Count High",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="",
+        comparison="max",
+        description="How many times the part must be refixtured.",
+        family=RuleFamily.SETUP,
+    )
+    NO_ORTHOGONAL_DATUM_TRIO = RuleType(
+        "No Orthogonal Datum Trio",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="No three square faces to locate the part from.",
+        family=RuleFamily.SETUP,
+    )
+    TOOL_ACCESS_SPECIAL_SETUP = RuleType(
+        "Tool Access Special Setup",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Feature reachable only from an angle needing a fixture or a fourth axis.",
+        family=RuleFamily.TOOL_ACCESS,
+    )
+
     # -- machining: thin features -------------------------------------------
     THIN_WALL = RuleType(
         "Thin Wall",
@@ -519,6 +662,66 @@ class Rulebook(Enum):
         unit=None,
         description="Part too small for vise work; needs soft jaws, a fixture or a pallet.",
         family=RuleFamily.SETUP,
+    )
+
+
+    # -- inspection: geometric dimensioning and tolerancing -----------------
+    #
+    # Dormant. These read tolerance and surface-finish annotations, which a
+    # FreeCAD document does not carry today -- the workbench has nowhere to
+    # get a feature control frame from. They are ported and registered so
+    # that the day the annotations arrive the policy is already written and
+    # already editable by the shop, rather than being a second project.
+    GDT_TOLERANCE_ACHIEVABLE = RuleType(
+        "Tolerance Achievable",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Tolerance tighter than the process can hold.",
+        family=RuleFamily.GDT,
+    )
+    GDT_DATUM_VALID = RuleType(
+        "Datum Valid",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Datum feature too small or too rough to locate from.",
+        family=RuleFamily.GDT,
+    )
+    GDT_DATUM_UNRESOLVED = RuleType(
+        "Datum Unresolved",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Control frame referencing a datum the model does not define.",
+        family=RuleFamily.GDT,
+    )
+    GDT_SURFACE_FINISH_CONFLICT = RuleType(
+        "Surface Finish Conflict",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Finish called out that the specified process cannot deliver.",
+        family=RuleFamily.GDT,
+    )
+    GDT_FEATURE_TOLERANCE_MISMATCH = RuleType(
+        "Feature Tolerance Mismatch",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Tolerance inappropriate for the kind of feature it is on.",
+        family=RuleFamily.GDT,
+    )
+    NOTE_SURFACE_FINISH_DEMANDING = RuleType(
+        "Demanding Surface Finish Note",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="A general finish note that will drive a separate operation.",
+        family=RuleFamily.GDT,
+    )
+    SURFACE_FINISH_PER_FACE_DEMANDING = RuleType(
+        "Demanding Surface Finish on a Face",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="A face-level finish callout needing grinding or lapping.",
+        family=RuleFamily.GDT,
     )
 
     @property

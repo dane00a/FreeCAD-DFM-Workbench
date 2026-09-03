@@ -75,10 +75,19 @@ class TaskResultsPresenter:
         tab.set_context(context)
 
     def handle_feature_faces(self, face_ids: list[int]):
+        """Light up the faces of a selected feature.
+
+        The recognizers number faces from one, the way OpenCascade and
+        FreeCAD's own `Face1` labels do, but the view bridge takes them from
+        zero and adds one back on. A finding gets converted on the way out of
+        the analysis by `_resolve_geometry_refs`; the census reads the
+        features directly, so it has to convert here or highlight the
+        neighbouring face instead.
+        """
         Gui.Selection.clearSelection()
         colour = severity_color(Severity.INFO)
         self.bridge.highlight_faces_and_edges_by_index(
-            [(face_id, colour) for face_id in face_ids], []
+            [(face_id - 1, colour) for face_id in face_ids], []
         )
 
     def refresh_ui(self):

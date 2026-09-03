@@ -10,3 +10,7 @@ docs/build/
 docs/build/
 .venv*/
 tests/freecad/*.out
+# Verification artefacts: the report and the screenshot are evidence of a
+# run, not part of the addon.
+tests/freecad/*.out
+tests/freecad/*.png

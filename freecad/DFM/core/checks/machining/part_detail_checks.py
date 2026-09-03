@@ -602,3 +602,61 @@ class FeatureComplexityCheck(MachiningCheck):
 def _readable(feature_type: str) -> str:
     """A feature type as a machinist would say it."""
     return feature_type.replace("_", " ").lower()
+
+
+@register_check(Rulebook.CASTING_DRAFT_ANGLE)
+class CastingDraftAngleCheck(MachiningCheck):
+    """A part declared as-cast whose walls carry no draft.
+
+    Only meaningful when the shop has said the blank is a casting, because
+    no analysis can recover that from geometry -- a machined part and a
+    machined casting look identical once the flash is off. Given that
+    declaration, walls with no draft on them are a contradiction: the part
+    could not have come out of the mould.
+
+    Read from the absence of draft features rather than from any marker on
+    the walls themselves. Marking every vertical wall as undrafted would flag
+    every pocket on every milled part and say nothing.
+    """
+
+    @property
+    def name(self) -> str:
+        return "Casting Draft Angle Check"
+
+    def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
+        if context.config.blank_form != "as_cast":
+            return []
+        if context.recognition.of_type(FeatureType.DRAFT_FACE):
+            return []  # drafted casting: consistent
+
+        limit = self.safe_float(rule_config.limit)
+        if limit is None:
+            limit = context.config.thresholds.rib_min_draft_angle_deg
+
+        return [
+            self.finding(
+                rule,
+                Severity.WARNING,
+                "no draft",
+                self.render(
+                    feedback,
+                    Severity.WARNING,
+                    0.0,
+                    limit,
+                    limit,
+                    "deg",
+                    "The blank is declared as-cast, but no wall on this model "
+                    "carries any draft. A casting has to release from its "
+                    "mould, which normally means one to three degrees on "
+                    "every wall running with the pull. Either the draft was "
+                    "modelled away -- in which case the supplier's draft "
+                    "allowances need checking against the machined envelope "
+                    "-- or this part is not really cast.",
+                ),
+                faces=[],
+                value=0.0,
+                limit=limit,
+                comparison="<",
+                unit="deg",
+            )
+        ]

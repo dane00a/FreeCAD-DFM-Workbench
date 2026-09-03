@@ -709,8 +709,11 @@ class TaskSetup:
 
         process_name = self.form.cbManProcess.currentData()
         material_name = self.form.cbMaterial.currentText()
-        runner = AnalysisRunner()
-        return runner.run_analysis(
+        # Kept, not discarded: the analyzer cache holds the machining
+        # context the feature census is built from, and re-running the
+        # recognizers to rebuild it would double the cost of an analysis.
+        self.runner = AnalysisRunner()
+        return self.runner.run_analysis(
             process_name=process_name,
             material_name=material_name,
             shape=self.target_shape,
@@ -761,12 +764,28 @@ class TaskSetup:
                 history_manager=history_manager,
                 doc_name=App.ActiveDocument.Name,  # type: ignore
                 shape_name=self.target_object.Label,  # type: ignore
+                machining_context=self._machining_context(),
             )
         except Exception as e:
             App.Console.PrintError(f"Failed to open results panel: {e}\n")
             import traceback
 
             App.Console.PrintError(traceback.format_exc())
+
+    def _machining_context(self):
+        """The machining analysis, if this process ran one.
+
+        A process with no machining rules never builds one, and a part that
+        failed to analyse has none either. The features tab says so rather
+        than showing an empty list.
+        """
+        runner = getattr(self, "runner", None)
+        if runner is None:
+            return None
+        data = runner.analyzer_cache.get("MACHINING_ANALYZER")
+        if not data:
+            return None
+        return next(iter(data.values()), None)
 
     def _cleanup_after_run(self):
         self.is_running = False

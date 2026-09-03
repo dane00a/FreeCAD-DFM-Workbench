@@ -34,6 +34,7 @@ class TaskResultsPresenter:
         history_manager: HistoryManager,
         doc_name="",
         shape_name="",
+        machining_context=None,
     ):
         self.view = view
         self.model = model
@@ -53,11 +54,32 @@ class TaskResultsPresenter:
         self.shape_name = shape_name
 
         self.build_history_tab()
+        self.build_features_tab(machining_context)
 
         self.view.adjust_details_height()
 
         self.refresh_ui()
         Gui.Control.showDialog(self.view)
+
+    def build_features_tab(self, context):
+        """Fill the feature census and let it drive the viewport.
+
+        The census doubles as a way to interrogate the model: selecting a
+        row lights up the faces the workbench read as that feature, which is
+        the quickest way to see whether it understood the part.
+        """
+        tab = getattr(self.view, "features_tab", None)
+        if tab is None:
+            return
+        tab.on_faces_selected = self.handle_feature_faces
+        tab.set_context(context)
+
+    def handle_feature_faces(self, face_ids: list[int]):
+        Gui.Selection.clearSelection()
+        colour = severity_color(Severity.INFO)
+        self.bridge.highlight_faces_and_edges_by_index(
+            [(face_id, colour) for face_id in face_ids], []
+        )
 
     def refresh_ui(self):
         self.view.form.leTarget.setText(self.bridge.target_object.Label)

@@ -6,6 +6,7 @@ import FreeCADGui as Gui  # type: ignore
 
 from .gui import task_setup, task_show_normals, process_library
 from .gui import preferences
+from .gui.machining_preferences import MachiningPreferences
 from .gui.preferences import DFMPreferencesGeneral, DFMPreferencesAnalyzers
 from .gui import tools as _dfm_contour_tools
 
@@ -51,3 +52,4 @@ class DFMWorkbench(Gui.Workbench):
 Gui.addWorkbench(DFMWorkbench())
 Gui.addPreferencePage(DFMPreferencesGeneral, "DFM")
 Gui.addPreferencePage(DFMPreferencesAnalyzers, "DFM")
+Gui.addPreferencePage(MachiningPreferences, "DFM")

@@ -2,4 +2,5 @@
 # SPDX-FileCopyrightText: 2025 Ryan Kembrey <ryan.FreeCAD@gmail.com>
 # SPDX-FileNotice: Part of the DFM addon.
 
+from ..gui.machining_preferences import MachiningPreferences
 from ..gui.preferences import DFMPreferencesGeneral, DFMPreferencesAnalyzers

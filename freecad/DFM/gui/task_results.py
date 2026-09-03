@@ -10,6 +10,7 @@ from PySide6.QtGui import QStandardItemModel, QStandardItem
 import FreeCADGui as Gui  # type: ignore
 
 from ..core.models import CheckResult, Severity
+from ..gui.results.tabs.features import FeaturesTab
 
 from ..gui.results.delegates import DFMTreeDelegate
 from ..gui.results.visuals import severity_color
@@ -63,6 +64,12 @@ class TaskResults(QtCore.QObject):
         self.form.gbDetails.setCheckable(True)
         self.form.gbDetails.setChecked(True)
         self.form.gbDetails.toggled.connect(self._on_details_toggled)
+
+        # The feature census. Added here rather than in the .ui file so the
+        # machining port stays additive: a build without it simply has one
+        # tab fewer.
+        self.features_tab = FeaturesTab()
+        self.form.tabWidget.addTab(self.features_tab, "Features")
 
     def _on_details_toggled(self, checked: bool):
         self.form.tbDetails.setVisible(checked)

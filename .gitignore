@@ -9,3 +9,4 @@ pyrightconfig.json
 docs/build/
 docs/build/
 .venv*/
+tests/freecad/*.out

@@ -118,7 +118,7 @@ class HoleRecognizer(FeatureRecognizer):
         # axis, into the air inside the hole, so the face is stored reversed.
         # A boss or an external fillet is not. Without this every boss on the
         # part would be reported as a hole.
-        if not cylinder.is_reversed or cylinder.cyl_cone_axis is None:
+        if not cylinder.is_internal or cylinder.cyl_cone_axis is None:
             return None
         if self._is_blend_band(graph, cylinder):
             return None
@@ -440,7 +440,7 @@ class HoleRecognizer(FeatureRecognizer):
                 if (
                     outer.face_id == cylinder.face_id
                     or outer.surface_type is not SurfaceType.CYLINDER
-                    or not outer.is_reversed
+                    or not outer.is_internal
                     or outer.cyl_cone_axis is None
                     or outer.face_id in taken
                     or outer.cyl_radius <= cylinder.cyl_radius + 1e-6

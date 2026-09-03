@@ -84,10 +84,19 @@ class AagNode:
     loop_count: int = 0
     inner_loop_count: int = 0
 
-    # True when the face's orientation is reversed relative to the solid. This
-    # is the internal-vs-external discriminator: a bore is reversed, a shaft is
-    # not. Every dot-product gate downstream depends on it.
+    # OpenCascade's stored orientation flag. Combined with the surface's own
+    # normal it yields the true outward direction, which is why
+    # `outward_normal` is reliable. The flag *alone* is not portable: the same
+    # solid built in FreeCAD and in OpenCascade carries opposite flags with
+    # correspondingly opposite surface parameterisations. Use `is_internal`
+    # to ask whether a face bounds a void.
     is_reversed: bool = False
+
+    # True when the face looks into a void rather than out into space: the
+    # wall of a bore rather than of a boss. Derived from geometry -- which
+    # side of the surface the material is on -- so it holds whatever produced
+    # the solid.
+    is_internal: bool = False
 
     # PLANE. Held in the surface's own sense, NOT corrected for orientation --
     # use `outward_normal` when you want the direction pointing out of material.

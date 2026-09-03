@@ -20,6 +20,7 @@ from OCP.Bnd import Bnd_Box
 from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.BRepBndLib import BRepBndLib
+from OCP.BRepClass3d import BRepClass3d_SolidClassifier
 from OCP.BRepGProp import BRepGProp
 from OCP.BRepLProp import BRepLProp_SLProps
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
@@ -28,7 +29,14 @@ from OCP.GeomAbs import GeomAbs_CurveType, GeomAbs_SurfaceType
 from OCP.GProp import GProp_GProps
 from OCP.gp import gp_Ax1, gp_Dir, gp_Pnt, gp_Pnt2d, gp_Vec, gp_Vec2d
 from OCP.ShapeAnalysis import ShapeAnalysis_Surface
-from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_REVERSED, TopAbs_WIRE
+from OCP.TopAbs import (
+    TopAbs_EDGE,
+    TopAbs_FACE,
+    TopAbs_IN,
+    TopAbs_OUT,
+    TopAbs_REVERSED,
+    TopAbs_WIRE,
+)
 from OCP.TopExp import TopExp, TopExp_Explorer
 from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape
 from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
@@ -119,11 +127,53 @@ class AagBuilder:
         node.inner_loop_count = max(0, loops - 1)
 
         self._classify_surface(node, face)
+        node.is_internal = self._is_internal(node, face)
 
         if node.surface_type.is_freeform:
             self._sample_freeform_curvature(node, face)
 
         return node
+
+    def _is_internal(self, node: AagNode, face: TopoDS_Face) -> bool:
+        """Whether the face bounds a void rather than facing out into space.
+
+        Asked geometrically rather than read off the orientation flag. The
+        same solid built in FreeCAD and in OpenCascade stores opposite flags,
+        with surface parameterisations that differ to match -- so the outward
+        normal agrees in both, and the flag on its own does not.
+
+        For a surface of revolution the question is which way the outward
+        normal leans relative to the axis. A bore's normal points at its axis;
+        a shaft's points away. That is exact, needs no solid classification,
+        and holds for either convention.
+        """
+        if node.surface_type in (SurfaceType.CYLINDER, SurfaceType.CONE):
+            axis = node.cyl_cone_axis
+            if axis is None:
+                return node.is_reversed
+            sample = _face_sample_point(face)
+            if sample is None:
+                return node.is_reversed
+            point, normal = sample
+            if face.Orientation() == TopAbs_REVERSED:
+                normal.Reverse()
+            radial = gp_Vec(axis.Location(), point)
+            axial = gp_Vec(axis.Direction()).Multiplied(radial.Dot(gp_Vec(axis.Direction())))
+            outward_radial = radial.Subtracted(axial)
+            if outward_radial.Magnitude() < 1e-9:
+                return node.is_reversed
+            return gp_Vec(normal).Dot(outward_radial) < 0.0
+
+        if node.surface_type is SurfaceType.SPHERE and node.sphere_center is not None:
+            sample = _face_sample_point(face)
+            if sample is None:
+                return node.is_reversed
+            point, normal = sample
+            if face.Orientation() == TopAbs_REVERSED:
+                normal.Reverse()
+            return gp_Vec(normal).Dot(gp_Vec(node.sphere_center, point)) < 0.0
+
+        return node.is_reversed
 
     def _classify_surface(self, node: AagNode, face: TopoDS_Face) -> None:
         adaptor = BRepAdaptor_Surface(face, True)
@@ -544,3 +594,35 @@ def _detect_sphere_cap(node: AagNode, face: TopoDS_Face) -> None:
     node.sphere_has_clip = True
     node.sphere_clip_normal = normal
     node.sphere_clip_offset = offset
+
+
+def _face_sample_point(face: TopoDS_Face) -> Optional[tuple[gp_Pnt, gp_Dir]]:
+    """A point inside the trimmed face, with its surface normal there.
+
+    The face's centroid is not usable: on a face with a hole in it the
+    centroid can fall in the hole. Parametric candidates are tried until one
+    lands on the face itself.
+    """
+    from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+
+    try:
+        u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(face)
+        classifier = BRepTopAdaptor_FClass2d(face, 1e-6)
+        adaptor = BRepAdaptor_Surface(face, True)  # named local: SLProps holds a ref
+    except Exception:
+        return None
+
+    for u_fraction in (0.5, 0.25, 0.75, 0.4, 0.6):
+        for v_fraction in (0.5, 0.25, 0.75, 0.4, 0.6):
+            u = u_min + (u_max - u_min) * u_fraction
+            v = v_min + (v_max - v_min) * v_fraction
+            try:
+                if classifier.Perform(gp_Pnt2d(u, v)) != TopAbs_IN:
+                    continue
+                props = BRepLProp_SLProps(adaptor, u, v, 1, 1e-6)
+                if not props.IsNormalDefined():
+                    continue
+                return (props.Value(), gp_Dir(props.Normal().XYZ()))
+            except Exception:
+                continue
+    return None

@@ -150,7 +150,9 @@ def _cluster_axes(graph: AttributedAdjacencyGraph) -> list[_AxisCluster]:
             home = _AxisCluster(representative=axis)
             clusters.append(home)
         home.total_area += node.area
-        if not node.is_reversed:
+        if not node.is_internal:
+            # The share of the cluster a lathe would present on the outside
+            # of the part, as opposed to bores that say nothing about turning.
             home.convex_area += node.area
         home.members.append(node.face_id)
     return clusters

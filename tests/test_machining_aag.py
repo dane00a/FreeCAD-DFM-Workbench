@@ -361,3 +361,81 @@ class TestConcavityCensus(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# =============================================================================
+
+
+class TestInternalFaceDetection(unittest.TestCase):
+    """Whether a face bounds a void must not depend on who built the solid.
+
+    OpenCascade's own modelling stores a bore's cylindrical face reversed;
+    the same solid built in FreeCAD stores it forward, with a surface
+    parameterisation that differs to match. The outward normal agrees in both
+    -- that is the invariant OpenCascade actually guarantees -- but the raw
+    orientation flag does not.
+
+    Reading the flag directly made every hole rule go silent on real FreeCAD
+    documents while passing every test here, which is exactly the failure the
+    geometric test exists to prevent. The cross-convention half of this check
+    needs a FreeCAD session and lives in tests/freecad/verify_in_freecad.py.
+    """
+
+    def test_bore_is_internal(self):
+        bore = _build(make_through_hole()).nodes_by_surface_type(SurfaceType.CYLINDER)[0]
+        self.assertTrue(bore.is_internal)
+
+    def test_boss_is_not_internal(self):
+        boss = _build(make_boss()).nodes_by_surface_type(SurfaceType.CYLINDER)[0]
+        self.assertFalse(boss.is_internal)
+
+    def test_blind_bore_is_internal(self):
+        bore = _build(make_blind_hole()).nodes_by_surface_type(SurfaceType.CYLINDER)[0]
+        self.assertTrue(bore.is_internal)
+
+    def test_spherical_pocket_is_internal(self):
+        bowl = _build(make_spherical_pocket()).nodes_by_surface_type(SurfaceType.SPHERE)[0]
+        self.assertTrue(bowl.is_internal)
+
+    def test_internal_agrees_with_the_material_side(self):
+        # The property means what it says: step away from the axis and you
+        # should be in material for a bore, and in air for a boss.
+        from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+        from OCP.gp import gp_Pnt, gp_Vec
+        from OCP.TopAbs import TopAbs_IN
+
+        from freecad.DFM.core.machining.aag_builder import _face_sample_point
+
+        for builder, expected in ((make_through_hole, True), (make_boss, False)):
+            with self.subTest(shape=builder.__name__):
+                shape = builder()
+                face_index = FaceIndex(shape)
+                graph = AagBuilder(shape, face_index).build()
+                node = graph.nodes_by_surface_type(SurfaceType.CYLINDER)[0]
+
+                # A full cylinder's centroid sits on its own axis, so the
+                # probe has to start from a point on the surface itself.
+                sample = _face_sample_point(face_index.face_at(node.face_id))
+                self.assertIsNotNone(sample)
+                point, _ = sample
+
+                axis = node.cyl_cone_axis
+                radial = gp_Vec(axis.Location(), point)
+                axial = gp_Vec(axis.Direction()).Multiplied(
+                    radial.Dot(gp_Vec(axis.Direction()))
+                )
+                outward = radial.Subtracted(axial)
+                outward.Normalize()
+                probe = gp_Pnt(
+                    point.X() + outward.X() * 0.2,
+                    point.Y() + outward.Y() * 0.2,
+                    point.Z() + outward.Z() * 0.2,
+                )
+                classifier = BRepClass3d_SolidClassifier(shape, probe, 1e-9)
+                material_outside = classifier.State() == TopAbs_IN
+                self.assertEqual(node.is_internal, expected)
+                self.assertEqual(
+                    material_outside,
+                    expected,
+                    "material should lie outside a bore and not outside a boss",
+                )

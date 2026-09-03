@@ -357,7 +357,7 @@ class SlotRecognizer(FeatureRecognizer):
         cylinders = [
             node
             for node in graph.nodes_by_surface_type(SurfaceType.CYLINDER)
-            if node.is_reversed and node.face_id not in taken and node.cyl_cone_axis is not None
+            if node.is_internal and node.face_id not in taken and node.cyl_cone_axis is not None
         ]
         found: list[FeatureInstance] = []
         claimed = set(taken)

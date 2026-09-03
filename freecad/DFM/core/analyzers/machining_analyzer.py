@@ -24,6 +24,7 @@ from ...core.machining.context import MachiningContext
 from ...core.machining.features import RecognitionResult
 from ...core.machining.process_classifier import classify_part_process
 from ...core.machining.recognizers import RECOGNIZER_PIPELINE
+from ...core.machining.resolver import resolve
 from ...core.registries import register_analyzer
 from ...core.utils.geometry import EdgeIndex, FaceIndex
 
@@ -90,6 +91,11 @@ class MachiningAnalyzer(BaseAnalyzer):
         recognizer rather than passed as arguments. Most recognizers need
         neither, and threading two more parameters through every signature to
         serve the two that do would be all cost and no clarity.
+
+        What comes out of the pipeline is raw. The recognizers are eager and
+        cannot see each other's work, so the same faces get claimed several
+        times over -- correctly each time, and only one of those readings is
+        what the shop is going to do. The resolver settles that.
         """
         result = RecognitionResult()
         claimed: set[int] = set()
@@ -111,4 +117,4 @@ class MachiningAnalyzer(BaseAnalyzer):
             for feature in found:
                 claimed.update(feature.faces)
 
-        return result
+        return resolve(result.features, graph)

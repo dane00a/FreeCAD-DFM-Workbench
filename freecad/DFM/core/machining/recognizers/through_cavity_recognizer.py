@@ -78,8 +78,9 @@ _MIN_GAP_MM = 0.001
 # across the through axis is the part's own silhouette, mis-grown.
 _OUTER_SILHOUETTE_SPAN_SHARE = 0.85
 
-# Four sharp corners is a plain rectangular window; the slot and pocket
-# recognizers serve it better.
+# A profile that turns no more than four times is a rectangle, and the slot
+# and pocket recognizers serve one of those better. A T-slot section turns
+# six times.
 _MAX_RECTANGULAR_CORNERS = 4
 
 

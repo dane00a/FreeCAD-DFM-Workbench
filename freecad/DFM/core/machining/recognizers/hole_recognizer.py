@@ -369,6 +369,11 @@ class HoleRecognizer(FeatureRecognizer):
                     node.plane_normal is not None
                     and abs(node.plane_normal.Dot(axis_dir)) > _CAP_AXIS_ALIGNMENT
                     and node.face_id not in caps.planar
+                    # The shoulder of a relief groove turned into the bore
+                    # wall is square to the axis like a cap, but it neither
+                    # opens the hole nor bottoms it. Counting it makes the
+                    # bore look terminated where it carries straight on.
+                    and not self._is_groove_shoulder(graph, node, cylinder)
                 ):
                     caps.planar.append(node.face_id)
             elif node.surface_type is SurfaceType.CONE:
@@ -566,6 +571,13 @@ class HoleRecognizer(FeatureRecognizer):
                 ):
                     continue
 
+                # A counterbore opens out at an end of the bore. A wider
+                # coaxial band with a shoulder at *both* ends is a relief
+                # groove turned into the middle of it, and absorbing that
+                # swallows the groove and misstates the counterbore depth.
+                if self._is_flanked(graph, outer, axis):
+                    continue
+
                 feature.type = FeatureType.COUNTERBORE
                 feature.faces = sorted(set(feature.faces + [shoulder.face_id, outer.face_id]))
                 feature.parameters["outer_diameter_mm"] = round(outer.cyl_radius * 2.0, 6)
@@ -574,6 +586,65 @@ class HoleRecognizer(FeatureRecognizer):
                 )
                 return True
         return False
+
+    @staticmethod
+    def _is_groove_shoulder(
+        graph: AttributedAdjacencyGraph, plane: AagNode, cylinder: AagNode
+    ) -> bool:
+        """Whether a planar neighbour is the wall of a groove, not a cap.
+
+        A groove shoulder steps out to a wider coaxial band that has another
+        shoulder at its far end. A counterbore seat looks identical from this
+        side, and is told apart by exactly that: its wider band opens to air
+        rather than stepping back down.
+        """
+        axis = cylinder.cyl_cone_axis
+        if axis is None:
+            return False
+        for band, _ in neighbours(graph, plane.face_id):
+            if band.face_id == cylinder.face_id:
+                continue
+            if band.surface_type is not SurfaceType.CYLINDER:
+                continue
+            if band.cyl_cone_axis is None or not band.is_internal:
+                continue
+            if band.cyl_radius <= cylinder.cyl_radius + 1e-6:
+                continue
+            if not axes_are_coaxial(band.cyl_cone_axis, axis):
+                continue
+            if HoleRecognizer._is_flanked(graph, band, axis):
+                return True
+        return False
+
+    @staticmethod
+    def _is_flanked(
+        graph: AttributedAdjacencyGraph, band: AagNode, axis
+    ) -> bool:
+        """Whether a wider band has a shoulder stepping down at both ends.
+
+        That is the signature of a groove rather than a counterbore: a
+        counterbore has material on one side and open air on the other.
+        """
+        steps = 0
+        for shoulder, _ in neighbours(graph, band.face_id):
+            if shoulder.surface_type is not SurfaceType.PLANE:
+                continue
+            normal = shoulder.outward_normal
+            if normal is None or abs(normal.Dot(axis.Direction())) < _CAP_AXIS_ALIGNMENT:
+                continue
+            for beyond, _ in neighbours(graph, shoulder.face_id):
+                if beyond.face_id == band.face_id:
+                    continue
+                if beyond.surface_type is not SurfaceType.CYLINDER:
+                    continue
+                if beyond.cyl_cone_axis is None or not beyond.is_internal:
+                    continue
+                if beyond.cyl_radius >= band.cyl_radius - 1e-6:
+                    continue
+                if axes_are_coaxial(beyond.cyl_cone_axis, axis):
+                    steps += 1
+                    break
+        return steps >= 2
 
     def _try_countersink(
         self,

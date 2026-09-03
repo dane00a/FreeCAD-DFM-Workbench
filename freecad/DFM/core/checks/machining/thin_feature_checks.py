@@ -22,6 +22,7 @@ from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 
 from ...machining.aag import AagNode, SurfaceType
 from ...machining.context import MachiningContext
+from ...machining.features import FeatureType
 from ...models import CheckResult, Severity
 from ...registries import register_check
 from ...rules import Rulebook
@@ -64,10 +65,16 @@ class ThinWallCheck(MachiningCheck):
 
         results: list[CheckResult] = []
         reported: set[tuple[int, int]] = set()
+        muted = self._muted_faces(context)
+        rib_pairs = self._rib_webs(context)
 
         for first, second, thickness in self._opposed_planar_pairs(context):
             pair = (min(first.face_id, second.face_id), max(first.face_id, second.face_id))
             if pair in reported:
+                continue
+            if first.face_id in muted or second.face_id in muted:
+                continue
+            if pair in rib_pairs:
                 continue
 
             verdict = self._grade(context, first, second, thickness, target, limit)
@@ -100,6 +107,40 @@ class ThinWallCheck(MachiningCheck):
             )
 
         return results
+
+    # -- suppression --------------------------------------------------------
+
+    @staticmethod
+    def _muted_faces(context) -> set[int]:
+        """Faces whose thinness is a consequence rather than a choice.
+
+        A tapped hole's wall thickness follows from the thread size, which
+        the designer picked for the fastener, not for the wall. An engraved
+        character is a few tenths of material between adjacent strokes, and a
+        marked part carries hundreds of them -- reporting each one buries
+        every finding worth reading.
+        """
+        muted: set[int] = set()
+        for feature in context.recognition.of_type(
+            FeatureType.THREADED_HOLE, FeatureType.MARKING_TEXT
+        ):
+            muted.update(feature.faces)
+        return muted
+
+    @staticmethod
+    def _rib_webs(context) -> set[tuple[int, int]]:
+        """The two web faces of each rib, as a pair.
+
+        A rib is thin by definition -- that is what makes it a rib rather
+        than a wall -- so its own two faces are not a finding. Only that pair
+        is muted: a rib standing too close to something else still is.
+        """
+        pairs: set[tuple[int, int]] = set()
+        for feature in context.recognition.of_type(FeatureType.RIB):
+            webs = sorted(feature.faces[:2])
+            if len(webs) == 2:
+                pairs.add((webs[0], webs[1]))
+        return pairs
 
     # -- grading ------------------------------------------------------------
 

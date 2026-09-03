@@ -200,11 +200,21 @@ class GrooveRecognizer(FeatureRecognizer):
             if designation:
                 parameters["adjacent_thread_designation"] = designation
 
+        # The flanks are members, not just context. A groove's faces then
+        # form a superset of what the counterbore path emits for the same
+        # geometry, so a counterbore mistaken for a groove is wholly
+        # contained and the resolver drops it. It also keeps a real bore
+        # alive: the bore has openings the groove does not, and the groove
+        # has flanks the bore's own reading does not, so neither set
+        # contains the other and both survive -- which is right, because a
+        # bore with a relief turned into it is still a bore.
         return FeatureInstance(
             instance_id=self.instance_id(0),
             type=groove_type,
             faces=sorted(
-                {groove.face_id} | {s.face_id for s in shoulders}
+                {groove.face_id}
+                | {node.face_id for node in shoulders}
+                | {node.face_id for node in flanks}
             ),
             parameters=parameters,
         )

@@ -28,6 +28,59 @@ class RuleShape(Enum):
     BINARY = "binary"
 
 
+class RuleFamily(Enum):
+    """Groups rules so the material editor stays navigable.
+
+    Once machining lands there are far too many rules to present as one flat
+    list, and a machinist looking for hole policy should not have to scroll
+    past sheet-metal bend rules to find it.
+    """
+
+    GENERAL = "general"
+    HOLE = "hole"
+    THREAD = "thread"
+    POCKET = "pocket"
+    SLOT = "slot"
+    THIN_FEATURE = "thin_feature"
+    BOSS = "boss"
+    RIB = "rib"
+    BLEND = "blend"
+    FREEFORM = "freeform"
+    TOOL_ACCESS = "tool_access"
+    SETUP = "setup"
+    PART = "part"
+    SHEET = "sheet"
+    GDT = "gdt"
+
+    @property
+    def label(self) -> str:
+        return self.value.replace("_", " ").title()
+
+    @property
+    def order(self) -> int:
+        """Display position, so families appear in a sensible reading order."""
+        return _FAMILY_ORDER.index(self)
+
+
+_FAMILY_ORDER: list["RuleFamily"] = [
+    RuleFamily.GENERAL,
+    RuleFamily.PART,
+    RuleFamily.SETUP,
+    RuleFamily.TOOL_ACCESS,
+    RuleFamily.HOLE,
+    RuleFamily.THREAD,
+    RuleFamily.POCKET,
+    RuleFamily.SLOT,
+    RuleFamily.THIN_FEATURE,
+    RuleFamily.BOSS,
+    RuleFamily.RIB,
+    RuleFamily.BLEND,
+    RuleFamily.FREEFORM,
+    RuleFamily.SHEET,
+    RuleFamily.GDT,
+]
+
+
 @dataclass(frozen=True)
 class RuleType:
     """Static metadata for one rule.
@@ -37,6 +90,7 @@ class RuleType:
     (e.g. "of wall thickness"), empty for absolute values.
     field_labels overrides the shape's default input labels.
     description is one short line shown under the rule name.
+    family groups the rule in the material editor.
     """
 
     label: str
@@ -46,6 +100,7 @@ class RuleType:
     unit_suffix: str = ""
     description: str = ""
     field_labels: tuple[str, ...] = ()
+    family: RuleFamily = RuleFamily.GENERAL
 
 
 SHAPE_DEFAULT_LABELS: dict[RuleShape, tuple[str, ...]] = {
@@ -115,6 +170,75 @@ class Rulebook(Enum):
         description="Maximum unsupported horizontal span between two supported regions.",
     )
 
+    # -- machining: part ----------------------------------------------------
+    PART_ASPECT_RATIO = RuleType(
+        "Part Slenderness",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="",
+        comparison="max",
+        field_labels=("Aim under", "At most"),
+        description="Ratio of the part's longest dimension to its shortest.",
+        family=RuleFamily.PART,
+    )
+    MATERIAL_REMOVAL = RuleType(
+        "Material Removal",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="%",
+        comparison="max",
+        field_labels=("Aim under", "At most"),
+        description="Share of the stock volume cut away to reach the finished part.",
+        family=RuleFamily.PART,
+    )
+    SEALED_VOID = RuleType(
+        "Sealed Void",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Enclosed cavity with no tool access from outside the part.",
+        family=RuleFamily.PART,
+    )
+
+    # -- machining: thin features -------------------------------------------
+    THIN_WALL = RuleType(
+        "Thin Wall",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="mm",
+        comparison="min",
+        description="Minimum material left between two opposing surfaces.",
+        family=RuleFamily.THIN_FEATURE,
+    )
+
+    # -- machining: setup and workholding -----------------------------------
+    NO_DATUM_FACE = RuleType(
+        "Datum Face",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="No flat face large enough to locate the part against.",
+        family=RuleFamily.SETUP,
+    )
+    NO_PARALLEL_DATUM_PAIR = RuleType(
+        "Parallel Clamping Faces",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="No opposed pair of flat faces for a vise to grip.",
+        family=RuleFamily.SETUP,
+    )
+    THIN_CLAMPING_DIMENSION = RuleType(
+        "Clamping Thickness",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Minimum stock thickness available for a vise to clamp on.",
+        family=RuleFamily.SETUP,
+    )
+    SMALL_PART_HOLDING = RuleType(
+        "Small Part Holding",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Part too small for vise work; needs soft jaws, a fixture or a pallet.",
+        family=RuleFamily.SETUP,
+    )
+
     @property
     def id(self) -> str:
         return self.name
@@ -138,6 +262,10 @@ class Rulebook(Enum):
     @property
     def shape(self) -> RuleShape:
         return self.value.shape
+
+    @property
+    def family(self) -> RuleFamily:
+        return self.value.family
 
     @property
     def is_binary(self) -> bool:

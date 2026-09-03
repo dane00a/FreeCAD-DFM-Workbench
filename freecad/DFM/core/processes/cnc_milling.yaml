@@ -1,10 +1,10 @@
 name: CNC Milling
 category: CNC Machining
-description: 'Subtractive machining on a milling centre: the part is cut from solid
-    stock held in a vise or fixture, with the cutter approaching from a limited number
-    of directions. Rules cover workholding, proportion, wall thickness and stock waste.
+description: 'Subtractive machining on a milling centre: the part is cut from solid stock
+  held in a vise or fixture, with the cutter approaching from a limited number of directions.
+  Rules cover workholding, proportion, wall thickness and stock waste.
 
-    '
+  '
 active_rules:
 - PART_ASPECT_RATIO
 - MATERIAL_REMOVAL
@@ -26,201 +26,444 @@ active_rules:
 - NO_PARALLEL_DATUM_PAIR
 - THIN_CLAMPING_DIMENSION
 - SMALL_PART_HOLDING
+- CUTTER_RADIUS_INFEASIBLE
+- CUTTER_RADIUS_SUBOPTIMAL
+- CHAMFER_NONSTANDARD_ANGLE
+- METAL_SEAL_WITNESS
+- BOSS_HEIGHT_RATIO
+- BOSS_WALL_THICKNESS
+- BOSS_UNDERCUT
+- RIB_HEIGHT_ASPECT
+- RIB_DRAFT_ANGLE
+- FREEFORM_INTERNAL_RADIUS
+- FREEFORM_FINISHING
+- SPHERICAL_POCKET_UNDERCUT
+- THREAD_RUNOUT
+- THREAD_SHOULDER_PROXIMITY
+- THREAD_WALL_THICKNESS
+- GROOVE_SQUARE_CORNER
+- HOLE_NONSTANDARD_DIAMETER
+- HOLE_PARTIAL_ENTRY
+- HOLE_COUNTERSINK_ANGLE
+- HOLE_MULTI_PASS
+- HOLE_INTERSECTS_CAVITY
+- POCKET_ASPECT_RATIO
+- SLOT_NONSTANDARD_WIDTH
+- FLEXURE_SLIT_PROCESS
+- BROACHED_SLOT_PROCESS
+- MINIMUM_FEATURE_SIZE
+- SHARP_INTERNAL_EDGE
+- PART_MARKING
+- RAISED_TEXT_MACHINED_FACE
+- FEATURE_COMPLEXITY
+- CASTING_DRAFT_ANGLE
+- SETUP_COUNT_HIGH
+- NO_ORTHOGONAL_DATUM_TRIO
+- TOOL_ACCESS_SPECIAL_SETUP
 rule_feedback:
-    UNDERCUT_PRESENT:
-        warning_msg: ''
-        error_msg: ''
-    TOOL_ACCESS_BLOCKED:
-        warning_msg: ''
-        error_msg: ''
-    POCKET_DEPTH_RATIO:
-        warning_msg: ''
-        error_msg: ''
-    POCKET_CORNER_RADIUS:
-        warning_msg: ''
-        error_msg: ''
-    POCKET_NARROW_OPENING:
-        warning_msg: ''
-        error_msg: ''
-    SLOT_DEPTH_RATIO:
-        warning_msg: ''
-        error_msg: ''
-    SLOT_OVERHANG:
-        warning_msg: ''
-        error_msg: ''
-    PART_ASPECT_RATIO:
-        warning_msg: ''
-        error_msg: ''
-    MATERIAL_REMOVAL:
-        warning_msg: ''
-        error_msg: ''
-    SEALED_VOID:
-        warning_msg: ''
-        error_msg: ''
-    THIN_WALL:
-        warning_msg: ''
-        error_msg: ''
-    NO_DATUM_FACE:
-        warning_msg: ''
-        error_msg: ''
-    NO_PARALLEL_DATUM_PAIR:
-        warning_msg: ''
-        error_msg: ''
-    THIN_CLAMPING_DIMENSION:
-        warning_msg: ''
-        error_msg: ''
-    SMALL_PART_HOLDING:
-        warning_msg: ''
-        error_msg: ''
-    HOLE_DEPTH_RATIO:
-        warning_msg: ''
-        error_msg: ''
-    HOLE_EDGE_DISTANCE:
-        warning_msg: ''
-        error_msg: ''
-    HOLE_WEB_THICKNESS:
-        warning_msg: ''
-        error_msg: ''
-    HOLE_FLAT_BOTTOM:
-        warning_msg: ''
-        error_msg: ''
-    HOLE_INTERSECTING:
-        warning_msg: ''
-        error_msg: ''
+  UNDERCUT_PRESENT:
+    warning_msg: ''
+    error_msg: ''
+  TOOL_ACCESS_BLOCKED:
+    warning_msg: ''
+    error_msg: ''
+  POCKET_DEPTH_RATIO:
+    warning_msg: ''
+    error_msg: ''
+  POCKET_CORNER_RADIUS:
+    warning_msg: ''
+    error_msg: ''
+  POCKET_NARROW_OPENING:
+    warning_msg: ''
+    error_msg: ''
+  SLOT_DEPTH_RATIO:
+    warning_msg: ''
+    error_msg: ''
+  SLOT_OVERHANG:
+    warning_msg: ''
+    error_msg: ''
+  PART_ASPECT_RATIO:
+    warning_msg: ''
+    error_msg: ''
+  MATERIAL_REMOVAL:
+    warning_msg: ''
+    error_msg: ''
+  SEALED_VOID:
+    warning_msg: ''
+    error_msg: ''
+  THIN_WALL:
+    warning_msg: ''
+    error_msg: ''
+  NO_DATUM_FACE:
+    warning_msg: ''
+    error_msg: ''
+  NO_PARALLEL_DATUM_PAIR:
+    warning_msg: ''
+    error_msg: ''
+  THIN_CLAMPING_DIMENSION:
+    warning_msg: ''
+    error_msg: ''
+  SMALL_PART_HOLDING:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_DEPTH_RATIO:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_EDGE_DISTANCE:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_WEB_THICKNESS:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_FLAT_BOTTOM:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_INTERSECTING:
+    warning_msg: ''
+    error_msg: ''
+  CUTTER_RADIUS_INFEASIBLE:
+    warning_msg: ''
+    error_msg: ''
+  CUTTER_RADIUS_SUBOPTIMAL:
+    warning_msg: ''
+    error_msg: ''
+  CHAMFER_NONSTANDARD_ANGLE:
+    warning_msg: ''
+    error_msg: ''
+  METAL_SEAL_WITNESS:
+    warning_msg: ''
+    error_msg: ''
+  BOSS_HEIGHT_RATIO:
+    warning_msg: ''
+    error_msg: ''
+  BOSS_WALL_THICKNESS:
+    warning_msg: ''
+    error_msg: ''
+  BOSS_UNDERCUT:
+    warning_msg: ''
+    error_msg: ''
+  RIB_HEIGHT_ASPECT:
+    warning_msg: ''
+    error_msg: ''
+  RIB_DRAFT_ANGLE:
+    warning_msg: ''
+    error_msg: ''
+  FREEFORM_INTERNAL_RADIUS:
+    warning_msg: ''
+    error_msg: ''
+  FREEFORM_FINISHING:
+    warning_msg: ''
+    error_msg: ''
+  SPHERICAL_POCKET_UNDERCUT:
+    warning_msg: ''
+    error_msg: ''
+  THREAD_RUNOUT:
+    warning_msg: ''
+    error_msg: ''
+  THREAD_SHOULDER_PROXIMITY:
+    warning_msg: ''
+    error_msg: ''
+  THREAD_WALL_THICKNESS:
+    warning_msg: ''
+    error_msg: ''
+  GROOVE_SQUARE_CORNER:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_NONSTANDARD_DIAMETER:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_PARTIAL_ENTRY:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_COUNTERSINK_ANGLE:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_MULTI_PASS:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_INTERSECTS_CAVITY:
+    warning_msg: ''
+    error_msg: ''
+  POCKET_ASPECT_RATIO:
+    warning_msg: ''
+    error_msg: ''
+  SLOT_NONSTANDARD_WIDTH:
+    warning_msg: ''
+    error_msg: ''
+  FLEXURE_SLIT_PROCESS:
+    warning_msg: ''
+    error_msg: ''
+  BROACHED_SLOT_PROCESS:
+    warning_msg: ''
+    error_msg: ''
+  MINIMUM_FEATURE_SIZE:
+    warning_msg: ''
+    error_msg: ''
+  SHARP_INTERNAL_EDGE:
+    warning_msg: ''
+    error_msg: ''
+  PART_MARKING:
+    warning_msg: ''
+    error_msg: ''
+  RAISED_TEXT_MACHINED_FACE:
+    warning_msg: ''
+    error_msg: ''
+  FEATURE_COMPLEXITY:
+    warning_msg: ''
+    error_msg: ''
+  CASTING_DRAFT_ANGLE:
+    warning_msg: ''
+    error_msg: ''
+  SETUP_COUNT_HIGH:
+    warning_msg: ''
+    error_msg: ''
+  NO_ORTHOGONAL_DATUM_TRIO:
+    warning_msg: ''
+    error_msg: ''
+  TOOL_ACCESS_SPECIAL_SETUP:
+    warning_msg: ''
+    error_msg: ''
 rule_criticality:
-    UNDERCUT_PRESENT: HIGH
-    TOOL_ACCESS_BLOCKED: CRITICAL
-    POCKET_DEPTH_RATIO: HIGH
-    POCKET_CORNER_RADIUS: MEDIUM
-    POCKET_NARROW_OPENING: HIGH
-    SLOT_DEPTH_RATIO: MEDIUM
-    SLOT_OVERHANG: LOW
-    HOLE_DEPTH_RATIO: HIGH
-    HOLE_EDGE_DISTANCE: HIGH
-    HOLE_WEB_THICKNESS: MEDIUM
-    HOLE_FLAT_BOTTOM: MEDIUM
-    HOLE_INTERSECTING: LOW
-    SEALED_VOID: CRITICAL
-    THIN_WALL: HIGH
-    NO_DATUM_FACE: HIGH
-    NO_PARALLEL_DATUM_PAIR: MEDIUM
-    THIN_CLAMPING_DIMENSION: MEDIUM
-    PART_ASPECT_RATIO: MEDIUM
-    MATERIAL_REMOVAL: LOW
-    SMALL_PART_HOLDING: LOW
-# Material names follow FreeCAD's own Machining material cards, so a material
-# chosen here refers to the same stock the CAM workbench would cut. Only the
-# rules where material genuinely changes the answer are overridden; everything
-# else inherits from Default.
+  UNDERCUT_PRESENT: HIGH
+  TOOL_ACCESS_BLOCKED: CRITICAL
+  POCKET_DEPTH_RATIO: HIGH
+  POCKET_CORNER_RADIUS: MEDIUM
+  POCKET_NARROW_OPENING: HIGH
+  SLOT_DEPTH_RATIO: MEDIUM
+  SLOT_OVERHANG: LOW
+  HOLE_DEPTH_RATIO: HIGH
+  HOLE_EDGE_DISTANCE: HIGH
+  HOLE_WEB_THICKNESS: MEDIUM
+  HOLE_FLAT_BOTTOM: MEDIUM
+  HOLE_INTERSECTING: LOW
+  SEALED_VOID: CRITICAL
+  THIN_WALL: HIGH
+  NO_DATUM_FACE: HIGH
+  NO_PARALLEL_DATUM_PAIR: MEDIUM
+  THIN_CLAMPING_DIMENSION: MEDIUM
+  PART_ASPECT_RATIO: MEDIUM
+  MATERIAL_REMOVAL: LOW
+  SMALL_PART_HOLDING: LOW
+  CUTTER_RADIUS_INFEASIBLE: CRITICAL
+  CUTTER_RADIUS_SUBOPTIMAL: LOW
+  CHAMFER_NONSTANDARD_ANGLE: LOW
+  METAL_SEAL_WITNESS: LOW
+  BOSS_HEIGHT_RATIO: MEDIUM
+  BOSS_WALL_THICKNESS: MEDIUM
+  BOSS_UNDERCUT: MEDIUM
+  RIB_HEIGHT_ASPECT: MEDIUM
+  RIB_DRAFT_ANGLE: LOW
+  FREEFORM_INTERNAL_RADIUS: HIGH
+  FREEFORM_FINISHING: LOW
+  SPHERICAL_POCKET_UNDERCUT: HIGH
+  THREAD_RUNOUT: HIGH
+  THREAD_SHOULDER_PROXIMITY: MEDIUM
+  THREAD_WALL_THICKNESS: HIGH
+  GROOVE_SQUARE_CORNER: MEDIUM
+  HOLE_NONSTANDARD_DIAMETER: LOW
+  HOLE_PARTIAL_ENTRY: HIGH
+  HOLE_COUNTERSINK_ANGLE: LOW
+  HOLE_MULTI_PASS: LOW
+  HOLE_INTERSECTS_CAVITY: MEDIUM
+  POCKET_ASPECT_RATIO: LOW
+  SLOT_NONSTANDARD_WIDTH: LOW
+  FLEXURE_SLIT_PROCESS: MEDIUM
+  BROACHED_SLOT_PROCESS: MEDIUM
+  MINIMUM_FEATURE_SIZE: HIGH
+  SHARP_INTERNAL_EDGE: MEDIUM
+  PART_MARKING: LOW
+  RAISED_TEXT_MACHINED_FACE: MEDIUM
+  FEATURE_COMPLEXITY: LOW
+  CASTING_DRAFT_ANGLE: MEDIUM
+  SETUP_COUNT_HIGH: MEDIUM
+  NO_ORTHOGONAL_DATUM_TRIO: MEDIUM
+  TOOL_ACCESS_SPECIAL_SETUP: MEDIUM
 materials:
-    Default:
-        category: Default
-        is_active: true
-        rule_limits:
-            PART_ASPECT_RATIO:
-                target: '8.0'
-                limit: 'N/A'
-            MATERIAL_REMOVAL:
-                target: '70'
-                limit: '85'
-            SEALED_VOID:
-                binary_severity: ERROR
-            UNDERCUT_PRESENT:
-                binary_severity: WARNING
-            TOOL_ACCESS_BLOCKED:
-                binary_severity: ERROR
-            HOLE_DEPTH_RATIO:
-                target: '6.0'
-                limit: '10.0'
-            HOLE_EDGE_DISTANCE:
-                target: 'N/A'
-                limit: '2.0'
-            HOLE_WEB_THICKNESS:
-                target: 'N/A'
-                limit: '1.5'
-            HOLE_FLAT_BOTTOM:
-                binary_severity: WARNING
-            HOLE_INTERSECTING:
-                binary_severity: WARNING
-            POCKET_DEPTH_RATIO:
-                target: '4.0'
-                limit: '6.0'
-            POCKET_CORNER_RADIUS:
-                target: 'N/A'
-                limit: '0.0'
-            POCKET_NARROW_OPENING:
-                binary_severity: WARNING
-            SLOT_DEPTH_RATIO:
-                target: 'N/A'
-                limit: '3.0'
-            SLOT_OVERHANG:
-                binary_severity: WARNING
-            THIN_WALL:
-                target: '1.5'
-                limit: '0.8'
-            NO_DATUM_FACE:
-                binary_severity: WARNING
-            NO_PARALLEL_DATUM_PAIR:
-                binary_severity: WARNING
-            THIN_CLAMPING_DIMENSION:
-                target: 'N/A'
-                limit: '3.0'
-            SMALL_PART_HOLDING:
-                binary_severity: INFO
-    Aluminum (Soft Wrought Alloy):
-        category: Aluminium
-        is_active: true
-        rule_limits:
-            # Cuts cleanly and holds an edge, so thinner sections survive
-            # machining without chatter or tearing.
-            THIN_WALL:
-                target: '1.2'
-                limit: '0.6'
-    Aluminum (Hard Cast Alloy):
-        category: Aluminium
-        is_active: true
-        rule_limits:
-            # High silicon content is abrasive and the casting may carry
-            # porosity, so leave a little more material than wrought.
-            THIN_WALL:
-                target: '1.5'
-                limit: '0.8'
-    Mild Steel:
-        category: Steel
-        is_active: true
-        rule_limits:
-            THIN_WALL:
-                target: '1.5'
-                limit: '0.8'
-    Low Alloy Steel:
-        category: Steel
-        is_active: true
-        rule_limits:
-            THIN_WALL:
-                target: '1.8'
-                limit: '1.0'
-    Austenitic Stainless Steel:
-        category: Steel
-        is_active: true
-        rule_limits:
-            # Work-hardens under a rubbing tool and pushes back hard, so thin
-            # sections deflect into the cutter and glaze rather than cut.
-            THIN_WALL:
-                target: '2.0'
-                limit: '1.2'
-    Tool Steel (unhardened):
-        category: Steel
-        is_active: true
-        rule_limits:
-            THIN_WALL:
-                target: '2.0'
-                limit: '1.2'
-    Gray Cast Iron:
-        category: Cast Iron
-        is_active: true
-        rule_limits:
-            # Brittle: thin sections chip at the cutter exit rather than
-            # deflecting, so the floor is higher than its hardness suggests.
-            THIN_WALL:
-                target: '2.5'
-                limit: '1.5'
+  Default:
+    category: Default
+    is_active: true
+    rule_limits:
+      PART_ASPECT_RATIO:
+        target: '8.0'
+        limit: N/A
+      MATERIAL_REMOVAL:
+        target: '70'
+        limit: '85'
+      SEALED_VOID:
+        binary_severity: ERROR
+      UNDERCUT_PRESENT:
+        binary_severity: WARNING
+      TOOL_ACCESS_BLOCKED:
+        binary_severity: ERROR
+      HOLE_DEPTH_RATIO:
+        target: '6.0'
+        limit: '10.0'
+      HOLE_EDGE_DISTANCE:
+        target: N/A
+        limit: '2.0'
+      HOLE_WEB_THICKNESS:
+        target: N/A
+        limit: '1.5'
+      HOLE_FLAT_BOTTOM:
+        binary_severity: WARNING
+      HOLE_INTERSECTING:
+        binary_severity: WARNING
+      POCKET_DEPTH_RATIO:
+        target: '4.0'
+        limit: '6.0'
+      POCKET_CORNER_RADIUS:
+        target: N/A
+        limit: '0.0'
+      POCKET_NARROW_OPENING:
+        binary_severity: WARNING
+      SLOT_DEPTH_RATIO:
+        target: N/A
+        limit: '3.0'
+      SLOT_OVERHANG:
+        binary_severity: WARNING
+      THIN_WALL:
+        target: '1.5'
+        limit: '0.8'
+      NO_DATUM_FACE:
+        binary_severity: WARNING
+      NO_PARALLEL_DATUM_PAIR:
+        binary_severity: WARNING
+      THIN_CLAMPING_DIMENSION:
+        target: N/A
+        limit: '3.0'
+      SMALL_PART_HOLDING:
+        binary_severity: INFO
+      CUTTER_RADIUS_INFEASIBLE:
+        target: N/A
+        limit: '0.0'
+      CUTTER_RADIUS_SUBOPTIMAL:
+        target: N/A
+        limit: '0.0'
+      CHAMFER_NONSTANDARD_ANGLE:
+        binary_severity: INFO
+      METAL_SEAL_WITNESS:
+        binary_severity: INFO
+      BOSS_HEIGHT_RATIO:
+        target: '4.0'
+        limit: '8.0'
+      BOSS_WALL_THICKNESS:
+        target: N/A
+        limit: '3.0'
+      BOSS_UNDERCUT:
+        binary_severity: WARNING
+      RIB_HEIGHT_ASPECT:
+        target: '5.0'
+        limit: N/A
+      RIB_DRAFT_ANGLE:
+        target: N/A
+        limit: '1.0'
+      FREEFORM_INTERNAL_RADIUS:
+        target: N/A
+        limit: '0.0'
+      FREEFORM_FINISHING:
+        binary_severity: INFO
+      SPHERICAL_POCKET_UNDERCUT:
+        binary_severity: WARNING
+      THREAD_RUNOUT:
+        target: N/A
+        limit: '1.5'
+      THREAD_SHOULDER_PROXIMITY:
+        target: N/A
+        limit: '1.5'
+      THREAD_WALL_THICKNESS:
+        target: N/A
+        limit: '1.5'
+      GROOVE_SQUARE_CORNER:
+        target: N/A
+        limit: '0.0'
+      HOLE_NONSTANDARD_DIAMETER:
+        binary_severity: INFO
+      HOLE_PARTIAL_ENTRY:
+        binary_severity: WARNING
+      HOLE_COUNTERSINK_ANGLE:
+        binary_severity: INFO
+      HOLE_MULTI_PASS:
+        binary_severity: INFO
+      HOLE_INTERSECTS_CAVITY:
+        binary_severity: WARNING
+      POCKET_ASPECT_RATIO:
+        target: '8.0'
+        limit: '15.0'
+      SLOT_NONSTANDARD_WIDTH:
+        binary_severity: INFO
+      FLEXURE_SLIT_PROCESS:
+        binary_severity: INFO
+      BROACHED_SLOT_PROCESS:
+        binary_severity: INFO
+      MINIMUM_FEATURE_SIZE:
+        target: N/A
+        limit: '0.5'
+      SHARP_INTERNAL_EDGE:
+        target: N/A
+        limit: '0.0'
+      PART_MARKING:
+        binary_severity: INFO
+      RAISED_TEXT_MACHINED_FACE:
+        binary_severity: WARNING
+      FEATURE_COMPLEXITY:
+        target: '40'
+        limit: '80'
+      CASTING_DRAFT_ANGLE:
+        target: N/A
+        limit: '1.0'
+      SETUP_COUNT_HIGH:
+        target: '2'
+        limit: '4'
+      NO_ORTHOGONAL_DATUM_TRIO:
+        binary_severity: WARNING
+      TOOL_ACCESS_SPECIAL_SETUP:
+        binary_severity: WARNING
+  Aluminum (Soft Wrought Alloy):
+    category: Aluminium
+    is_active: true
+    rule_limits:
+      THIN_WALL:
+        target: '1.2'
+        limit: '0.6'
+  Aluminum (Hard Cast Alloy):
+    category: Aluminium
+    is_active: true
+    rule_limits:
+      THIN_WALL:
+        target: '1.5'
+        limit: '0.8'
+  Mild Steel:
+    category: Steel
+    is_active: true
+    rule_limits:
+      THIN_WALL:
+        target: '1.5'
+        limit: '0.8'
+  Low Alloy Steel:
+    category: Steel
+    is_active: true
+    rule_limits:
+      THIN_WALL:
+        target: '1.8'
+        limit: '1.0'
+  Austenitic Stainless Steel:
+    category: Steel
+    is_active: true
+    rule_limits:
+      THIN_WALL:
+        target: '2.0'
+        limit: '1.2'
+  Tool Steel (unhardened):
+    category: Steel
+    is_active: true
+    rule_limits:
+      THIN_WALL:
+        target: '2.0'
+        limit: '1.2'
+  Gray Cast Iron:
+    category: Cast Iron
+    is_active: true
+    rule_limits:
+      THIN_WALL:
+        target: '2.5'
+        limit: '1.5'

@@ -1,10 +1,10 @@
 name: CNC Turning
 category: CNC Machining
-description: 'Subtractive machining on a lathe: the part rotates and the tool traverses,
-    so the geometry is a body of revolution. The part is gripped by its outside diameter
-    in a chuck, which is why the vise workholding rules do not apply here.
+description: 'Subtractive machining on a lathe: the part rotates and the tool traverses, so
+  the geometry is a body of revolution. The part is gripped by its outside diameter in a chuck,
+  which is why the vise workholding rules do not apply here.
 
-    '
+  '
 active_rules:
 - PART_ASPECT_RATIO
 - MATERIAL_REMOVAL
@@ -17,146 +17,344 @@ active_rules:
 - HOLE_FLAT_BOTTOM
 - HOLE_INTERSECTING
 - THIN_WALL
+- CUTTER_RADIUS_INFEASIBLE
+- CUTTER_RADIUS_SUBOPTIMAL
+- CHAMFER_NONSTANDARD_ANGLE
+- METAL_SEAL_WITNESS
+- BOSS_HEIGHT_RATIO
+- BOSS_WALL_THICKNESS
+- FREEFORM_INTERNAL_RADIUS
+- FREEFORM_FINISHING
+- TURNED_PROFILE_RADIUS
+- SPHERICAL_POCKET_UNDERCUT
+- THREAD_RUNOUT
+- THREAD_SHOULDER_PROXIMITY
+- THREAD_WALL_THICKNESS
+- THREAD_RELIEF_WIDTH
+- HOLE_NONSTANDARD_DIAMETER
+- HOLE_PARTIAL_ENTRY
+- HOLE_COUNTERSINK_ANGLE
+- HOLE_MULTI_PASS
+- HOLE_INTERSECTS_CAVITY
+- MINIMUM_FEATURE_SIZE
+- SHARP_INTERNAL_EDGE
+- PART_MARKING
+- RAISED_TEXT_MACHINED_FACE
+- FEATURE_COMPLEXITY
+- CASTING_DRAFT_ANGLE
+- SETUP_COUNT_HIGH
+- TOOL_ACCESS_SPECIAL_SETUP
 rule_feedback:
-    UNDERCUT_PRESENT:
-        warning_msg: ''
-        error_msg: ''
-    TOOL_ACCESS_BLOCKED:
-        warning_msg: ''
-        error_msg: ''
-    PART_ASPECT_RATIO:
-        warning_msg: ''
-        error_msg: ''
-    MATERIAL_REMOVAL:
-        warning_msg: ''
-        error_msg: ''
-    SEALED_VOID:
-        warning_msg: ''
-        error_msg: ''
-    THIN_WALL:
-        warning_msg: ''
-        error_msg: ''
-    HOLE_DEPTH_RATIO:
-        warning_msg: ''
-        error_msg: ''
-    HOLE_EDGE_DISTANCE:
-        warning_msg: ''
-        error_msg: ''
-    HOLE_WEB_THICKNESS:
-        warning_msg: ''
-        error_msg: ''
-    HOLE_FLAT_BOTTOM:
-        warning_msg: ''
-        error_msg: ''
-    HOLE_INTERSECTING:
-        warning_msg: ''
-        error_msg: ''
+  UNDERCUT_PRESENT:
+    warning_msg: ''
+    error_msg: ''
+  TOOL_ACCESS_BLOCKED:
+    warning_msg: ''
+    error_msg: ''
+  PART_ASPECT_RATIO:
+    warning_msg: ''
+    error_msg: ''
+  MATERIAL_REMOVAL:
+    warning_msg: ''
+    error_msg: ''
+  SEALED_VOID:
+    warning_msg: ''
+    error_msg: ''
+  THIN_WALL:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_DEPTH_RATIO:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_EDGE_DISTANCE:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_WEB_THICKNESS:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_FLAT_BOTTOM:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_INTERSECTING:
+    warning_msg: ''
+    error_msg: ''
+  CUTTER_RADIUS_INFEASIBLE:
+    warning_msg: ''
+    error_msg: ''
+  CUTTER_RADIUS_SUBOPTIMAL:
+    warning_msg: ''
+    error_msg: ''
+  CHAMFER_NONSTANDARD_ANGLE:
+    warning_msg: ''
+    error_msg: ''
+  METAL_SEAL_WITNESS:
+    warning_msg: ''
+    error_msg: ''
+  BOSS_HEIGHT_RATIO:
+    warning_msg: ''
+    error_msg: ''
+  BOSS_WALL_THICKNESS:
+    warning_msg: ''
+    error_msg: ''
+  FREEFORM_INTERNAL_RADIUS:
+    warning_msg: ''
+    error_msg: ''
+  FREEFORM_FINISHING:
+    warning_msg: ''
+    error_msg: ''
+  TURNED_PROFILE_RADIUS:
+    warning_msg: ''
+    error_msg: ''
+  SPHERICAL_POCKET_UNDERCUT:
+    warning_msg: ''
+    error_msg: ''
+  THREAD_RUNOUT:
+    warning_msg: ''
+    error_msg: ''
+  THREAD_SHOULDER_PROXIMITY:
+    warning_msg: ''
+    error_msg: ''
+  THREAD_WALL_THICKNESS:
+    warning_msg: ''
+    error_msg: ''
+  THREAD_RELIEF_WIDTH:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_NONSTANDARD_DIAMETER:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_PARTIAL_ENTRY:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_COUNTERSINK_ANGLE:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_MULTI_PASS:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_INTERSECTS_CAVITY:
+    warning_msg: ''
+    error_msg: ''
+  MINIMUM_FEATURE_SIZE:
+    warning_msg: ''
+    error_msg: ''
+  SHARP_INTERNAL_EDGE:
+    warning_msg: ''
+    error_msg: ''
+  PART_MARKING:
+    warning_msg: ''
+    error_msg: ''
+  RAISED_TEXT_MACHINED_FACE:
+    warning_msg: ''
+    error_msg: ''
+  FEATURE_COMPLEXITY:
+    warning_msg: ''
+    error_msg: ''
+  CASTING_DRAFT_ANGLE:
+    warning_msg: ''
+    error_msg: ''
+  SETUP_COUNT_HIGH:
+    warning_msg: ''
+    error_msg: ''
+  TOOL_ACCESS_SPECIAL_SETUP:
+    warning_msg: ''
+    error_msg: ''
 rule_criticality:
-    UNDERCUT_PRESENT: HIGH
-    TOOL_ACCESS_BLOCKED: CRITICAL
-    HOLE_DEPTH_RATIO: HIGH
-    HOLE_EDGE_DISTANCE: HIGH
-    HOLE_WEB_THICKNESS: MEDIUM
-    HOLE_FLAT_BOTTOM: MEDIUM
-    HOLE_INTERSECTING: LOW
-    SEALED_VOID: CRITICAL
-    PART_ASPECT_RATIO: HIGH
-    THIN_WALL: HIGH
-    MATERIAL_REMOVAL: LOW
-# Material names follow FreeCAD's own Machining material cards. The
-# slenderness limits are the turning ones -- length over diameter, where 4:1
-# wants a steady rest and 8:1 is Swiss-style territory -- rather than the
-# bounding-box ratio used for milled parts.
+  UNDERCUT_PRESENT: HIGH
+  TOOL_ACCESS_BLOCKED: CRITICAL
+  HOLE_DEPTH_RATIO: HIGH
+  HOLE_EDGE_DISTANCE: HIGH
+  HOLE_WEB_THICKNESS: MEDIUM
+  HOLE_FLAT_BOTTOM: MEDIUM
+  HOLE_INTERSECTING: LOW
+  SEALED_VOID: CRITICAL
+  PART_ASPECT_RATIO: HIGH
+  THIN_WALL: HIGH
+  MATERIAL_REMOVAL: LOW
+  CUTTER_RADIUS_INFEASIBLE: CRITICAL
+  CUTTER_RADIUS_SUBOPTIMAL: LOW
+  CHAMFER_NONSTANDARD_ANGLE: LOW
+  METAL_SEAL_WITNESS: LOW
+  BOSS_HEIGHT_RATIO: MEDIUM
+  BOSS_WALL_THICKNESS: MEDIUM
+  FREEFORM_INTERNAL_RADIUS: HIGH
+  FREEFORM_FINISHING: LOW
+  TURNED_PROFILE_RADIUS: MEDIUM
+  SPHERICAL_POCKET_UNDERCUT: HIGH
+  THREAD_RUNOUT: HIGH
+  THREAD_SHOULDER_PROXIMITY: MEDIUM
+  THREAD_WALL_THICKNESS: HIGH
+  THREAD_RELIEF_WIDTH: MEDIUM
+  HOLE_NONSTANDARD_DIAMETER: LOW
+  HOLE_PARTIAL_ENTRY: HIGH
+  HOLE_COUNTERSINK_ANGLE: LOW
+  HOLE_MULTI_PASS: LOW
+  HOLE_INTERSECTS_CAVITY: MEDIUM
+  MINIMUM_FEATURE_SIZE: HIGH
+  SHARP_INTERNAL_EDGE: MEDIUM
+  PART_MARKING: LOW
+  RAISED_TEXT_MACHINED_FACE: MEDIUM
+  FEATURE_COMPLEXITY: LOW
+  CASTING_DRAFT_ANGLE: MEDIUM
+  SETUP_COUNT_HIGH: MEDIUM
+  TOOL_ACCESS_SPECIAL_SETUP: MEDIUM
 materials:
-    Default:
-        category: Default
-        is_active: true
-        rule_limits:
-            PART_ASPECT_RATIO:
-                target: '4.0'
-                limit: '8.0'
-            MATERIAL_REMOVAL:
-                target: '75'
-                limit: '90'
-            SEALED_VOID:
-                binary_severity: ERROR
-            UNDERCUT_PRESENT:
-                binary_severity: WARNING
-            TOOL_ACCESS_BLOCKED:
-                binary_severity: ERROR
-            HOLE_DEPTH_RATIO:
-                target: '6.0'
-                limit: '10.0'
-            HOLE_EDGE_DISTANCE:
-                target: 'N/A'
-                limit: '2.0'
-            HOLE_WEB_THICKNESS:
-                target: 'N/A'
-                limit: '1.5'
-            HOLE_FLAT_BOTTOM:
-                binary_severity: WARNING
-            HOLE_INTERSECTING:
-                binary_severity: WARNING
-            THIN_WALL:
-                target: '1.5'
-                limit: '0.8'
-    Aluminum (Soft Wrought Alloy):
-        category: Aluminium
-        is_active: true
-        rule_limits:
-            THIN_WALL:
-                target: '1.2'
-                limit: '0.6'
-    Aluminum (Hard Cast Alloy):
-        category: Aluminium
-        is_active: true
-        rule_limits:
-            THIN_WALL:
-                target: '1.5'
-                limit: '0.8'
-    Mild Steel:
-        category: Steel
-        is_active: true
-        rule_limits:
-            THIN_WALL:
-                target: '1.5'
-                limit: '0.8'
-    Low Alloy Steel:
-        category: Steel
-        is_active: true
-        rule_limits:
-            # Tougher material pushes back harder on an overhanging bar, so a
-            # slender part needs support sooner than in aluminium.
-            PART_ASPECT_RATIO:
-                target: '3.5'
-                limit: '7.0'
-            THIN_WALL:
-                target: '1.8'
-                limit: '1.0'
-    Austenitic Stainless Steel:
-        category: Steel
-        is_active: true
-        rule_limits:
-            PART_ASPECT_RATIO:
-                target: '3.0'
-                limit: '6.0'
-            THIN_WALL:
-                target: '2.0'
-                limit: '1.2'
-    Tool Steel (unhardened):
-        category: Steel
-        is_active: true
-        rule_limits:
-            PART_ASPECT_RATIO:
-                target: '3.0'
-                limit: '6.0'
-            THIN_WALL:
-                target: '2.0'
-                limit: '1.2'
-    Gray Cast Iron:
-        category: Cast Iron
-        is_active: true
-        rule_limits:
-            THIN_WALL:
-                target: '2.5'
-                limit: '1.5'
+  Default:
+    category: Default
+    is_active: true
+    rule_limits:
+      PART_ASPECT_RATIO:
+        target: '4.0'
+        limit: '8.0'
+      MATERIAL_REMOVAL:
+        target: '75'
+        limit: '90'
+      SEALED_VOID:
+        binary_severity: ERROR
+      UNDERCUT_PRESENT:
+        binary_severity: WARNING
+      TOOL_ACCESS_BLOCKED:
+        binary_severity: ERROR
+      HOLE_DEPTH_RATIO:
+        target: '6.0'
+        limit: '10.0'
+      HOLE_EDGE_DISTANCE:
+        target: N/A
+        limit: '2.0'
+      HOLE_WEB_THICKNESS:
+        target: N/A
+        limit: '1.5'
+      HOLE_FLAT_BOTTOM:
+        binary_severity: WARNING
+      HOLE_INTERSECTING:
+        binary_severity: WARNING
+      THIN_WALL:
+        target: '1.5'
+        limit: '0.8'
+      CUTTER_RADIUS_INFEASIBLE:
+        target: N/A
+        limit: '0.0'
+      CUTTER_RADIUS_SUBOPTIMAL:
+        target: N/A
+        limit: '0.0'
+      CHAMFER_NONSTANDARD_ANGLE:
+        binary_severity: INFO
+      METAL_SEAL_WITNESS:
+        binary_severity: INFO
+      BOSS_HEIGHT_RATIO:
+        target: '4.0'
+        limit: '8.0'
+      BOSS_WALL_THICKNESS:
+        target: N/A
+        limit: '3.0'
+      FREEFORM_INTERNAL_RADIUS:
+        target: N/A
+        limit: '0.0'
+      FREEFORM_FINISHING:
+        binary_severity: INFO
+      TURNED_PROFILE_RADIUS:
+        target: N/A
+        limit: '0.0'
+      SPHERICAL_POCKET_UNDERCUT:
+        binary_severity: WARNING
+      THREAD_RUNOUT:
+        target: N/A
+        limit: '1.5'
+      THREAD_SHOULDER_PROXIMITY:
+        target: N/A
+        limit: '1.5'
+      THREAD_WALL_THICKNESS:
+        target: N/A
+        limit: '1.5'
+      THREAD_RELIEF_WIDTH:
+        target: N/A
+        limit: '1.5'
+      HOLE_NONSTANDARD_DIAMETER:
+        binary_severity: INFO
+      HOLE_PARTIAL_ENTRY:
+        binary_severity: WARNING
+      HOLE_COUNTERSINK_ANGLE:
+        binary_severity: INFO
+      HOLE_MULTI_PASS:
+        binary_severity: INFO
+      HOLE_INTERSECTS_CAVITY:
+        binary_severity: WARNING
+      MINIMUM_FEATURE_SIZE:
+        target: N/A
+        limit: '0.5'
+      SHARP_INTERNAL_EDGE:
+        target: N/A
+        limit: '0.0'
+      PART_MARKING:
+        binary_severity: INFO
+      RAISED_TEXT_MACHINED_FACE:
+        binary_severity: WARNING
+      FEATURE_COMPLEXITY:
+        target: '40'
+        limit: '80'
+      CASTING_DRAFT_ANGLE:
+        target: N/A
+        limit: '1.0'
+      SETUP_COUNT_HIGH:
+        target: '2'
+        limit: '4'
+      TOOL_ACCESS_SPECIAL_SETUP:
+        binary_severity: WARNING
+  Aluminum (Soft Wrought Alloy):
+    category: Aluminium
+    is_active: true
+    rule_limits:
+      THIN_WALL:
+        target: '1.2'
+        limit: '0.6'
+  Aluminum (Hard Cast Alloy):
+    category: Aluminium
+    is_active: true
+    rule_limits:
+      THIN_WALL:
+        target: '1.5'
+        limit: '0.8'
+  Mild Steel:
+    category: Steel
+    is_active: true
+    rule_limits:
+      THIN_WALL:
+        target: '1.5'
+        limit: '0.8'
+  Low Alloy Steel:
+    category: Steel
+    is_active: true
+    rule_limits:
+      PART_ASPECT_RATIO:
+        target: '3.5'
+        limit: '7.0'
+      THIN_WALL:
+        target: '1.8'
+        limit: '1.0'
+  Austenitic Stainless Steel:
+    category: Steel
+    is_active: true
+    rule_limits:
+      PART_ASPECT_RATIO:
+        target: '3.0'
+        limit: '6.0'
+      THIN_WALL:
+        target: '2.0'
+        limit: '1.2'
+  Tool Steel (unhardened):
+    category: Steel
+    is_active: true
+    rule_limits:
+      PART_ASPECT_RATIO:
+        target: '3.0'
+        limit: '6.0'
+      THIN_WALL:
+        target: '2.0'
+        limit: '1.2'
+  Gray Cast Iron:
+    category: Cast Iron
+    is_active: true
+    rule_limits:
+      THIN_WALL:
+        target: '2.5'
+        limit: '1.5'

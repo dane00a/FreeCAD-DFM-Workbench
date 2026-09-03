@@ -28,6 +28,7 @@ from ...core.machining.process_classifier import (
 )
 from ...core.machining.recognizers import RECOGNIZER_PIPELINE
 from ...core.machining.resolver import resolve
+from ...core.machining.thread_sources import ThreadEvidence, thread_evidence_for
 from ...core.registries import register_analyzer
 from ...core.utils.geometry import EdgeIndex, FaceIndex
 
@@ -71,7 +72,15 @@ class MachiningAnalyzer(BaseAnalyzer):
             return {}
 
         part_process = classify_part_process(graph, self.config.thresholds, shape)
-        recognition = self._recognize(graph, shape, part_process, check_abort)
+        # Read before recognition, because a bore the document calls tapped
+        # has to be one when the hole pass sees it. The target object is what
+        # carries the answer; an analysis handed nothing but a shape -- a
+        # test, or a caller with no document -- gets empty evidence and the
+        # helix search on its own, exactly as before.
+        evidence = thread_evidence_for(kwargs.get("target_object"))
+        recognition = self._recognize(
+            graph, shape, part_process, check_abort, evidence
+        )
 
         # The classification ran before recognition because the recognizers
         # need its verdict, so it decided on shape alone. Two of its answers
@@ -96,16 +105,24 @@ class MachiningAnalyzer(BaseAnalyzer):
         )
         return {CONTEXT_KEY: context}
 
-    def _recognize(self, graph, shape, part_process, check_abort) -> RecognitionResult:
+    def _recognize(
+        self,
+        graph,
+        shape,
+        part_process,
+        check_abort,
+        evidence: Optional[ThreadEvidence] = None,
+    ) -> RecognitionResult:
         """Run the recognizers in order, each told what the others claimed.
 
         The order is load-bearing: a later recognizer is given the faces
         already spoken for, so a groove does not re-recognize the bore it
         sits in.
 
-        The shop configuration and the part classification are set on each
-        recognizer rather than passed as arguments. Most recognizers need
-        neither, and threading two more parameters through every signature to
+        The shop configuration, the part classification and whatever the
+        document states about the part's threads are set on each recognizer
+        rather than passed as arguments. Most recognizers need none of the
+        three, and threading three more parameters through every signature to
         serve the two that do would be all cost and no clarity.
 
         What comes out of the pipeline is raw. The recognizers are eager and
@@ -115,6 +132,8 @@ class MachiningAnalyzer(BaseAnalyzer):
         """
         result = RecognitionResult()
         claimed: set[int] = set()
+        if evidence is None:
+            evidence = ThreadEvidence()
 
         for recognizer_class in RECOGNIZER_PIPELINE:
             if check_abort and check_abort():
@@ -122,6 +141,7 @@ class MachiningAnalyzer(BaseAnalyzer):
             recognizer = recognizer_class()
             recognizer.config = self.config
             recognizer.part_process = part_process
+            recognizer.thread_evidence = evidence
             try:
                 found = recognizer.recognize(graph, shape, claimed, result.features)
             except Exception as exc:  # one bad recognizer must not lose the rest

@@ -16,9 +16,11 @@ geometry, because none of it reliably can be -- a machined casting and a
 machined billet are identical once the flash is off, and no analysis can
 recover which one it was looking at.
 
-The thresholds themselves live in the material and process editors, where
-they belong: they are policy, and policy varies by material. What is here is
-the equipment and the stock.
+What is here is the shop as a whole -- how it is equipped and what stock it
+buys. The numbers the rules compare against are on the Machining Limits page
+and the shelf they are compared against is on Machining Tooling, because
+there are a hundred-odd of the first and a hundred-odd of the second and
+neither belongs in a dropdown next to "Axes available".
 """
 
 from PySide6 import QtGui, QtWidgets
@@ -113,12 +115,15 @@ class MachiningPreferences:
         )
 
         self.confirm_threads = QtWidgets.QCheckBox(
-            "Ask before treating an inferred thread as real"
+            "Ask which tap-drill-sized bores are tapped"
         )
         self.confirm_threads.setToolTip(
-            "A thread is only asserted when it is actually modelled as a\n"
-            "helix. With this on, anything less certain is raised as a\n"
-            "question rather than reported as a fact."
+            "An imported model carries no thread data, so a tapped hole\n"
+            "looks exactly like a dowel hole. With this on, bores drilled\n"
+            "at a standard tap drill are put up for confirmation after an\n"
+            "analysis, and the answers are kept with the document.\n\n"
+            "A part modelled in FreeCAD needs none of this: a PartDesign\n"
+            "hole states its own thread, and that is read directly."
         )
 
         layout.addWidget(
@@ -163,9 +168,9 @@ class MachiningPreferences:
     @staticmethod
     def _footnote() -> QtWidgets.QLabel:
         label = QtWidgets.QLabel(
-            "Limits and tolerances live in the material and process editors, "
-            "where they can vary by material. Tool sizes come from the tool "
-            "library."
+            "Every limit these rules compare against is on the Machining "
+            "Limits page. What the shop owns -- the tool library and the "
+            "drill indexes -- is on Machining Tooling."
         )
         label.setWordWrap(True)
         font = label.font()

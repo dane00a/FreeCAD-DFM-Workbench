@@ -32,6 +32,12 @@ from OCP.gp import gp_Dir, gp_Vec
 from ..aag import AagNode, AttributedAdjacencyGraph, Concavity, SurfaceType
 from ..features import BORE_TYPES, FeatureInstance, FeatureType
 from ..helix import candidate_axes, find_helices
+from ..thread_sources import (
+    MODELLED_HELIX,
+    ThreadEvidence,
+    bore_wall,
+    centreline_of,
+)
 from ..threads import match_tap_drill
 from .base import (
     FeatureRecognizer,
@@ -74,6 +80,12 @@ class HoleRecognizer(FeatureRecognizer):
     """Finds through holes, blind holes, counterbores and countersinks."""
 
     prefix = "h"
+
+    #: What the document and the user have already said about this part's
+    #: threads, set by the analyzer before the run. Nothing when the analysis
+    #: has no document behind it, which is the headless case, and then the
+    #: helix search is the only source there is.
+    thread_evidence: Optional[ThreadEvidence] = None
 
     @property
     def name(self) -> str:
@@ -191,24 +203,39 @@ class HoleRecognizer(FeatureRecognizer):
     def _try_thread(
         self, graph: AttributedAdjacencyGraph, feature: FeatureInstance
     ) -> bool:
-        """Promote a bore to a tapped hole, on modelled evidence only.
+        """Promote a bore to a tapped hole, on positive evidence only.
 
         A hole whose diameter merely matches a tap drill is not evidence of a
         thread. Most bores that size are clearance, reamed, dowel or pilot
         holes, and inferring from diameter alone turns a plate of standard
-        drill sizes into a fully tapped part. So the thread has to actually
-        be in the model: a helix, coaxial with the bore, at about its radius.
+        drill sizes into a fully tapped part.
 
-        The tap-drill table is still what names the thread once a helix has
-        confirmed one -- the bore diameter is the tap drill, by definition.
+        So somebody has to have said so. Either the document states it -- a
+        threaded ``PartDesign::Hole``, or a bore the user has confirmed --
+        or the thread is actually cut in the solid as a helix, coaxial with
+        the bore and at about its radius.
+
+        A statement is taken first and taken whole. It comes with its own
+        designation, pitch and tapped depth, and it is not subject to the
+        geometric refusals below: those exist to stop the workbench guessing,
+        and there is nothing left to guess at once the designer has written
+        the callout into the feature.
+
+        The tap-drill table is still what names a thread the helix found --
+        the bore diameter is the tap drill, by definition.
         """
-        if not self._helices or feature.type not in BORE_TYPES:
+        if feature.type not in BORE_TYPES:
             return False
         diameter = feature.number("diameter_mm") or 0.0
         if diameter <= 0.0:
             return False
-        cylinder = self._seed_cylinder(graph, feature)
+        cylinder = bore_wall(graph, feature)
         if cylinder is None:
+            return False
+
+        if self._apply_stated_thread(feature, cylinder, diameter):
+            return True
+        if not self._helices:
             return False
 
         # A bore that runs out into another cavity has no closed end to tap
@@ -245,7 +272,7 @@ class HoleRecognizer(FeatureRecognizer):
         feature.parameters["thread_designation"] = spec.designation
         feature.parameters["thread_nominal_mm"] = spec.nominal_mm
         feature.parameters["thread_pitch_mm"] = spec.pitch_mm
-        feature.parameters["thread_evidence"] = "modelled_helix"
+        feature.parameters["thread_evidence"] = MODELLED_HELIX
         # The axial reach of the helix is the tapped length. Worst-casing to
         # the full hole depth would make the run-out rule fire on parts that
         # took the trouble to model the thread properly.
@@ -253,28 +280,28 @@ class HoleRecognizer(FeatureRecognizer):
             feature.parameters["thread_depth_mm"] = round(helix.axial_span, 6)
         return True
 
-    @staticmethod
-    def _seed_cylinder(
-        graph: AttributedAdjacencyGraph, feature: FeatureInstance
-    ) -> Optional[AagNode]:
-        """The bore wall a hole feature was grown from.
+    def _apply_stated_thread(
+        self, feature: FeatureInstance, cylinder: AagNode, diameter: float
+    ) -> bool:
+        """Take a thread somebody has already declared for this bore.
 
-        The smallest coaxial cylinder among its faces: on a counterbore that
-        is the through bore rather than the enlarged mouth, which is the one
-        a tap would run in.
+        Matched on the bore's centreline and diameter, the same way a helix
+        is matched to the bore it was cut in. There is no better handle to
+        match on: FreeCAD keeps no usable record of which face on the final
+        shape came from which feature, so a declared hole and a bore on the
+        finished part have to be tied together by where they sit.
         """
-        best: Optional[AagNode] = None
-        for face_id in feature.faces:
-            if not graph.has_node(face_id):
-                continue
-            node = graph.node(face_id)
-            if node.surface_type is not SurfaceType.CYLINDER:
-                continue
-            if node.cyl_cone_axis is None or not node.is_internal:
-                continue
-            if best is None or node.cyl_radius < best.cyl_radius:
-                best = node
-        return best
+        evidence = self.thread_evidence
+        if evidence is None:
+            return False
+        line = centreline_of(cylinder)
+        if line is None:
+            return False
+        fact = evidence.fact_for(diameter, line[0], line[1])
+        if fact is None:
+            return False
+        fact.apply_to(feature, hole_depth_mm=feature.number("depth_mm"))
+        return True
 
     def _helix_for(self, cylinder: AagNode):
         """The modelled thread cut on this bore, if there is one.

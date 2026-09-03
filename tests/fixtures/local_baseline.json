@@ -1,0 +1,2558 @@
+{
+ "aerospace_bracket_l": {
+  "area_mm2": 19254.4255,
+  "bbox_mm": [
+   80.0,
+   60.0,
+   48.0
+  ],
+  "edge_count": 60,
+  "face_count": 22,
+  "solid_count": 1,
+  "volume_mm3": 63343.346
+ },
+ "aerospace_hydraulic_servo_valve_body": {
+  "area_mm2": 48892.7364,
+  "bbox_mm": [
+   120.0,
+   80.0,
+   60.0
+  ],
+  "edge_count": 105,
+  "face_count": 49,
+  "solid_count": 1,
+  "volume_mm3": 565826.994
+ },
+ "aerospace_pocket_pyramid": {
+  "area_mm2": 23640.0,
+  "bbox_mm": [
+   100.0,
+   80.0,
+   15.0
+  ],
+  "edge_count": 48,
+  "face_count": 21,
+  "solid_count": 1,
+  "volume_mm3": 89600.0
+ },
+ "aerospace_tensioner_pulley": {
+  "area_mm2": 34235.9772,
+  "bbox_mm": [
+   99.0,
+   99.0,
+   38.0
+  ],
+  "edge_count": 27,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 206147.344
+ },
+ "as_cast_no_draft": {
+  "area_mm2": 16567.823,
+  "bbox_mm": [
+   90.0,
+   60.0,
+   22.0
+  ],
+  "edge_count": 39,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 70419.38
+ },
+ "billet_reservoir_cap": {
+  "area_mm2": 9101.6404,
+  "bbox_mm": [
+   55.0,
+   55.0,
+   15.8
+  ],
+  "edge_count": 174,
+  "face_count": 77,
+  "solid_count": 1,
+  "volume_mm3": 21630.209
+ },
+ "blind_hole": {
+  "area_mm2": 10471.2389,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 15,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 61321.903
+ },
+ "blind_hole_drill_point": {
+  "area_mm2": 10434.6876,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 17,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 61488.486
+ },
+ "bolt_circle_4x": {
+  "area_mm2": 13094.1582,
+  "bbox_mm": [
+   80.0,
+   80.0,
+   10.0
+  ],
+  "edge_count": 15,
+  "face_count": 7,
+  "solid_count": 1,
+  "volume_mm3": 49134.509
+ },
+ "boss_field_tall_and_thin": {
+  "area_mm2": 14676.5485,
+  "bbox_mm": [
+   90.0,
+   60.0,
+   53.0
+  ],
+  "edge_count": 18,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 46773.562
+ },
+ "boss_flush_corner": {
+  "area_mm2": 8880.0,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   13.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 19800.0
+ },
+ "boss_flush_edge": {
+  "area_mm2": 8800.0,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   13.0
+  ],
+  "edge_count": 25,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 19200.0
+ },
+ "boss_on_plate": {
+  "area_mm2": 12542.4778,
+  "bbox_mm": [
+   80.0,
+   60.0,
+   20.0
+  ],
+  "edge_count": 27,
+  "face_count": 13,
+  "solid_count": 1,
+  "volume_mm3": 30512.389
+ },
+ "boss_on_stepped_plate": {
+  "area_mm2": 11816.9911,
+  "bbox_mm": [
+   80.0,
+   60.0,
+   20.0
+  ],
+  "edge_count": 21,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 27342.478
+ },
+ "boss_undercut": {
+  "area_mm2": 9936.7622,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   28.3205
+  ],
+  "edge_count": 17,
+  "face_count": 9,
+  "solid_count": 1,
+  "volume_mm3": 30978.808
+ },
+ "boss_wall_thickness": {
+  "area_mm2": 6060.3186,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   13.0
+  ],
+  "edge_count": 15,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 12536.191
+ },
+ "bracket_with_thread_array": {
+  "area_mm2": 17406.0174,
+  "bbox_mm": [
+   100.0,
+   60.0,
+   15.0
+  ],
+  "edge_count": 38,
+  "face_count": 20,
+  "solid_count": 1,
+  "volume_mm3": 85880.678
+ },
+ "bracket_with_undercut_pocket": {
+  "area_mm2": 17596.6371,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   30.0
+  ],
+  "edge_count": 42,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 99260.398
+ },
+ "cf_knife_edge_flange": {
+  "area_mm2": 11498.9595,
+  "bbox_mm": [
+   69.9,
+   69.9,
+   12.7
+  ],
+  "edge_count": 32,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 31064.838
+ },
+ "chamfer_edges": {
+  "area_mm2": 9517.2302,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 32,
+  "face_count": 14,
+  "solid_count": 1,
+  "volume_mm3": 61656.998
+ },
+ "clamp_jaw_assembly_half": {
+  "area_mm2": 10290.1768,
+  "bbox_mm": [
+   60.0,
+   30.0,
+   30.0
+  ],
+  "edge_count": 35,
+  "face_count": 16,
+  "solid_count": 1,
+  "volume_mm3": 44135.841
+ },
+ "cnc_router_test_fixture": {
+  "area_mm2": 25944.9957,
+  "bbox_mm": [
+   100.0,
+   100.0,
+   10.0
+  ],
+  "edge_count": 54,
+  "face_count": 22,
+  "solid_count": 1,
+  "volume_mm3": 90084.879
+ },
+ "cnc_test_part_dfm_violation": {
+  "area_mm2": 20839.4777,
+  "bbox_mm": [
+   80.0,
+   60.0,
+   30.0
+  ],
+  "edge_count": 48,
+  "face_count": 20,
+  "solid_count": 1,
+  "volume_mm3": 137750.965
+ },
+ "compact_mountain_block": {
+  "area_mm2": 14504.8671,
+  "bbox_mm": [
+   80.0,
+   40.0,
+   30.0
+  ],
+  "edge_count": 24,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 68230.089
+ },
+ "complex_undercut_part_v2": {
+  "area_mm2": 23850.0,
+  "bbox_mm": [
+   80.0,
+   60.0,
+   40.0
+  ],
+  "edge_count": 61,
+  "face_count": 25,
+  "solid_count": 1,
+  "volume_mm3": 179250.0
+ },
+ "counterbore": {
+  "area_mm2": 10596.9026,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 18,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 60976.328
+ },
+ "counterbore_drill_point": {
+  "area_mm2": 10482.221,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 20,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 61515.425
+ },
+ "countersink": {
+  "area_mm2": 10354.3143,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 17,
+  "face_count": 9,
+  "solid_count": 1,
+  "volume_mm3": 61567.994
+ },
+ "countersink_drill_point": {
+  "area_mm2": 10259.6092,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 19,
+  "face_count": 9,
+  "solid_count": 1,
+  "volume_mm3": 61839.009
+ },
+ "cutter_radius_infeasible": {
+  "area_mm2": 10433.8195,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   20.0
+  ],
+  "edge_count": 36,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 39200.927
+ },
+ "cutter_radius_suboptimal": {
+  "area_mm2": 10415.2779,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   20.0
+  ],
+  "edge_count": 36,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 39214.833
+ },
+ "datum_blocks_access": {
+  "area_mm2": 15388.4956,
+  "bbox_mm": [
+   80.0,
+   60.0,
+   20.0
+  ],
+  "edge_count": 15,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 95717.257
+ },
+ "deep_hole": {
+  "area_mm2": 15885.9291,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   50.0
+  ],
+  "edge_count": 15,
+  "face_count": 7,
+  "solid_count": 1,
+  "volume_mm3": 123586.283
+ },
+ "deep_pocket": {
+  "area_mm2": 23600.0,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   60.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 211000.0
+ },
+ "deep_slot": {
+  "area_mm2": 12600.0,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   30.0
+  ],
+  "edge_count": 24,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 71000.0
+ },
+ "die_cast_pattern_block": {
+  "area_mm2": 18655.5751,
+  "bbox_mm": [
+   80.0,
+   60.0,
+   35.0
+  ],
+  "edge_count": 36,
+  "face_count": 19,
+  "solid_count": 1,
+  "volume_mm3": 117444.425
+ },
+ "door_closer_body": {
+  "area_mm2": 56683.8711,
+  "bbox_mm": [
+   190.0,
+   45.0,
+   45.0
+  ],
+  "edge_count": 71,
+  "face_count": 27,
+  "solid_count": 1,
+  "volume_mm3": 246906.901
+ },
+ "drafted_fin_channel": {
+  "area_mm2": 14509.3803,
+  "bbox_mm": [
+   90.0,
+   50.0,
+   28.0
+  ],
+  "edge_count": 36,
+  "face_count": 16,
+  "solid_count": 1,
+  "volume_mm3": 39913.364
+ },
+ "dual_marking_control_plate": {
+  "area_mm2": 9614.735,
+  "bbox_mm": [
+   80.0,
+   50.0,
+   6.0
+  ],
+  "edge_count": 508,
+  "face_count": 217,
+  "solid_count": 1,
+  "volume_mm3": 23987.513
+ },
+ "electronics_enclosure_billet": {
+  "area_mm2": 23959.9236,
+  "bbox_mm": [
+   85.0,
+   55.0,
+   25.0
+  ],
+  "edge_count": 236,
+  "face_count": 93,
+  "solid_count": 1,
+  "volume_mm3": 41100.262
+ },
+ "euro_lock_cylinder": {
+  "area_mm2": 9825.592,
+  "bbox_mm": [
+   70.0,
+   17.0,
+   33.0
+  ],
+  "edge_count": 68,
+  "face_count": 24,
+  "solid_count": 1,
+  "volume_mm3": 15617.991
+ },
+ "extruded_grip_rail": {
+  "area_mm2": 11605.6362,
+  "bbox_mm": [
+   120.0,
+   30.0,
+   17.6097
+  ],
+  "edge_count": 20,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 47352.885
+ },
+ "fillet_edges": {
+  "area_mm2": 9535.7732,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 32,
+  "face_count": 14,
+  "solid_count": 1,
+  "volume_mm3": 61779.891
+ },
+ "five_axis_candidate": {
+  "area_mm2": 19626.8488,
+  "bbox_mm": [
+   61.7404,
+   60.0,
+   48.9952
+  ],
+  "edge_count": 36,
+  "face_count": 16,
+  "solid_count": 1,
+  "volume_mm3": 135283.623
+ },
+ "five_axis_compound_angles": {
+  "area_mm2": 19391.1333,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   44.1225
+  ],
+  "edge_count": 40,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 138426.219
+ },
+ "fixture_plate_dowels": {
+  "area_mm2": 45018.4913,
+  "bbox_mm": [
+   150.0,
+   100.0,
+   20.0
+  ],
+  "edge_count": 72,
+  "face_count": 28,
+  "solid_count": 1,
+  "volume_mm3": 289050.37
+ },
+ "flexure_thin_blade": {
+  "area_mm2": 16760.0,
+  "bbox_mm": [
+   60.0,
+   40.0,
+   20.0
+  ],
+  "edge_count": 36,
+  "face_count": 14,
+  "solid_count": 1,
+  "volume_mm3": 44000.0
+ },
+ "floorless_engraved_logo": {
+  "area_mm2": 5627.3274,
+  "bbox_mm": [
+   50.0,
+   34.0,
+   12.0
+  ],
+  "edge_count": 132,
+  "face_count": 62,
+  "solid_count": 1,
+  "volume_mm3": 20148.145
+ },
+ "four_axis_hex_block": {
+  "area_mm2": 13180.6426,
+  "bbox_mm": [
+   50.0,
+   43.3013,
+   60.0
+  ],
+  "edge_count": 48,
+  "face_count": 20,
+  "solid_count": 1,
+  "volume_mm3": 95968.756
+ },
+ "four_sided_milled_block": {
+  "area_mm2": 21099.5574,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   40.0
+  ],
+  "edge_count": 63,
+  "face_count": 27,
+  "solid_count": 1,
+  "volume_mm3": 121658.407
+ },
+ "freeform_revolved_nozzle": {
+  "area_mm2": 6957.1684,
+  "bbox_mm": [
+   43.5008,
+   43.5008,
+   48.0
+  ],
+  "edge_count": 3,
+  "face_count": 3,
+  "solid_count": 1,
+  "volume_mm3": 40344.631
+ },
+ "freeform_transition_bracket": {
+  "area_mm2": 12394.4016,
+  "bbox_mm": [
+   90.0,
+   60.0,
+   33.8188
+  ],
+  "edge_count": 44,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 45648.616
+ },
+ "gearbox_flange": {
+  "area_mm2": 23135.2722,
+  "bbox_mm": [
+   100.0,
+   100.0,
+   15.0
+  ],
+  "edge_count": 26,
+  "face_count": 12,
+  "solid_count": 1,
+  "volume_mm3": 94091.224
+ },
+ "grid_3x3": {
+  "area_mm2": 28035.752,
+  "bbox_mm": [
+   100.0,
+   100.0,
+   15.0
+  ],
+  "edge_count": 39,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 146182.965
+ },
+ "heat_exchanger_tube_sheet": {
+  "area_mm2": 291001.1684,
+  "bbox_mm": [
+   240.0,
+   240.0,
+   40.0
+  ],
+  "edge_count": 825,
+  "face_count": 285,
+  "solid_count": 1,
+  "volume_mm3": 1888815.166
+ },
+ "heat_sink_finned_block": {
+  "area_mm2": 13780.0,
+  "bbox_mm": [
+   60.0,
+   40.0,
+   20.0
+  ],
+  "edge_count": 82,
+  "face_count": 36,
+  "solid_count": 1,
+  "volume_mm3": 24600.0
+ },
+ "high_removal": {
+  "area_mm2": 23832.0,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   50.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 23432.0
+ },
+ "hole_breakout_into_pocket": {
+  "area_mm2": 16349.0459,
+  "bbox_mm": [
+   60.0,
+   50.0,
+   40.0
+  ],
+  "edge_count": 18,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 112778.734
+ },
+ "hole_countersink_angle": {
+  "area_mm2": 10311.9079,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 17,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 61596.275
+ },
+ "hole_crosses_wide_cavity": {
+  "area_mm2": 22994.8671,
+  "bbox_mm": [
+   100.0,
+   40.0,
+   40.0
+  ],
+  "edge_count": 30,
+  "face_count": 12,
+  "solid_count": 1,
+  "volume_mm3": 141738.053
+ },
+ "hole_intersecting": {
+  "area_mm2": 16958.867,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   30.0
+  ],
+  "edge_count": 26,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 102309.475
+ },
+ "hole_partial_entry": {
+  "area_mm2": 11948.563,
+  "bbox_mm": [
+   55.0,
+   60.0,
+   30.0
+  ],
+  "edge_count": 15,
+  "face_count": 7,
+  "solid_count": 1,
+  "volume_mm3": 71293.142
+ },
+ "hole_partial_entry_blind": {
+  "area_mm2": 11816.6161,
+  "bbox_mm": [
+   55.0,
+   60.0,
+   30.0
+  ],
+  "edge_count": 15,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 71575.885
+ },
+ "holes_near_edges": {
+  "area_mm2": 8904.7787,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   15.0
+  ],
+  "edge_count": 41,
+  "face_count": 17,
+  "solid_count": 1,
+  "volume_mm3": 35803.54
+ },
+ "hydraulic_actuator_end_cap": {
+  "area_mm2": 31883.9596,
+  "bbox_mm": [
+   85.0,
+   85.0,
+   50.0
+  ],
+  "edge_count": 47,
+  "face_count": 26,
+  "solid_count": 1,
+  "volume_mm3": 166753.094
+ },
+ "hydraulic_manifold_block": {
+  "area_mm2": 15555.9499,
+  "bbox_mm": [
+   60.0,
+   40.0,
+   40.0
+  ],
+  "edge_count": 51,
+  "face_count": 16,
+  "solid_count": 1,
+  "volume_mm3": 90197.948
+ },
+ "hydraulic_manifold_block_v2": {
+  "area_mm2": 92637.7472,
+  "bbox_mm": [
+   140.0,
+   90.0,
+   60.0
+  ],
+  "edge_count": 319,
+  "face_count": 117,
+  "solid_count": 1,
+  "volume_mm3": 663967.379
+ },
+ "hygienic_manifold_plate": {
+  "area_mm2": 28330.1644,
+  "bbox_mm": [
+   110.8239,
+   80.8239,
+   20.0
+  ],
+  "edge_count": 110,
+  "face_count": 50,
+  "solid_count": 1,
+  "volume_mm3": 162729.411
+ },
+ "impeller_blade_hub": {
+  "area_mm2": 17003.8692,
+  "bbox_mm": [
+   241.2323,
+   262.803,
+   40.2
+  ],
+  "edge_count": 36,
+  "face_count": 12,
+  "solid_count": 1,
+  "volume_mm3": 61951.506
+ },
+ "inertial_sensor_housing": {
+  "area_mm2": 35889.6535,
+  "bbox_mm": [
+   75.0,
+   75.0,
+   45.0
+  ],
+  "edge_count": 150,
+  "face_count": 59,
+  "solid_count": 1,
+  "volume_mm3": 132536.962
+ },
+ "injection_mold_cavity_pattern": {
+  "area_mm2": 21307.1858,
+  "bbox_mm": [
+   80.0,
+   60.0,
+   30.0
+  ],
+  "edge_count": 48,
+  "face_count": 19,
+  "solid_count": 1,
+  "volume_mm3": 118875.207
+ },
+ "injection_mold_cavity_plate": {
+  "area_mm2": 170815.0123,
+  "bbox_mm": [
+   220.0,
+   160.0,
+   65.0
+  ],
+  "edge_count": 227,
+  "face_count": 66,
+  "solid_count": 1,
+  "volume_mm3": 2084123.074
+ },
+ "inspection_test_block": {
+  "area_mm2": 24391.0638,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   60.0
+  ],
+  "edge_count": 31,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 196828.827
+ },
+ "instrument_chassis": {
+  "area_mm2": 27606.3716,
+  "bbox_mm": [
+   100.0,
+   60.0,
+   30.0
+  ],
+  "edge_count": 84,
+  "face_count": 43,
+  "solid_count": 1,
+  "volume_mm3": 115033.96
+ },
+ "instrument_front_panel": {
+  "area_mm2": 13297.0367,
+  "bbox_mm": [
+   120.0,
+   50.0,
+   4.0
+  ],
+  "edge_count": 1023,
+  "face_count": 432,
+  "solid_count": 1,
+  "volume_mm3": 22329.627
+ },
+ "interacting_features": {
+  "area_mm2": 11666.1947,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 27,
+  "face_count": 12,
+  "solid_count": 1,
+  "volume_mm3": 51046.549
+ },
+ "iso_k_vacuum_flange": {
+  "area_mm2": 48872.0066,
+  "bbox_mm": [
+   178.5947,
+   178.5947,
+   20.0
+  ],
+  "edge_count": 140,
+  "face_count": 66,
+  "solid_count": 1,
+  "volume_mm3": 243328.218
+ },
+ "kitchen_sink": {
+  "area_mm2": 27527.1368,
+  "bbox_mm": [
+   100.0,
+   80.0,
+   30.0
+  ],
+  "edge_count": 59,
+  "face_count": 24,
+  "solid_count": 1,
+  "volume_mm3": 192582.325
+ },
+ "l_slot": {
+  "area_mm2": 10960.0,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 24,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 57700.0
+ },
+ "lightweight_grid_panel": {
+  "area_mm2": 27250.0,
+  "bbox_mm": [
+   120.0,
+   80.0,
+   10.0
+  ],
+  "edge_count": 109,
+  "face_count": 43,
+  "solid_count": 1,
+  "volume_mm3": 28500.0
+ },
+ "linear_array_3x": {
+  "area_mm2": 10678.584,
+  "bbox_mm": [
+   80.0,
+   40.0,
+   15.0
+  ],
+  "edge_count": 21,
+  "face_count": 9,
+  "solid_count": 1,
+  "volume_mm3": 46727.655
+ },
+ "linear_rail_block": {
+  "area_mm2": 19087.6989,
+  "bbox_mm": [
+   100.0,
+   40.0,
+   25.0
+  ],
+  "edge_count": 66,
+  "face_count": 30,
+  "solid_count": 1,
+  "volume_mm3": 71729.005
+ },
+ "long_slot": {
+  "area_mm2": 10300.0,
+  "bbox_mm": [
+   80.0,
+   30.0,
+   20.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 45500.0
+ },
+ "machine_base_angle_plate": {
+  "area_mm2": 192400.0,
+  "bbox_mm": [
+   300.0,
+   200.0,
+   85.0
+  ],
+  "edge_count": 35,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 1882500.0
+ },
+ "micro_fluidic_channels": {
+  "area_mm2": 10483.8938,
+  "bbox_mm": [
+   80.0,
+   40.0,
+   10.0
+  ],
+  "edge_count": 192,
+  "face_count": 74,
+  "solid_count": 1,
+  "volume_mm3": 31229.314
+ },
+ "minimum_feature_size": {
+  "area_mm2": 3023.0,
+  "bbox_mm": [
+   30.0,
+   30.0,
+   10.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 8997.0
+ },
+ "molded_style_cover": {
+  "area_mm2": 14986.5318,
+  "bbox_mm": [
+   78.6586,
+   60.0,
+   32.0
+  ],
+  "edge_count": 35,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 52912.715
+ },
+ "mtb_handlebar_stem": {
+  "area_mm2": 25924.5396,
+  "bbox_mm": [
+   115.0,
+   44.0,
+   50.0
+  ],
+  "edge_count": 147,
+  "face_count": 52,
+  "solid_count": 1,
+  "volume_mm3": 98389.56
+ },
+ "multi_pocket_stepped": {
+  "area_mm2": 19300.0,
+  "bbox_mm": [
+   80.0,
+   50.0,
+   30.0
+  ],
+  "edge_count": 36,
+  "face_count": 16,
+  "solid_count": 1,
+  "volume_mm3": 98125.0
+ },
+ "nonstandard_hole": {
+  "area_mm2": 10489.6329,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 15,
+  "face_count": 7,
+  "solid_count": 1,
+  "volume_mm3": 61453.653
+ },
+ "off_cardinal_viz_block": {
+  "area_mm2": 64265.9562,
+  "bbox_mm": [
+   104.8284,
+   111.0588,
+   117.3848
+  ],
+  "edge_count": 61,
+  "face_count": 26,
+  "solid_count": 1,
+  "volume_mm3": 992023.073
+ },
+ "optical_periscope_housing": {
+  "area_mm2": 124646.0297,
+  "bbox_mm": [
+   260.0,
+   80.0,
+   50.0
+  ],
+  "edge_count": 192,
+  "face_count": 80,
+  "solid_count": 1,
+  "volume_mm3": 612668.212
+ },
+ "optics_spider_mount": {
+  "area_mm2": 23856.641,
+  "bbox_mm": [
+   200.0,
+   200.0,
+   15.0
+  ],
+  "edge_count": 296,
+  "face_count": 111,
+  "solid_count": 1,
+  "volume_mm3": 39655.433
+ },
+ "photonic_fiber_v_groove_array": {
+  "area_mm2": 1000.5999,
+  "bbox_mm": [
+   25.0,
+   12.0,
+   5.0
+  ],
+  "edge_count": 106,
+  "face_count": 47,
+  "solid_count": 1,
+  "volume_mm3": 1483.45
+ },
+ "pocket_aspect_ratio": {
+  "area_mm2": 10320.0,
+  "bbox_mm": [
+   30.0,
+   30.0,
+   60.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 52020.0
+ },
+ "pocket_chamfered_top": {
+  "area_mm2": 12266.0387,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 32,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 44249.333
+ },
+ "pocket_edm_inner_corner": {
+  "area_mm2": 9794.8496,
+  "bbox_mm": [
+   60.0,
+   40.0,
+   20.0
+  ],
+  "edge_count": 36,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 42000.773
+ },
+ "pocket_filleted_corners": {
+  "area_mm2": 12228.3185,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 36,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 44929.204
+ },
+ "pocket_island": {
+  "area_mm2": 14320.0,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   20.0
+  ],
+  "edge_count": 36,
+  "face_count": 16,
+  "solid_count": 1,
+  "volume_mm3": 53800.0
+ },
+ "pocket_multiple_floor_levels": {
+  "area_mm2": 15950.0,
+  "bbox_mm": [
+   70.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 34,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 61250.0
+ },
+ "pocket_narrow_opening": {
+  "area_mm2": 6734.4,
+  "bbox_mm": [
+   40.0,
+   40.0,
+   20.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 31856.0
+ },
+ "precision_optical_mount": {
+  "area_mm2": 14197.5793,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   20.0
+  ],
+  "edge_count": 44,
+  "face_count": 22,
+  "solid_count": 1,
+  "volume_mm3": 58261.019
+ },
+ "precision_spindle_end_cap": {
+  "area_mm2": 36428.6627,
+  "bbox_mm": [
+   112.0,
+   112.0,
+   40.0
+  ],
+  "edge_count": 71,
+  "face_count": 37,
+  "solid_count": 1,
+  "volume_mm3": 165427.19
+ },
+ "profiled_spindle_tight_valley": {
+  "area_mm2": 6362.1671,
+  "bbox_mm": [
+   32.1894,
+   32.1894,
+   56.0
+  ],
+  "edge_count": 7,
+  "face_count": 5,
+  "solid_count": 1,
+  "volume_mm3": 37910.724
+ },
+ "progressive_die_punch": {
+  "area_mm2": 16822.7452,
+  "bbox_mm": [
+   60.0,
+   50.0,
+   30.0
+  ],
+  "edge_count": 86,
+  "face_count": 34,
+  "solid_count": 1,
+  "volume_mm3": 81504.574
+ },
+ "pump_cover_part_marking": {
+  "area_mm2": 18067.6747,
+  "bbox_mm": [
+   100.0,
+   70.0,
+   11.0
+  ],
+  "edge_count": 692,
+  "face_count": 293,
+  "solid_count": 1,
+  "volume_mm3": 65480.101
+ },
+ "radial_bolt_pattern_hub": {
+  "area_mm2": 13459.9608,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   25.0
+  ],
+  "edge_count": 32,
+  "face_count": 21,
+  "solid_count": 1,
+  "volume_mm3": 59345.732
+ },
+ "rectangular_pocket": {
+  "area_mm2": 12400.0,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 44500.0
+ },
+ "relieved_logo_plaque": {
+  "area_mm2": 7680.7743,
+  "bbox_mm": [
+   70.0,
+   40.0,
+   8.0
+  ],
+  "edge_count": 156,
+  "face_count": 58,
+  "solid_count": 1,
+  "volume_mm3": 21594.088
+ },
+ "rib_on_plate": {
+  "area_mm2": 6745.0,
+  "bbox_mm": [
+   60.0,
+   40.0,
+   20.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 12675.0
+ },
+ "robotic_gripper_finger": {
+  "area_mm2": 27446.9879,
+  "bbox_mm": [
+   90.0,
+   22.0,
+   110.0
+  ],
+  "edge_count": 141,
+  "face_count": 56,
+  "solid_count": 1,
+  "volume_mm3": 99628.422
+ },
+ "sculpted_lid_thin_web": {
+  "area_mm2": 17949.3212,
+  "bbox_mm": [
+   102.0,
+   72.0,
+   21.5174
+  ],
+  "edge_count": 36,
+  "face_count": 16,
+  "solid_count": 1,
+  "volume_mm3": 64554.209
+ },
+ "sealed_void": {
+  "area_mm2": 16809.5574,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   50.0
+  ],
+  "edge_count": 25,
+  "face_count": 12,
+  "solid_count": 1,
+  "volume_mm3": 117761.771
+ },
+ "sensor_housing": {
+  "area_mm2": 10043.6495,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   15.0
+  ],
+  "edge_count": 48,
+  "face_count": 19,
+  "solid_count": 1,
+  "volume_mm3": 24765.566
+ },
+ "servo_coupling_clamp": {
+  "area_mm2": 7660.3232,
+  "bbox_mm": [
+   32.0,
+   32.0028,
+   38.0
+  ],
+  "edge_count": 57,
+  "face_count": 24,
+  "solid_count": 1,
+  "volume_mm3": 26951.939
+ },
+ "setup_count_high": {
+  "area_mm2": 23032.5663,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   60.0
+  ],
+  "edge_count": 24,
+  "face_count": 14,
+  "solid_count": 1,
+  "volume_mm3": 213851.151
+ },
+ "shaft_endcap": {
+  "area_mm2": 11541.1168,
+  "bbox_mm": [
+   50.0,
+   50.0037,
+   30.0
+  ],
+  "edge_count": 29,
+  "face_count": 13,
+  "solid_count": 1,
+  "volume_mm3": 50194.278
+ },
+ "sheet_metal_bracket": {
+  "area_mm2": 4362.1212,
+  "bbox_mm": [
+   40.0,
+   30.0,
+   30.0
+  ],
+  "edge_count": 36,
+  "face_count": 14,
+  "solid_count": 1,
+  "volume_mm3": 3876.455
+ },
+ "sheet_metal_channel": {
+  "area_mm2": 11694.6578,
+  "bbox_mm": [
+   50.0,
+   60.0,
+   25.0
+  ],
+  "edge_count": 45,
+  "face_count": 17,
+  "solid_count": 1,
+  "volume_mm3": 10990.136
+ },
+ "simple_box": {
+  "area_mm2": 10000.0,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 12,
+  "face_count": 6,
+  "solid_count": 1,
+  "volume_mm3": 62500.0
+ },
+ "single_datum_dome": {
+  "area_mm2": 8482.3002,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   30.0
+  ],
+  "edge_count": 3,
+  "face_count": 2,
+  "solid_count": 1,
+  "volume_mm3": 56548.668
+ },
+ "slot_filleted_corner": {
+  "area_mm2": 10850.1947,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 36,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 59712.708
+ },
+ "slot_nonstandard_width": {
+  "area_mm2": 8075.2,
+  "bbox_mm": [
+   60.0,
+   30.0,
+   20.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 34120.0
+ },
+ "sm_bend_angle_135": {
+  "area_mm2": 2876.9579,
+  "bbox_mm": [
+   34.9997,
+   25.0,
+   17.021
+  ],
+  "edge_count": 24,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 2571.463
+ },
+ "sm_bend_angle_heavy": {
+  "area_mm2": 4047.791,
+  "bbox_mm": [
+   36.0,
+   30.0,
+   22.9706
+  ],
+  "edge_count": 24,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 5274.268
+ },
+ "sm_bend_radius_pair": {
+  "area_mm2": 6137.6685,
+  "bbox_mm": [
+   50.0,
+   30.0,
+   25.0
+  ],
+  "edge_count": 36,
+  "face_count": 14,
+  "solid_count": 1,
+  "volume_mm3": 5641.524
+ },
+ "sm_closed_channel": {
+  "area_mm2": 9288.4954,
+  "bbox_mm": [
+   40.0,
+   30.0,
+   40.0
+  ],
+  "edge_count": 48,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 8707.964
+ },
+ "sm_corner_box": {
+  "area_mm2": 6687.5498,
+  "bbox_mm": [
+   40.0,
+   40.0,
+   25.0
+  ],
+  "edge_count": 83,
+  "face_count": 35,
+  "solid_count": 1,
+  "volume_mm3": 6179.646
+ },
+ "sm_corner_relief_round": {
+  "area_mm2": 6638.0373,
+  "bbox_mm": [
+   40.0,
+   40.0,
+   25.0
+  ],
+  "edge_count": 90,
+  "face_count": 34,
+  "solid_count": 1,
+  "volume_mm3": 6078.176
+ },
+ "sm_countersunk_panel": {
+  "area_mm2": 4347.6146,
+  "bbox_mm": [
+   40.0,
+   30.0,
+   30.0
+  ],
+  "edge_count": 36,
+  "face_count": 14,
+  "solid_count": 1,
+  "volume_mm3": 3899.016
+ },
+ "sm_csk_knife_edge": {
+  "area_mm2": 5578.4272,
+  "bbox_mm": [
+   60.0,
+   40.0,
+   8.0
+  ],
+  "edge_count": 65,
+  "face_count": 25,
+  "solid_count": 1,
+  "volume_mm3": 1365.734
+ },
+ "sm_curved_louver": {
+  "area_mm2": 8876.556,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   30.0
+  ],
+  "edge_count": 84,
+  "face_count": 32,
+  "solid_count": 1,
+  "volume_mm3": 8020.228
+ },
+ "sm_diagonal_bend": {
+  "area_mm2": 4115.8146,
+  "bbox_mm": [
+   40.0,
+   40.0,
+   25.0
+  ],
+  "edge_count": 25,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 5416.084
+ },
+ "sm_e_chassis": {
+  "area_mm2": 65895.3365,
+  "bbox_mm": [
+   160.0,
+   107.0,
+   40.0
+  ],
+  "edge_count": 456,
+  "face_count": 164,
+  "solid_count": 1,
+  "volume_mm3": 47895.778
+ },
+ "sm_emboss_field": {
+  "area_mm2": 6787.7841,
+  "bbox_mm": [
+   40.0,
+   40.0,
+   30.0
+  ],
+  "edge_count": 120,
+  "face_count": 50,
+  "solid_count": 1,
+  "volume_mm3": 6362.648
+ },
+ "sm_emboss_freeform": {
+  "area_mm2": 8020.7846,
+  "bbox_mm": [
+   40.0,
+   50.0,
+   30.0
+  ],
+  "edge_count": 36,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 7549.22
+ },
+ "sm_emboss_gallery": {
+  "area_mm2": 10657.3398,
+  "bbox_mm": [
+   40.0,
+   60.0,
+   30.0
+  ],
+  "edge_count": 128,
+  "face_count": 60,
+  "solid_count": 1,
+  "volume_mm3": 10152.203
+ },
+ "sm_flange_ladder": {
+  "area_mm2": 4892.2423,
+  "bbox_mm": [
+   50.0,
+   30.0,
+   21.0
+  ],
+  "edge_count": 36,
+  "face_count": 14,
+  "solid_count": 1,
+  "volume_mm3": 4473.973
+ },
+ "sm_formed_shapes": {
+  "area_mm2": 6652.7221,
+  "bbox_mm": [
+   40.0,
+   40.0,
+   30.0
+  ],
+  "edge_count": 116,
+  "face_count": 50,
+  "solid_count": 1,
+  "volume_mm3": 6227.586
+ },
+ "sm_gauge_below_floor": {
+  "area_mm2": 4225.1374,
+  "bbox_mm": [
+   50.0,
+   30.0,
+   20.0
+  ],
+  "edge_count": 24,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 521.918
+ },
+ "sm_gauge_range": {
+  "area_mm2": 19398.1079,
+  "bbox_mm": [
+   80.0,
+   60.0,
+   70.0
+  ],
+  "edge_count": 24,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 58167.247
+ },
+ "sm_gauge_steel_ceiling": {
+  "area_mm2": 9936.6559,
+  "bbox_mm": [
+   70.0,
+   40.0,
+   45.0
+  ],
+  "edge_count": 24,
+  "face_count": 10,
+  "solid_count": 1,
+  "volume_mm3": 19368.518
+ },
+ "sm_hd_bracket": {
+  "area_mm2": 34678.0484,
+  "bbox_mm": [
+   120.9209,
+   110.0006,
+   44.0006
+  ],
+  "edge_count": 228,
+  "face_count": 85,
+  "solid_count": 1,
+  "volume_mm3": 47829.177
+ },
+ "sm_hem_pair": {
+  "area_mm2": 9225.5547,
+  "bbox_mm": [
+   74.5,
+   30.0,
+   34.5
+  ],
+  "edge_count": 48,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 8536.455
+ },
+ "sm_hem_teardrop": {
+  "area_mm2": 9782.2665,
+  "bbox_mm": [
+   74.0,
+   30.0,
+   35.5
+  ],
+  "edge_count": 48,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 13093.996
+ },
+ "sm_hem_thin_gauge": {
+  "area_mm2": 8136.3756,
+  "bbox_mm": [
+   72.5,
+   30.0,
+   32.5
+  ],
+  "edge_count": 48,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 3907.923
+ },
+ "sm_hole_bend_field": {
+  "area_mm2": 4362.1212,
+  "bbox_mm": [
+   40.0,
+   30.0,
+   30.0
+  ],
+  "edge_count": 30,
+  "face_count": 12,
+  "solid_count": 1,
+  "volume_mm3": 3926.721
+ },
+ "sm_hybrid_milled_pocket": {
+  "area_mm2": 5932.0,
+  "bbox_mm": [
+   40.0,
+   40.0,
+   30.0
+  ],
+  "edge_count": 35,
+  "face_count": 16,
+  "solid_count": 1,
+  "volume_mm3": 5216.0
+ },
+ "sm_lance_bridge": {
+  "area_mm2": 6119.7841,
+  "bbox_mm": [
+   40.0,
+   40.0,
+   30.0
+  ],
+  "edge_count": 90,
+  "face_count": 30,
+  "solid_count": 1,
+  "volume_mm3": 5446.648
+ },
+ "sm_lookalike_billet": {
+  "area_mm2": 8067.0796,
+  "bbox_mm": [
+   60.0,
+   40.0,
+   18.0
+  ],
+  "edge_count": 38,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 28757.947
+ },
+ "sm_louver_angular": {
+  "area_mm2": 8397.1361,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   30.0
+  ],
+  "edge_count": 62,
+  "face_count": 24,
+  "solid_count": 1,
+  "volume_mm3": 7788.065
+ },
+ "sm_louver_angular_sym": {
+  "area_mm2": 8394.0002,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   30.0
+  ],
+  "edge_count": 62,
+  "face_count": 24,
+  "solid_count": 1,
+  "volume_mm3": 7785.016
+ },
+ "sm_louver_bank": {
+  "area_mm2": 8305.447,
+  "bbox_mm": [
+   40.0,
+   50.0,
+   30.0
+  ],
+  "edge_count": 114,
+  "face_count": 40,
+  "solid_count": 1,
+  "volume_mm3": 7572.311
+ },
+ "sm_louver_bank_curved": {
+  "area_mm2": 14941.9452,
+  "bbox_mm": [
+   54.0,
+   89.0,
+   34.657
+  ],
+  "edge_count": 219,
+  "face_count": 70,
+  "solid_count": 1,
+  "volume_mm3": 13777.25
+ },
+ "sm_louver_dome": {
+  "area_mm2": 8370.4844,
+  "bbox_mm": [
+   54.0,
+   54.0,
+   34.4289
+  ],
+  "edge_count": 60,
+  "face_count": 22,
+  "solid_count": 1,
+  "volume_mm3": 7758.531
+ },
+ "sm_louver_standard": {
+  "area_mm2": 8360.0635,
+  "bbox_mm": [
+   54.0,
+   54.0,
+   34.9106
+  ],
+  "edge_count": 58,
+  "face_count": 22,
+  "solid_count": 1,
+  "volume_mm3": 7749.008
+ },
+ "sm_louver_standard_sym": {
+  "area_mm2": 8397.8141,
+  "bbox_mm": [
+   54.0,
+   54.0,
+   34.657
+  ],
+  "edge_count": 63,
+  "face_count": 22,
+  "solid_count": 1,
+  "volume_mm3": 7784.013
+ },
+ "sm_notch_baits": {
+  "area_mm2": 7345.7841,
+  "bbox_mm": [
+   60.0,
+   40.0,
+   30.0
+  ],
+  "edge_count": 48,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 6656.648
+ },
+ "sm_punch_grid": {
+  "area_mm2": 4368.0116,
+  "bbox_mm": [
+   40.0,
+   30.0,
+   30.0
+  ],
+  "edge_count": 42,
+  "face_count": 16,
+  "solid_count": 1,
+  "volume_mm3": 3847.788
+ },
+ "sm_relief_bait": {
+  "area_mm2": 4878.2643,
+  "bbox_mm": [
+   40.0,
+   40.0,
+   30.0
+  ],
+  "edge_count": 62,
+  "face_count": 26,
+  "solid_count": 1,
+  "volume_mm3": 4415.513
+ },
+ "sm_relief_shapes": {
+  "area_mm2": 12301.7509,
+  "bbox_mm": [
+   40.0,
+   110.0,
+   30.0
+  ],
+  "edge_count": 202,
+  "face_count": 79,
+  "solid_count": 1,
+  "volume_mm3": 11275.262
+ },
+ "sm_sharp_fold_shell": {
+  "area_mm2": 5872.0,
+  "bbox_mm": [
+   40.0,
+   40.0,
+   30.0
+  ],
+  "edge_count": 23,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 5440.0
+ },
+ "sm_tab_notch_comb": {
+  "area_mm2": 5475.7841,
+  "bbox_mm": [
+   40.0,
+   40.0,
+   30.0
+  ],
+  "edge_count": 72,
+  "face_count": 26,
+  "solid_count": 1,
+  "volume_mm3": 4842.648
+ },
+ "sm_tall_lance": {
+  "area_mm2": 6279.7841,
+  "bbox_mm": [
+   40.0,
+   40.0,
+   30.0
+  ],
+  "edge_count": 90,
+  "face_count": 30,
+  "solid_count": 1,
+  "volume_mm3": 5574.648
+ },
+ "sm_torture_combo": {
+  "area_mm2": 7464.4879,
+  "bbox_mm": [
+   40.0,
+   50.0,
+   30.0
+  ],
+  "edge_count": 90,
+  "face_count": 36,
+  "solid_count": 1,
+  "volume_mm3": 6912.228
+ },
+ "sm_torture_curved_outline": {
+  "area_mm2": 5932.8539,
+  "bbox_mm": [
+   40.0,
+   50.0,
+   30.0
+  ],
+  "edge_count": 101,
+  "face_count": 43,
+  "solid_count": 1,
+  "volume_mm3": 5360.854
+ },
+ "sm_torture_mixed_folds": {
+  "area_mm2": 8725.447,
+  "bbox_mm": [
+   40.0,
+   50.0,
+   30.0
+  ],
+  "edge_count": 37,
+  "face_count": 15,
+  "solid_count": 1,
+  "volume_mm3": 8164.311
+ },
+ "sm_vent_pan": {
+  "area_mm2": 74990.48,
+  "bbox_mm": [
+   180.0,
+   125.0,
+   30.0
+  ],
+  "edge_count": 546,
+  "face_count": 206,
+  "solid_count": 1,
+  "volume_mm3": 72120.401
+ },
+ "small_part": {
+  "area_mm2": 600.0,
+  "bbox_mm": [
+   10.0,
+   10.0,
+   10.0
+  ],
+  "edge_count": 12,
+  "face_count": 6,
+  "solid_count": 1,
+  "volume_mm3": 1000.0
+ },
+ "spline_shaft_blank": {
+  "area_mm2": 10525.9616,
+  "bbox_mm": [
+   30.0,
+   30.0,
+   100.0
+  ],
+  "edge_count": 24,
+  "face_count": 12,
+  "solid_count": 1,
+  "volume_mm3": 57031.557
+ },
+ "step_feature": {
+  "area_mm2": 9500.0,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 18,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 50000.0
+ },
+ "structural_rib_panel": {
+  "area_mm2": 22120.0,
+  "bbox_mm": [
+   100.0,
+   80.0,
+   17.0
+  ],
+  "edge_count": 56,
+  "face_count": 26,
+  "solid_count": 1,
+  "volume_mm3": 44272.0
+ },
+ "surgical_handpiece_body": {
+  "area_mm2": 6286.524,
+  "bbox_mm": [
+   14.0,
+   14.0,
+   110.0
+  ],
+  "edge_count": 36,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 13812.01
+ },
+ "tall_boss": {
+  "area_mm2": 9405.3096,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   45.0
+  ],
+  "edge_count": 15,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 20010.619
+ },
+ "tap_drill_index_plate": {
+  "area_mm2": 12288.754,
+  "bbox_mm": [
+   90.0,
+   40.0,
+   15.0
+  ],
+  "edge_count": 42,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 51827.27
+ },
+ "thin_sheet": {
+  "area_mm2": 21160.0,
+  "bbox_mm": [
+   100.0,
+   100.0,
+   2.9
+  ],
+  "edge_count": 12,
+  "face_count": 6,
+  "solid_count": 1,
+  "volume_mm3": 29000.0
+ },
+ "thin_threshold_3_1mm": {
+  "area_mm2": 21240.0,
+  "bbox_mm": [
+   100.0,
+   100.0,
+   3.1
+  ],
+  "edge_count": 12,
+  "face_count": 6,
+  "solid_count": 1,
+  "volume_mm3": 31000.0
+ },
+ "thin_wall": {
+  "area_mm2": 12756.6371,
+  "bbox_mm": [
+   60.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 18,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 71073.009
+ },
+ "thread_m6_approx": {
+  "area_mm2": 5082.7433,
+  "bbox_mm": [
+   30.0,
+   30.0,
+   25.0
+  ],
+  "edge_count": 15,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 22146.571
+ },
+ "thread_shoulder_proximity": {
+  "area_mm2": 14348.4956,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   25.0
+  ],
+  "edge_count": 27,
+  "face_count": 13,
+  "solid_count": 1,
+  "volume_mm3": 82564.381
+ },
+ "thread_wall_thickness": {
+  "area_mm2": 5114.1593,
+  "bbox_mm": [
+   30.0,
+   30.0,
+   25.0
+  ],
+  "edge_count": 15,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 22107.301
+ },
+ "threshold_hole_5_9x": {
+  "area_mm2": 33376.46,
+  "bbox_mm": [
+   80.0,
+   80.0,
+   59.0
+  ],
+  "edge_count": 15,
+  "face_count": 7,
+  "solid_count": 1,
+  "volume_mm3": 372966.151
+ },
+ "threshold_hole_6_1x": {
+  "area_mm2": 34079.2919,
+  "bbox_mm": [
+   80.0,
+   80.0,
+   61.0
+  ],
+  "edge_count": 15,
+  "face_count": 7,
+  "solid_count": 1,
+  "volume_mm3": 385609.071
+ },
+ "threshold_hole_deep_10_1x": {
+  "area_mm2": 48135.9289,
+  "bbox_mm": [
+   80.0,
+   80.0,
+   101.0
+  ],
+  "edge_count": 15,
+  "face_count": 7,
+  "solid_count": 1,
+  "volume_mm3": 638467.479
+ },
+ "threshold_hole_deep_9_9x": {
+  "area_mm2": 47433.0971,
+  "bbox_mm": [
+   80.0,
+   80.0,
+   99.0
+  ],
+  "edge_count": 15,
+  "face_count": 7,
+  "solid_count": 1,
+  "volume_mm3": 625824.558
+ },
+ "threshold_pocket_3_9x": {
+  "area_mm2": 31510.0,
+  "bbox_mm": [
+   70.0,
+   70.0,
+   65.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 305337.5
+ },
+ "threshold_pocket_4_1x": {
+  "area_mm2": 16040.0,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   47.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 113400.0
+ },
+ "threshold_pocket_5_9x": {
+  "area_mm2": 21360.0,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   70.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 169100.0
+ },
+ "threshold_pocket_6_1x": {
+  "area_mm2": 21840.0,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   72.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 173900.0
+ },
+ "threshold_removal_69pct": {
+  "area_mm2": 26880.0,
+  "bbox_mm": [
+   100.0,
+   100.0,
+   10.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 35200.0
+ },
+ "threshold_removal_71pct": {
+  "area_mm2": 27168.0,
+  "bbox_mm": [
+   100.0,
+   100.0,
+   10.0
+  ],
+  "edge_count": 24,
+  "face_count": 11,
+  "solid_count": 1,
+  "volume_mm3": 28720.0
+ },
+ "threshold_wall_0_7mm": {
+  "area_mm2": 12756.6371,
+  "bbox_mm": [
+   60.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 18,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 71073.009
+ },
+ "threshold_wall_0_9mm": {
+  "area_mm2": 12756.6371,
+  "bbox_mm": [
+   60.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 18,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 71073.009
+ },
+ "threshold_wall_1_4mm": {
+  "area_mm2": 12756.6371,
+  "bbox_mm": [
+   60.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 18,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 71073.009
+ },
+ "threshold_wall_1_6mm": {
+  "area_mm2": 12756.6371,
+  "bbox_mm": [
+   60.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 18,
+  "face_count": 8,
+  "solid_count": 1,
+  "volume_mm3": 71073.009
+ },
+ "through_hole": {
+  "area_mm2": 10628.3185,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   25.0
+  ],
+  "edge_count": 15,
+  "face_count": 7,
+  "solid_count": 1,
+  "volume_mm3": 60536.505
+ },
+ "tilted_hole_block": {
+  "area_mm2": 19626.8488,
+  "bbox_mm": [
+   61.7404,
+   60.0,
+   48.9952
+  ],
+  "edge_count": 36,
+  "face_count": 16,
+  "solid_count": 1,
+  "volume_mm3": 135283.623
+ },
+ "tool_access_blocked": {
+  "area_mm2": 20400.0,
+  "bbox_mm": [
+   60.0,
+   60.0,
+   40.0
+  ],
+  "edge_count": 32,
+  "face_count": 16,
+  "solid_count": 1,
+  "volume_mm3": 130500.0
+ },
+ "tool_access_special_setup": {
+  "area_mm2": 11554.5405,
+  "bbox_mm": [
+   60.0,
+   40.0,
+   38.0828
+  ],
+  "edge_count": 15,
+  "face_count": 7,
+  "solid_count": 1,
+  "volume_mm3": 70258.753
+ },
+ "torture_casting_ribfield": {
+  "area_mm2": 62507.12,
+  "bbox_mm": [
+   160.0,
+   110.0,
+   57.0
+  ],
+  "edge_count": 117,
+  "face_count": 55,
+  "solid_count": 1,
+  "volume_mm3": 389901.659
+ },
+ "torture_freeform_leviathan": {
+  "area_mm2": 27223.428,
+  "bbox_mm": [
+   80.0,
+   80.0,
+   100.0
+  ],
+  "edge_count": 115,
+  "face_count": 38,
+  "solid_count": 1,
+  "volume_mm3": 248135.94
+ },
+ "torture_hole_labyrinth": {
+  "area_mm2": 60635.4066,
+  "bbox_mm": [
+   150.0,
+   100.0,
+   40.0
+  ],
+  "edge_count": 92,
+  "face_count": 41,
+  "solid_count": 1,
+  "volume_mm3": 564368.549
+ },
+ "torture_machinists_maze": {
+  "area_mm2": 96337.624,
+  "bbox_mm": [
+   178.0,
+   120.0,
+   50.0
+  ],
+  "edge_count": 169,
+  "face_count": 66,
+  "solid_count": 1,
+  "volume_mm3": 853075.078
+ },
+ "transaxle_housing_cover": {
+  "area_mm2": 96355.57,
+  "bbox_mm": [
+   183.3322,
+   143.3322,
+   48.7763
+  ],
+  "edge_count": 156,
+  "face_count": 59,
+  "solid_count": 1,
+  "volume_mm3": 1020212.551
+ },
+ "tslot_carrier_plate": {
+  "area_mm2": 16478.7964,
+  "bbox_mm": [
+   100.0,
+   70.0,
+   10.0
+  ],
+  "edge_count": 60,
+  "face_count": 22,
+  "solid_count": 1,
+  "volume_mm3": 57509.027
+ },
+ "turbine_compressor_disk": {
+  "area_mm2": 177392.0426,
+  "bbox_mm": [
+   219.9355,
+   219.9355,
+   45.0
+  ],
+  "edge_count": 654,
+  "face_count": 229,
+  "solid_count": 1,
+  "volume_mm3": 917323.644
+ },
+ "turbo_compressor_housing": {
+  "area_mm2": 153834.9521,
+  "bbox_mm": [
+   160.0,
+   169.0225,
+   108.0
+  ],
+  "edge_count": 126,
+  "face_count": 50,
+  "solid_count": 1,
+  "volume_mm3": 1486775.472
+ },
+ "turned_freeform_handle": {
+  "area_mm2": 11332.06,
+  "bbox_mm": [
+   48.0,
+   48.0,
+   52.0
+  ],
+  "edge_count": 13,
+  "face_count": 7,
+  "solid_count": 1,
+  "volume_mm3": 69742.516
+ },
+ "turned_valley_tight_radius": {
+  "area_mm2": 3816.9092,
+  "bbox_mm": [
+   25.0957,
+   25.0957,
+   44.0
+  ],
+  "edge_count": 7,
+  "face_count": 5,
+  "solid_count": 1,
+  "volume_mm3": 17365.42
+ },
+ "undercut_part": {
+  "area_mm2": 14000.0,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   30.0
+  ],
+  "edge_count": 38,
+  "face_count": 17,
+  "solid_count": 1,
+  "volume_mm3": 61500.0
+ },
+ "valve_body_mini": {
+  "area_mm2": 17167.397,
+  "bbox_mm": [
+   50.0,
+   50.0,
+   40.0
+  ],
+  "edge_count": 38,
+  "face_count": 18,
+  "solid_count": 1,
+  "volume_mm3": 79336.551
+ },
+ "worm_gearbox_housing": {
+  "area_mm2": 101907.4093,
+  "bbox_mm": [
+   120.0,
+   130.0,
+   90.0
+  ],
+  "edge_count": 171,
+  "face_count": 66,
+  "solid_count": 1,
+  "volume_mm3": 752920.079
+ },
+ "wr90_waveguide_flange": {
+  "area_mm2": 4757.5087,
+  "bbox_mm": [
+   41.4,
+   41.4,
+   6.35
+  ],
+  "edge_count": 78,
+  "face_count": 29,
+  "solid_count": 1,
+  "volume_mm3": 8707.528
+ }
+}

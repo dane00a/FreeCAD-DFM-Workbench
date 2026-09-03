@@ -57,6 +57,23 @@ class FeatureRecognizer:
     def instance_id(self, index: int) -> str:
         return f"{self.prefix}_{index}"
 
+    def threshold(self, name: str, default: float) -> float:
+        """A shop-configured limit, or the built-in default.
+
+        Some of what a recognizer treats as a constant is really shop policy
+        -- what counts as a rib, which seal standard a gland is cut to, how
+        deep the engraver goes. Those are on the settings page, and reading
+        them here is what makes editing them do anything.
+
+        The default is passed in rather than looked up so the recognizer
+        still works when no configuration has been supplied, which is how
+        every unit test calls it.
+        """
+        config = self.config
+        if config is None:
+            return default
+        return float(getattr(config.thresholds, name, default))
+
 
 # =============================================================================
 # Geometry helpers

@@ -51,6 +51,7 @@ try:
     say("")
 
     import OCP  # noqa: F401
+    import Part  # noqa: F401
     import freecad.DFM  # noqa: F401
 
     from freecad.DFM.core.analyzers.machining_analyzer import MachiningAnalyzer
@@ -230,6 +231,311 @@ try:
               node.is_internal
               for node in turned.graph.nodes_by_surface_type(SurfaceType.CYLINDER)
           ))
+
+    # -- a threaded PartDesign::Hole ----------------------------------------
+    #
+    # The one thing no headless test can cover. A tapped hole is modelled as
+    # a plain bore, so the only reason to call this one tapped is that the
+    # Hole feature says so, and that statement exists nowhere but in a live
+    # PartDesign document. Reading it back out means finding the Hole,
+    # working out where its profile put the bore, and matching that against
+    # the bore the recognizer found on the finished shape.
+    say("")
+    say("A threaded PartDesign::Hole")
+    from freecad.DFM.core.machining.thread_sources import (
+        NATIVE_DECLARATION,
+        thread_evidence_for,
+    )
+
+    tapped_body = doc.addObject("PartDesign::Body", "TappedBody")
+    pad_sketch = doc.addObject("Sketcher::SketchObject", "PadSketch")
+    tapped_body.addObject(pad_sketch)
+    pad_sketch.addGeometry(Part.LineSegment(
+        FreeCAD.Vector(0, 0, 0), FreeCAD.Vector(40, 0, 0)), False)
+    pad_sketch.addGeometry(Part.LineSegment(
+        FreeCAD.Vector(40, 0, 0), FreeCAD.Vector(40, 40, 0)), False)
+    pad_sketch.addGeometry(Part.LineSegment(
+        FreeCAD.Vector(40, 40, 0), FreeCAD.Vector(0, 40, 0)), False)
+    pad_sketch.addGeometry(Part.LineSegment(
+        FreeCAD.Vector(0, 40, 0), FreeCAD.Vector(0, 0, 0)), False)
+    pad = doc.addObject("PartDesign::Pad", "Pad")
+    tapped_body.addObject(pad)
+    pad.Profile = pad_sketch
+    pad.Length = 20.0
+    doc.recompute()
+
+    # The profile circle is drawn on the top face's plane, which is where a
+    # user would put it: the Hole feature drills down from there.
+    hole_sketch = doc.addObject("Sketcher::SketchObject", "HoleSketch")
+    tapped_body.addObject(hole_sketch)
+    hole_sketch.Placement = FreeCAD.Placement(
+        FreeCAD.Vector(0, 0, 20), FreeCAD.Rotation(0, 0, 0, 1)
+    )
+    hole_sketch.addGeometry(
+        Part.Circle(FreeCAD.Vector(20, 20, 0), FreeCAD.Vector(0, 0, 1), 2.5), False
+    )
+    hole = doc.addObject("PartDesign::Hole", "TappedHole")
+    tapped_body.addObject(hole)
+    hole.Profile = hole_sketch
+    hole.Threaded = True
+    hole.ThreadType = "ISOMetricProfile"
+    # Spelled the way FreeCAD's own enumeration spells it, which happens to
+    # be the way the thread table spells it too.
+    hole.ThreadSize = "M6x1.0"
+    hole.ThreadDepthType = "Hole Depth"
+    hole.DepthType = "Dimension"
+    hole.Depth = 12.0
+    hole.ModelThread = False
+    doc.recompute()
+
+    check("the body recomputes with a threaded hole in it", hole.Shape.isValid())
+    check(
+        "the hole is not modelled as a thread",
+        not hole.ModelThread,
+        " (a plain bore is what a tapped hole really looks like)",
+    )
+
+    evidence = thread_evidence_for(tapped_body)
+    check(
+        "the declaration is read off the document",
+        len(evidence.declarations) == 1,
+        " (found %d)" % len(evidence.declarations),
+    )
+    if evidence.declarations:
+        declared = evidence.declarations[0]
+        say("  declared: %s, bore window %.2f to %.2f, at %s"
+            % (declared.designation, declared.bore_window[0],
+               declared.bore_window[1], declared.positions))
+        check("the thread is named", declared.designation == "M6x1.0",
+              " (%s)" % declared.designation)
+        check(
+            "the profile circle is placed in the shape's own coordinates",
+            any(
+                abs(p[0] - 20.0) < 0.01 and abs(p[1] - 20.0) < 0.01
+                for p in declared.positions
+            ),
+            " (%s)" % (declared.positions,),
+        )
+
+    tapped_occ = freecad_to_ocp(tapped_body.Shape)
+    tapped_data = MachiningAnalyzer().execute(
+        tapped_occ,
+        FaceIndex(tapped_occ),
+        EdgeIndex(tapped_occ),
+        prefs={},
+        target_object=tapped_body,
+    )
+    tapped_context = list(tapped_data.values())[0]
+    tapped = [
+        f
+        for f in tapped_context.recognition.features
+        if f.param("thread_designation")
+    ]
+    say("  features: " + str(tapped_context.recognition.counts()))
+    check(
+        "the bore comes back as a tapped hole with nothing asked",
+        len(tapped) == 1,
+        " (found %d)" % len(tapped),
+    )
+    if tapped:
+        check("it carries the declared thread",
+              tapped[0].param("thread_designation") == "M6x1.0",
+              " (%s)" % tapped[0].param("thread_designation"))
+        check("the evidence names the document as the source",
+              tapped[0].param("thread_evidence") == NATIVE_DECLARATION,
+              " (%s)" % tapped[0].param("thread_evidence"))
+        check("the pitch comes with it",
+              abs((tapped[0].number("thread_pitch_mm") or 0.0) - 1.0) < 1e-6)
+
+    # The same shape with no object behind it must stay a plain bore. This is
+    # what keeps a 5 mm hole on an imported part from being called an M6.
+    bare = MachiningAnalyzer().execute(
+        tapped_occ, FaceIndex(tapped_occ), EdgeIndex(tapped_occ), prefs={}
+    )
+    bare_context = list(bare.values())[0]
+    check(
+        "the same shape with no document behind it is not tapped",
+        not any(
+            f.param("thread_designation")
+            for f in bare_context.recognition.features
+        ),
+    )
+
+    # -- confirming a thread on a part that cannot say ----------------------
+    #
+    # The same body with the declaration taken off it, which is what an
+    # imported STEP of the same part amounts to: a bore at the M6 tap drill
+    # and nothing anywhere saying what it is for.
+    say("")
+    say("Confirming a thread by hand")
+    from freecad.DFM.core.machining.thread_sources import (
+        USER_CONFIRMED,
+        ConfirmationStore,
+        candidates_for,
+        load_confirmations,
+        record_answers,
+        save_confirmations,
+    )
+
+    hole.Threaded = False
+    # Clearing the thread hands the diameter back to the user, and FreeCAD
+    # puts its own default in. Drilling it at the M6 tap drill again is what
+    # makes this the same hole as before, minus anybody saying so.
+    hole.Diameter = 5.0
+    doc.recompute()
+    plain_occ = freecad_to_ocp(tapped_body.Shape)
+
+    def analyse_plain():
+        data = MachiningAnalyzer().execute(
+            plain_occ,
+            FaceIndex(plain_occ),
+            EdgeIndex(plain_occ),
+            prefs={},
+            target_object=tapped_body,
+        )
+        return list(data.values())[0]
+
+    unstated = analyse_plain()
+    check(
+        "with the declaration gone the bore is a plain hole again",
+        not any(
+            f.param("thread_designation") for f in unstated.recognition.features
+        ),
+    )
+
+    offered = candidates_for(
+        unstated.recognition.features,
+        unstated.graph,
+        thread_evidence_for(tapped_body),
+    )
+    check(
+        "the tap-drill-sized bore is offered for confirmation",
+        len(offered) == 1,
+        " (offered %d)" % len(offered),
+    )
+    if offered:
+        say("  candidate: %s, likely %s"
+            % (offered[0].describe(), offered[0].designation))
+        store = ConfirmationStore()
+        record_answers(store, offered, {offered[0].key.encode(): True})
+        check("the answer saves onto the document", save_confirmations(doc, store))
+        reloaded = load_confirmations(doc)
+        verdict = reloaded.verdict_for(offered[0].key)
+        check("and comes back off it afterwards",
+              verdict is not None and verdict.accepted)
+
+        # The record has to be inert: no shape, nothing to recompute, and
+        # nothing that turns up in the analysis as part of the part.
+        holder = [o for o in doc.Objects if hasattr(o, "DFMThreadRecords")]
+        check("the answers live on one hidden document object",
+              len(holder) == 1, " (found %d)" % len(holder))
+        check("the record object carries no shape of its own",
+              not holder or not getattr(holder[0], "Shape", None))
+
+        confirmed_context = analyse_plain()
+        confirmed = [
+            f
+            for f in confirmed_context.recognition.features
+            if f.param("thread_evidence") == USER_CONFIRMED
+        ]
+        check(
+            "a confirmed bore is thereafter treated as tapped",
+            len(confirmed) == 1,
+            " (found %d)" % len(confirmed),
+        )
+        if confirmed:
+            check("and named from the tap drill it was cut at",
+                  confirmed[0].param("thread_designation") == "M6x1.0",
+                  " (%s)" % confirmed[0].param("thread_designation"))
+        check(
+            "and is never put up for confirmation again",
+            not candidates_for(
+                confirmed_context.recognition.features,
+                confirmed_context.graph,
+                thread_evidence_for(tapped_body),
+            ),
+        )
+
+        # -- and it has to survive the model moving underneath it -----------
+        #
+        # The reason the answers are filed under a centreline and a diameter
+        # rather than a face index. Cutting another hole in the plate
+        # renumbers the faces after it, so an answer filed under "Face 7"
+        # would silently slide onto a different hole. This one must not.
+        spare_sketch = doc.addObject("Sketcher::SketchObject", "SpareSketch")
+        tapped_body.addObject(spare_sketch)
+        spare_sketch.Placement = FreeCAD.Placement(
+            FreeCAD.Vector(0, 0, 20), FreeCAD.Rotation(0, 0, 0, 1)
+        )
+        spare_sketch.addGeometry(
+            Part.Circle(FreeCAD.Vector(8, 8, 0), FreeCAD.Vector(0, 0, 1), 6.0), False
+        )
+        spare = doc.addObject("PartDesign::Hole", "SpareHole")
+        tapped_body.addObject(spare)
+        spare.Profile = spare_sketch
+        spare.Diameter = 12.0
+        spare.DepthType = "ThroughAll"
+        doc.recompute()
+
+        rebuilt_occ = freecad_to_ocp(tapped_body.Shape)
+        rebuilt = list(
+            MachiningAnalyzer()
+            .execute(
+                rebuilt_occ,
+                FaceIndex(rebuilt_occ),
+                EdgeIndex(rebuilt_occ),
+                prefs={},
+                target_object=tapped_body,
+            )
+            .values()
+        )[0]
+        say("  after the rebuild: %s" % rebuilt.recognition.counts())
+        still_tapped = [
+            f
+            for f in rebuilt.recognition.features
+            if f.param("thread_evidence") == USER_CONFIRMED
+        ]
+        check(
+            "the answer still lands on the same bore after a rebuild",
+            len(still_tapped) == 1
+            and abs((still_tapped[0].number("diameter_mm") or 0.0) - 5.0) < 0.01,
+            " (found %d)" % len(still_tapped),
+        )
+        check(
+            "and does not spread to the hole that was added",
+            sum(
+                1
+                for f in rebuilt.recognition.features
+                if f.param("thread_designation")
+            )
+            == 1,
+        )
+        doc.removeObject(spare.Name)
+        doc.removeObject(spare_sketch.Name)
+        doc.recompute()
+
+        # A rejection has to stick just as hard, or the shop learns to click
+        # past the question without reading it.
+        rejected_store = ConfirmationStore()
+        record_answers(rejected_store, offered, {offered[0].key.encode(): False})
+        save_confirmations(doc, rejected_store)
+        rejected_context = analyse_plain()
+        check(
+            "a rejected bore stays a plain hole",
+            not any(
+                f.param("thread_designation")
+                for f in rejected_context.recognition.features
+            ),
+        )
+        check(
+            "and is not asked about again either",
+            not candidates_for(
+                rejected_context.recognition.features,
+                rejected_context.graph,
+                thread_evidence_for(tapped_body),
+            ),
+        )
+
 
     # -- the machining preferences page -------------------------------------
     say("")

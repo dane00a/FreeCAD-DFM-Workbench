@@ -240,8 +240,7 @@ class GrooveRecognizer(FeatureRecognizer):
                 return candidate
         return None
 
-    @staticmethod
-    def _classify(width: float, depth: float, thread_adjacent: bool) -> str:
+    def _classify(self, width: float, depth: float, thread_adjacent: bool) -> str:
         """What the groove is for, from its proportions and its neighbours.
 
         Context beats dimension: a groove next to a thread is a relief
@@ -252,9 +251,19 @@ class GrooveRecognizer(FeatureRecognizer):
 
         ratio = width / depth if depth > 1e-9 else 0.0
 
+        # Which seal standard the shop cuts to -- AS568 cord against a
+        # metric one -- moves this band, so it is the shop's to set.
         if (
-            _GLAND_MIN_WIDTH_MM <= width <= _GLAND_MAX_WIDTH_MM
-            and _GLAND_MIN_RATIO <= ratio <= _GLAND_MAX_RATIO
+            self.threshold("oring_gland_min_width_mm", _GLAND_MIN_WIDTH_MM)
+            <= width
+            <= self.threshold("oring_gland_max_width_mm", _GLAND_MAX_WIDTH_MM)
+            and self.threshold(
+                "oring_gland_min_width_depth_ratio", _GLAND_MIN_RATIO
+            )
+            <= ratio
+            <= self.threshold(
+                "oring_gland_max_width_depth_ratio", _GLAND_MAX_RATIO
+            )
         ):
             return FeatureType.O_RING_GLAND
 

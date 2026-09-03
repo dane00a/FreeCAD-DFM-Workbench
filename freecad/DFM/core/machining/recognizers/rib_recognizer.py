@@ -174,7 +174,11 @@ class RibRecognizer(FeatureRecognizer):
         if along > 0.0:
             return None
         thickness = abs(along)
-        if thickness < _MIN_THICKNESS_MM or thickness > _MAX_THICKNESS_MM:
+        # What counts as a rib scales with the size of the work, so the
+        # shop's own figures win over the built-in ones.
+        if thickness < _MIN_THICKNESS_MM or thickness > self.threshold(
+            "rib_recognized_max_thickness_mm", _MAX_THICKNESS_MM
+        ):
             return None
 
         if not self._connected_within_two_hops(graph, first, second):
@@ -198,7 +202,9 @@ class RibRecognizer(FeatureRecognizer):
             base_normal = _world_axis(curved_height_axis)
 
         height, length = self._span(first, normal, base_normal)
-        if height / thickness < _MIN_HEIGHT_ASPECT:
+        if height / thickness < self.threshold(
+            "rib_recognized_min_height_aspect", _MIN_HEIGHT_ASPECT
+        ):
             return None
 
         faces = [first.face_id, second.face_id]

@@ -678,6 +678,13 @@ class TaskSetup:
                 self.form.pbRunAnalysis.show()
                 self._update_run_button_state()
             else:
+                # An imported model states nothing about its threads, so the
+                # only way to establish one is to ask. The question can only
+                # be put once the bores are known, which means after the
+                # first pass; a confirmed thread then changes what the rules
+                # have to say, so the pass is run again over the answers.
+                if self._offer_thread_confirmations():
+                    results = self._execute_analysis(kwargs)
                 self._finish_analysis(results)
         except Exception as e:
             App.Console.PrintError(f"A critical error occurred during analysis: {e}\n")
@@ -719,6 +726,9 @@ class TaskSetup:
             shape=self.target_shape,
             progress_cb=progress_callback,
             check_abort=check_abort,
+            # The object as well as its shape: a native document states which
+            # of its holes are tapped, and a shape on its own cannot.
+            target_object=self.target_object,
             **kwargs,
         )
 
@@ -771,6 +781,51 @@ class TaskSetup:
             import traceback
 
             App.Console.PrintError(traceback.format_exc())
+
+    def _offer_thread_confirmations(self) -> bool:
+        """Ask which tap-drill-sized bores are really tapped, once each.
+
+        Returns whether anything was confirmed, which is the only outcome
+        worth re-analysing for: a rejection changes no finding, because the
+        workbench was never going to assert that thread anyway.
+
+        A part whose document declares its threads is never asked about. The
+        designer has already said, and putting the same question again invites
+        a worse answer than the one already on file.
+        """
+        params = App.ParamGet("User parameter:BaseApp/Preferences/Mod/DFM")
+        if not params.GetBool("MachiningConfirmInferredThreads", True):
+            return False
+        context = self._machining_context()
+        if context is None or self.target_object is None:
+            return False
+
+        from ..core.machining import thread_sources
+        from ..gui import thread_confirm
+
+        try:
+            evidence = thread_sources.thread_evidence_for(self.target_object)
+            if evidence.declarations:
+                return False
+            candidates = thread_sources.candidates_for(
+                context.recognition.features,
+                context.graph,
+                evidence,
+                unit_system=getattr(context.config, "unit_system", "both"),
+            )
+            answers = thread_confirm.ask(candidates, self.target_object)
+            if not answers:
+                return False
+            confirmed = thread_sources.record_answers(
+                evidence.confirmations, candidates, answers
+            )
+            thread_sources.save_confirmations(
+                self.target_object.Document, evidence.confirmations
+            )
+            return confirmed > 0
+        except Exception as e:
+            App.Console.PrintError(f"Could not confirm tapped holes: {e}\n")
+            return False
 
     def _machining_context(self):
         """The machining analysis, if this process ran one.

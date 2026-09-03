@@ -53,6 +53,53 @@ class ToolEntry:
             <= self.max_diameter_mm + tolerance_mm
         )
 
+    def to_spec(self) -> str:
+        """One line of the stored library, in the field order below."""
+        return ",".join(
+            (
+                self.type,
+                _number(self.min_diameter_mm),
+                _number(self.max_diameter_mm),
+                _number(self.corner_radius_mm),
+                _number(self.max_flute_length_mm),
+                _number(self.max_reach_mm),
+                self.unit,
+            )
+        )
+
+    @classmethod
+    def from_spec(cls, spec: str) -> Optional["ToolEntry"]:
+        """Parse one stored line, or None if it is not a usable tool.
+
+        A garbled line is dropped rather than raised on. The parameter store
+        is a text file a user can open, and one bad edit should cost one tool
+        off the shelf, not the whole library.
+        """
+        parts = [part.strip() for part in spec.split(",")]
+        if len(parts) < 6 or not parts[0]:
+            return None
+        try:
+            numbers = [float(part or 0.0) for part in parts[1:6]]
+        except ValueError:
+            return None
+        unit = parts[6] if len(parts) > 6 else ""
+        if unit not in ("", "metric", "imperial"):
+            unit = ""
+        return cls(
+            type=parts[0],
+            min_diameter_mm=numbers[0],
+            max_diameter_mm=numbers[1],
+            corner_radius_mm=numbers[2],
+            max_flute_length_mm=numbers[3],
+            max_reach_mm=numbers[4],
+            unit=unit,
+        )
+
+
+def _number(value: float) -> str:
+    """Shortest form that reads back identically, so 6.0 stores as "6"."""
+    return f"{float(value):.6g}"
+
 
 _METRIC_END_MILLS = (
     1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0,
@@ -206,6 +253,74 @@ IMPERIAL_DRILL_SIZES_MM = (
     7.137, 7.366, 7.493, 7.671, 8.026, 8.204, 8.433, 8.611, 8.839, 9.093,
     9.347, 9.576, 9.804, 10.084, 10.262, 10.490,
 )
+
+
+# The parameter store holds one scalar per key, so a shelf of tools and a
+# drill index have to travel as text. One tool per entry, entries separated
+# by ";", which is a character no tool type or unit name uses.
+TOOL_LIBRARY_PREF_KEY = "MachiningToolLibrary"
+METRIC_DRILL_PREF_KEY = "MachiningDrillSizesMetric"
+IMPERIAL_DRILL_PREF_KEY = "MachiningDrillSizesImperial"
+
+TOOL_TYPES = (
+    "end_mill",
+    "ball_nose",
+    "drill",
+    "tap",
+    "reamer",
+    "boring_bar",
+    "turning_insert",
+)
+
+
+def encode_tool_library(tools) -> str:
+    return ";".join(tool.to_spec() for tool in tools)
+
+
+def decode_tool_library(text: str) -> list[ToolEntry]:
+    """Read a stored library back, dropping anything unusable.
+
+    An empty result means the stored text said nothing, and the caller is
+    expected to fall back to the default shelf rather than analyse a part
+    against no tooling at all.
+    """
+    tools: list[ToolEntry] = []
+    for spec in (text or "").split(";"):
+        if not spec.strip():
+            continue
+        tool = ToolEntry.from_spec(spec)
+        if tool is not None:
+            tools.append(tool)
+    return tools
+
+
+def encode_size_list(sizes) -> str:
+    return ",".join(_number(size) for size in sizes)
+
+
+def decode_size_list(text: str) -> list[float]:
+    """Read a drill index back, ascending and free of duplicates.
+
+    Order is not the user's problem: a shop adding a 6.8 mm tap drill types
+    it wherever it lands, and every rule that reads the index walks it in
+    size order. Nor is the layout: the index is edited in a text box, so
+    one size per line, or a column pasted from a spreadsheet, means the
+    same list as a comma-separated row.
+    """
+    sizes: list[float] = []
+    for part in (text or "").replace(";", " ").replace(",", " ").split():
+        try:
+            size = float(part)
+        except ValueError:
+            continue
+        if size > 0.0:
+            sizes.append(size)
+    sizes.sort()
+    deduplicated: list[float] = []
+    for size in sizes:
+        if not deduplicated or abs(size - deduplicated[-1]) >= 1e-6:
+            deduplicated.append(size)
+    return deduplicated
 
 
 # =============================================================================
@@ -383,6 +498,40 @@ class RuleThresholds:
     turned_fraction_milled_max: float = 0.20
     turned_convex_share_min: float = 0.10
     profile_bar_min_length_ratio: float = 2.0
+    # The band a deliberate draft falls in. Below the minimum is modelling
+    # noise or a wall meant to be vertical; past the maximum the taper is
+    # doing something else. A shop with a house draft standard, or one
+    # machining to a foundry's, wants to say so.
+    draft_min_deg: float = 0.5
+    draft_max_deg: float = 8.0
+    # What still counts as a rib rather than structure. Both scale with the
+    # size of work: a 5 mm web is a rib on a bracket and a heavy boss on a
+    # cover plate, and a shop running one or the other knows which.
+    rib_recognized_max_thickness_mm: float = 5.0
+    rib_recognized_min_height_aspect: float = 3.0
+    # The heaviest gauge the brake will take. Thicker is plate to be
+    # machined, not sheet to be formed, and the crossover is press capacity
+    # rather than anything in the model.
+    sheet_classify_max_gauge_mm: float = 8.0
+    # A fold modelled with no radius still means sheet-metal intent, and the
+    # gauge it implies has to be plausible for the same brake.
+    sheet_fold_min_gauge_mm: float = 0.5
+    sheet_fold_max_gauge_mm: float = 6.0
+    # Where engraving stops and a machined recess starts. All three follow
+    # the marking tooling: a fine engraving spindle cuts narrower strokes
+    # than a 90-degree V-bit, and a nameplate shop marks larger than a shop
+    # stamping a part number.
+    marking_max_depth_mm: float = 2.8
+    marking_max_stroke_width_mm: float = 3.5
+    marking_max_glyph_size_mm: float = 20.0
+    # An O-ring gland is wider than it is deep so the cord can roll and seal
+    # without being pinched. The defaults are AS568 cord sizes; a shop
+    # sealing to metric cord or a customer's own standard cuts a different
+    # band and should not be told its gland is an annular pocket.
+    oring_gland_min_width_mm: float = 2.0
+    oring_gland_max_width_mm: float = 10.0
+    oring_gland_min_width_depth_ratio: float = 1.4
+    oring_gland_max_width_depth_ratio: float = 2.2
 
     # -- tolerance capability (dormant until a tolerance source exists) ------
     tol_grinding_max_mm: float = 0.02
@@ -424,6 +573,10 @@ class RuleThresholds:
 # Configuration
 # =============================================================================
 
+# Threshold keys carry this prefix in the parameter store so they cannot
+# collide with the analyzer preferences that share the group.
+THRESHOLD_PREF_PREFIX = "MachiningThreshold"
+
 MACHINE_MODES = ("3axis", "3plus2", "5axis")
 UNIT_SYSTEMS = ("metric", "imperial", "both")
 BLANK_FORMS = ("", "billet", "as_cast", "profile_extrusion")
@@ -443,6 +596,12 @@ class MachiningConfig:
 
     tool_library: list[ToolEntry] = field(default_factory=default_tool_library)
     drill_sizes_mm: list[float] = field(default_factory=lambda: list(METRIC_DRILL_SIZES_MM))
+    # The imperial index is a field rather than the module constant so a shop
+    # that stocks an odd set -- or none -- can say so, the same as the metric
+    # one. Both default to the catalogue.
+    imperial_drill_sizes_mm: list[float] = field(
+        default_factory=lambda: list(IMPERIAL_DRILL_SIZES_MM)
+    )
     thresholds: RuleThresholds = field(default_factory=RuleThresholds)
 
     disabled_rules: list[str] = field(default_factory=list)
@@ -499,7 +658,7 @@ class MachiningConfig:
         if self.unit_system in ("metric", "both"):
             sizes.extend(self.drill_sizes_mm or METRIC_DRILL_SIZES_MM)
         if self.unit_system in ("imperial", "both"):
-            sizes.extend(IMPERIAL_DRILL_SIZES_MM)
+            sizes.extend(self.imperial_drill_sizes_mm or IMPERIAL_DRILL_SIZES_MM)
 
         sizes.sort()
         deduplicated: list[float] = []
@@ -536,11 +695,27 @@ class MachiningConfig:
         config.material_family = str(prefs.get("MachiningMaterialFamily", ""))
         config.precision_mode = bool(prefs.get("MachiningPrecisionMode", False))
 
-        prefix = "MachiningThreshold"
+        prefix = THRESHOLD_PREF_PREFIX
         overrides = {
             key[len(prefix) :]: value
             for key, value in prefs.items()
             if key.startswith(prefix)
         }
         config.thresholds.apply_overrides(overrides)
+
+        # An unset or emptied key means "the catalogue", never "no tooling".
+        # A shop that has genuinely thrown its imperial drills out says so by
+        # choosing metric-only units, not by clearing the index.
+        tools = decode_tool_library(str(prefs.get(TOOL_LIBRARY_PREF_KEY, "")))
+        if tools:
+            config.tool_library = tools
+
+        metric = decode_size_list(str(prefs.get(METRIC_DRILL_PREF_KEY, "")))
+        if metric:
+            config.drill_sizes_mm = metric
+
+        imperial = decode_size_list(str(prefs.get(IMPERIAL_DRILL_PREF_KEY, "")))
+        if imperial:
+            config.imperial_drill_sizes_mm = imperial
+
         return config

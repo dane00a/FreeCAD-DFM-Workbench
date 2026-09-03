@@ -38,9 +38,8 @@ from .base import FeatureRecognizer
 # a ruled band that happened to be modelled as a spline.
 _MIN_SCULPT_CURVATURE = 1.0 / 500.0
 
-# A blend is a transition, not a surface anyone set out to make. This mirrors
-# the default the freeform rules use, so the feature census shows the same
-# faces that drive the findings.
+# A blend is a transition, not a surface anyone set out to make. The default
+# mirrors the freeform rules' own, and the shop's figure overrides both.
 _BLEND_BAND_MAX_RADIUS_MM = 10.0
 
 # Two faces belong to one profile when their axes agree this closely.
@@ -64,6 +63,11 @@ class TurnedProfileRecognizer(FeatureRecognizer):
         prior: Optional[Sequence[FeatureInstance]] = None,
     ) -> list[FeatureInstance]:
         turned = self._part_is_turned()
+        # The same figure the freeform rules use, so the census shows the
+        # faces that actually drive the findings.
+        blend_radius = self.threshold(
+            "freeform_blend_band_max_radius_mm", _BLEND_BAND_MAX_RADIUS_MM
+        )
 
         profile_faces: list[AagNode] = []
         sculpted_faces: list[AagNode] = []
@@ -72,7 +76,7 @@ class TurnedProfileRecognizer(FeatureRecognizer):
                 continue
             if turned and node.surface_type is SurfaceType.REVOLVED:
                 profile_faces.append(node)
-            elif self._is_sculpted(graph, node):
+            elif self._is_sculpted(graph, node, blend_radius):
                 sculpted_faces.append(node)
 
         found: list[FeatureInstance] = []
@@ -112,7 +116,9 @@ class TurnedProfileRecognizer(FeatureRecognizer):
     # -- qualification ------------------------------------------------------
 
     @staticmethod
-    def _is_sculpted(graph: AttributedAdjacencyGraph, node: AagNode) -> bool:
+    def _is_sculpted(
+        graph: AttributedAdjacencyGraph, node: AagNode, blend_radius: float
+    ) -> bool:
         """Whether a curved face is really shaped, or just a blend.
 
         A fillet modelled as a spline reads as curved by every local test, so
@@ -128,9 +134,9 @@ class TurnedProfileRecognizer(FeatureRecognizer):
             # edge break rather than a form.
             if node.freeform_max_convex_curvature <= _MIN_SCULPT_CURVATURE:
                 return False
-            return 1.0 / node.freeform_max_convex_curvature > _BLEND_BAND_MAX_RADIUS_MM
+            return 1.0 / node.freeform_max_convex_curvature > blend_radius
 
-        if concave <= _BLEND_BAND_MAX_RADIUS_MM:
+        if concave <= blend_radius:
             # Tangent at both ends means it is bridging two surfaces rather
             # than being one.
             tangent = sum(1 for edge in graph.edges_of(node.face_id) if edge.is_tangent)

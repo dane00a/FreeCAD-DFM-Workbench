@@ -59,6 +59,9 @@ class DraftRecognizer(FeatureRecognizer):
         prior: Optional[Sequence[FeatureInstance]] = None,
     ) -> list[FeatureInstance]:
         found: list[FeatureInstance] = []
+        # A house or foundry draft standard is policy, not geometry.
+        minimum = self.threshold("draft_min_deg", _DRAFT_MIN_DEG)
+        maximum = self.threshold("draft_max_deg", _DRAFT_MAX_DEG)
 
         for node in graph.nodes:
             if node.surface_type is not SurfaceType.PLANE:
@@ -72,7 +75,7 @@ class DraftRecognizer(FeatureRecognizer):
                 continue
 
             draft = _draft_angle(normal)
-            if not _DRAFT_MIN_DEG <= draft <= _DRAFT_MAX_DEG:
+            if not minimum <= draft <= maximum:
                 continue
 
             found.append(

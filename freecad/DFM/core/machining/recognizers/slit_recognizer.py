@@ -79,6 +79,8 @@ _REENTRANT_MAX_DOT = -0.12
 # A slit this narrow, and this deep for its width, is a flexure. Mirrors
 # `flexure_slit_max_width_mm` and `flexure_slit_min_depth_ratio` in the
 # machining thresholds -- recognizers are not handed the config.
+# Defaults only: these duplicate the shared thresholds of the same name, so
+# a shop that has set its own wire or saw kerf gets that instead.
 _FLEXURE_MAX_WIDTH_MM = 4.0
 _FLEXURE_MIN_DEPTH_RATIO = 3.0
 
@@ -235,13 +237,20 @@ class SlitRecognizer(FeatureRecognizer):
 
         return self._merge_by_wall_pair(found)
 
-    @staticmethod
-    def _floored_type(reentrant: bool, width: float, depth: float) -> str:
+    def _floored_type(self, reentrant: bool, width: float, depth: float) -> str:
         if reentrant:
             return FeatureType.BROACHED_SLOT
-        if width <= _FLEXURE_MAX_WIDTH_MM and depth / width >= _FLEXURE_MIN_DEPTH_RATIO:
+        if width <= self._max_width() and depth / width >= self._min_depth_ratio():
             return FeatureType.FLEXURE_SLIT
         return FeatureType.SLOT
+
+    def _max_width(self) -> float:
+        return self.threshold("flexure_slit_max_width_mm", _FLEXURE_MAX_WIDTH_MM)
+
+    def _min_depth_ratio(self) -> float:
+        return self.threshold(
+            "flexure_slit_min_depth_ratio", _FLEXURE_MIN_DEPTH_RATIO
+        )
 
     @staticmethod
     def _wall_pair(
@@ -427,7 +436,7 @@ class SlitRecognizer(FeatureRecognizer):
                 if normal_a.Dot(normal_b) > _PENETRATION_WALLS_MAX_DOT:
                     continue
                 gap = gp_Vec(first.centroid, second.centroid).Dot(gp_Vec(normal_a))
-                if gap <= _MIN_WIDTH_MM or gap > _FLEXURE_MAX_WIDTH_MM:
+                if gap <= _MIN_WIDTH_MM or gap > self._max_width():
                     continue
 
                 across, along = _in_plane_frame(normal_a)
@@ -439,9 +448,9 @@ class SlitRecognizer(FeatureRecognizer):
                 overlap_along = _overlap(first_along, second_along)
                 # Deep in both in-plane directions: a shallow reveal between
                 # two plates is not a slit.
-                if overlap_across < _FLEXURE_MIN_DEPTH_RATIO * gap:
+                if overlap_across < self._min_depth_ratio() * gap:
                     continue
-                if overlap_along < _FLEXURE_MIN_DEPTH_RATIO * gap:
+                if overlap_along < self._min_depth_ratio() * gap:
                     continue
 
                 if not self._walls_are_congruent(

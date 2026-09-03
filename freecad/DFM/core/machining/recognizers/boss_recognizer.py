@@ -42,8 +42,9 @@ from .base import FeatureRecognizer, cylinder_length
 # otherwise satisfy every downstream guard.
 _TOP_MAX_ASPECT = 5.0
 
-# A neighbour has to be smaller than this multiple of the top to count as a
-# wall of it. Anything larger is the surface the boss stands on.
+# The surface a boss stands on is larger than its top by at least this much,
+# as well as facing the same way. Size alone is not enough: the walls of a
+# tall boss outgrow its top without becoming its base.
 _BASE_MIN_AREA_RATIO = 2.0
 
 # A cone this shallow across its slant is edge treatment -- a lead-in chamfer
@@ -155,11 +156,18 @@ class BossRecognizer(FeatureRecognizer):
             if not graph.has_node(face_id):
                 continue
             node = graph.node(face_id)
-            # A wall is anything not planar, or a planar face small enough not
-            # to be the surface the boss stands on.
-            if (
-                node.surface_type is SurfaceType.PLANE
-                and node.area >= top.area * _BASE_MIN_AREA_RATIO
+            # A wall is anything not planar, or a planar face that stands
+            # across the top rather than continuing in the same plane as it.
+            #
+            # Orientation rather than area, because area is a proxy that
+            # fails on exactly the bosses the height rule cares about: the
+            # walls of a pad taller than twice its width are bigger than its
+            # top, so an area test called them the base, dropped them, and
+            # left the top unenclosed. A pad then vanished above 2x width --
+            # while the rule warns at 4x, so it could never fire on one.
+            # Cylindrical bosses were unaffected, which is what hid it.
+            if node.surface_type is SurfaceType.PLANE and self._is_base_plane(
+                node, top
             ):
                 continue
             walls.add(face_id)
@@ -167,6 +175,23 @@ class BossRecognizer(FeatureRecognizer):
                 edge_treatment.add(face_id)
 
         return walls, edge_treatment
+
+    @staticmethod
+    def _is_base_plane(node: AagNode, top: AagNode) -> bool:
+        """Whether a planar neighbour of the top is what the boss stands on.
+
+        The surface a boss rises from faces the same way the top does, and is
+        larger. A wall stands across it. Both conditions are needed: without
+        the orientation test a tall boss's own wall reads as its base, and
+        without the size test a shelf reads as a boss standing on nothing.
+        """
+        top_normal = top.outward_normal
+        normal = node.outward_normal
+        if top_normal is None or normal is None:
+            return node.area >= top.area * _BASE_MIN_AREA_RATIO
+        if abs(top_normal.Dot(normal)) < _BASE_PARALLEL_MIN_DOT:
+            return False
+        return node.area >= top.area * _BASE_MIN_AREA_RATIO
 
     @staticmethod
     def _has_base(

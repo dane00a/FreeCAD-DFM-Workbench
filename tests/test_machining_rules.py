@@ -66,8 +66,51 @@ def make_ordinary_block() -> TopoDS_Shape:
 
 
 def make_thin_plate() -> TopoDS_Shape:
-    """200 x 120 x 2.5: broad, thin and floppy."""
+    """200 x 120 x 2.5: broad, thin and floppy.
+
+    A plate on its own, which is the right shape for the rules about holding
+    it and about its proportions -- but not for the thin-wall rule. There
+    both of its large faces ARE the part, so they are read as its outside
+    and nothing is reported, which is what the reference engine does with its
+    own thin-sheet fixture too. Use `make_thin_floor` for a wall.
+    """
     return BRepPrimAPI_MakeBox(200.0, 120.0, 2.5).Shape()
+
+
+def make_thin_floor() -> TopoDS_Shape:
+    """A 2.5 mm floor left under a deep recess.
+
+    A wall is a wall when there is a feature on one side of it and material
+    on the other. Deep on purpose: the sides have to carry enough of the
+    part's surface that neither the floor nor the underside reads as the
+    outside of the part.
+    """
+    outer = BRepPrimAPI_MakeBox(200.0, 120.0, 80.0).Shape()
+    recess = BRepPrimAPI_MakeBox(
+        gp_Pnt(20.0, 20.0, 2.5), gp_Pnt(180.0, 100.0, 81.0)
+    ).Shape()
+    return _cut(outer, recess)
+
+
+def make_walled_plate(thickness: float, across: float = 16.0) -> TopoDS_Shape:
+    """A floor of a given thickness under a recess of a given width.
+
+    The vehicle for the threshold tests: one number varies, and the geometry
+    around it stays a shape where a wall genuinely is a wall.
+    """
+    # The surround is deliberately heavy. A recess with thin walls all round
+    # is a folded box to the classifier, and the sheet-metal rules take the
+    # part over -- so the only thin section here has to be the floor.
+    wall = 12.0
+    depth = max(across * 2.0, 40.0)
+    outer = BRepPrimAPI_MakeBox(
+        across + wall * 2.0, across + wall * 2.0, depth
+    ).Shape()
+    recess = BRepPrimAPI_MakeBox(
+        gp_Pnt(wall, wall, thickness),
+        gp_Pnt(across + wall, across + wall, depth + 1.0),
+    ).Shape()
+    return _cut(outer, recess)
 
 
 def make_slender_bar() -> TopoDS_Shape:
@@ -203,7 +246,7 @@ class TestThinWall(unittest.TestCase):
         self.assertEqual(check(make_ordinary_block(), self.RULE), [])
 
     def test_thin_plate_is_a_thin_wall(self):
-        findings = check(make_thin_plate(), self.RULE)
+        findings = check(make_thin_floor(), self.RULE)
         self.assertTrue(findings)
         self.assertAlmostEqual(findings[0].value, 2.5, places=2)
 
@@ -228,15 +271,15 @@ class TestThinWall(unittest.TestCase):
         # A narrow footprint on purpose: at 16mm across, neither thickness is
         # broad enough to trip the aspect path, so this isolates the absolute
         # threshold. A wider plate would legitimately fire either way.
-        below = check(BRepPrimAPI_MakeBox(16.0, 16.0, 1.4).Shape(), self.RULE, target="1.5", limit="0.8")
-        above = check(BRepPrimAPI_MakeBox(16.0, 16.0, 1.6).Shape(), self.RULE, target="1.5", limit="0.8")
+        below = check(make_walled_plate(1.4), self.RULE, target="1.5", limit="0.8")
+        above = check(make_walled_plate(1.6), self.RULE, target="1.5", limit="0.8")
         self.assertEqual(severities(below), [Severity.WARNING])
         self.assertEqual(above, [])
 
     def test_broad_thin_section_fires_on_aspect_alone(self):
         # 1.6mm is above the absolute target, but 60mm across it is still a
         # panel that will drum. This is the aspect path doing its job.
-        findings = check(BRepPrimAPI_MakeBox(60.0, 60.0, 1.6).Shape(), self.RULE, target="1.5", limit="0.8")
+        findings = check(make_walled_plate(1.6, across=60.0), self.RULE, target="1.5", limit="0.8")
         self.assertEqual(severities(findings), [Severity.WARNING])
         self.assertIn("aspect ratio", findings[0].message)
 
@@ -249,8 +292,8 @@ class TestThinWall(unittest.TestCase):
         )
 
     def test_threshold_pair_straddles_the_error_limit(self):
-        below = check(BRepPrimAPI_MakeBox(60.0, 60.0, 0.7).Shape(), self.RULE, target="1.5", limit="0.8")
-        above = check(BRepPrimAPI_MakeBox(60.0, 60.0, 0.9).Shape(), self.RULE, target="1.5", limit="0.8")
+        below = check(make_walled_plate(0.7), self.RULE, target="1.5", limit="0.8")
+        above = check(make_walled_plate(0.9), self.RULE, target="1.5", limit="0.8")
         self.assertEqual(severities(below), [Severity.ERROR])
         self.assertEqual(severities(above), [Severity.WARNING])
 
@@ -309,25 +352,25 @@ class TestFindingShape(unittest.TestCase):
     """Findings have to be usable by the existing results panel."""
 
     def test_geometry_references_are_one_based_face_ids(self):
-        findings = check(make_thin_plate(), Rulebook.THIN_WALL)
+        findings = check(make_thin_floor(), Rulebook.THIN_WALL)
         self.assertTrue(findings)
         for kind, index in findings[0].failing_geometry:
             self.assertEqual(kind, "Face")
             self.assertGreaterEqual(index, 1)
 
     def test_findings_carry_a_measured_value_and_limit(self):
-        finding = check(make_thin_plate(), Rulebook.THIN_WALL)[0]
+        finding = check(make_thin_floor(), Rulebook.THIN_WALL)[0]
         self.assertGreater(finding.value, 0.0)
         self.assertGreater(finding.limit, 0.0)
         self.assertEqual(finding.unit, "mm")
 
     def test_messages_are_written_out_not_left_as_templates(self):
-        finding = check(make_thin_plate(), Rulebook.THIN_WALL)[0]
+        finding = check(make_thin_floor(), Rulebook.THIN_WALL)[0]
         self.assertNotIn("{measured}", finding.message)
         self.assertGreater(len(finding.message), 40)
 
     def test_process_feedback_overrides_the_default_message(self):
-        data = _analyse(make_thin_plate())
+        data = _analyse(make_thin_floor())
         check_class = get_check_class(Rulebook.THIN_WALL)
         assert check_class is not None
         findings = check_class().run_check(
@@ -408,7 +451,7 @@ class TestCncProcesses(unittest.TestCase):
 
     def test_material_changes_the_thin_wall_verdict(self):
         # 1.0mm is acceptable in wrought aluminium and not in stainless.
-        plate = BRepPrimAPI_MakeBox(18.0, 18.0, 1.0).Shape()
+        plate = make_walled_plate(1.0)
         aluminium = self._limits_for(
             "CNC Milling", "Aluminum (Soft Wrought Alloy)", Rulebook.THIN_WALL
         )

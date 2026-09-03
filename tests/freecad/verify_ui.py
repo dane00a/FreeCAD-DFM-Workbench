@@ -82,6 +82,28 @@ def pump():
     QtWidgets.QApplication.processEvents()
 
 
+def settle(read, limit=200):
+    """Pump until a value stops changing, or give up.
+
+    The camera moves on a timer rather than in one step, so a single trip
+    through the event loop catches it partway or not at all. Reading it
+    until it holds still is the difference between testing the zoom and
+    testing how fast the test ran.
+    """
+    from PySide6 import QtWidgets
+
+    previous = read()
+    unchanged = 0
+    for _ in range(limit):
+        QtWidgets.QApplication.processEvents()
+        current = read()
+        unchanged = unchanged + 1 if current == previous else 0
+        previous = current
+        if unchanged >= 5:
+            break
+    return previous
+
+
 # ---------------------------------------------------------------------------
 # The part, and the analysis of it
 # ---------------------------------------------------------------------------
@@ -670,13 +692,32 @@ def verify_zoom(view, presenter, doc, part):
     view3d.viewAxonometric()
     FreeCADGui.SendMsgToActiveView("ViewFit")
     pump()
-    before = camera()
     guard("double-clicking a finding zooms without raising",
           lambda: presenter.handle_zoom(finding))
-    pump()
-    moved = any(abs(a - b) > 1e-6 for a, b in zip(before, camera()))
-    check("the camera actually moved", moved,
-          "" if moved else " (still at %s)" % (camera(),))
+    here = settle(camera)
+
+    # Framing the whole part is not zooming to a finding, and after a fit it
+    # looks identical. What proves the camera is following the finding is
+    # that a different finding somewhere else puts it somewhere else.
+    elsewhere = next(
+        (payload_of(i) for i in walk(view.model)
+         if kind_of(i) == "finding"
+         and payload_of(i) is not finding
+         and any(ref.type == "Face" for ref in payload_of(i).refs)
+         and not (set(face_refs_of([payload_of(i)]))
+                  & set(face_refs_of([finding])))),
+        None,
+    )
+    if elsewhere is None:
+        check("a second finding elsewhere on the part to zoom to", False)
+    else:
+        presenter.handle_zoom(elsewhere)
+        there = settle(camera)
+        moved = any(abs(a - b) > 1e-6 for a, b in zip(here, there))
+        check("the camera follows the finding, not just the part", moved,
+              "" if moved else " (both framings at %s)" % (camera(),))
+        presenter.handle_zoom(finding)
+        settle(camera)
     got = painted_faces(doc, face_count)
     want = face_refs_of([finding])
     check("and the finding is still the thing lit up", got == want,

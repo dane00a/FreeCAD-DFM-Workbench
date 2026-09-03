@@ -604,17 +604,18 @@ whose materials follow FreeCAD's own machining cards, and 170 tests.
 
 ### Phases 3 to 7 results
 
-**Everything in scope is ported.** Twenty-one recognizers, ninety-five rules,
-and the process classification, all running over the corpus with no failures.
+**Everything in scope is ported.** Twenty-one recognizers, ninety-five rules
+across four processes, and the process classification, all running over the
+corpus with no failures. Every rule has a check behind it.
 
 | Measure | At Phase 2 | Now |
 |---|---|---|
-| Process classification vs the reference | 158 / 211 | **207 / 211 (98.1%)** |
-| Sheet metal identified | 0 / 45 | **44 / 45** |
+| Process classification vs the reference | 158 / 211 | **208 / 211 (98.6%)** |
+| Sheet metal identified | 0 / 45 | **45 / 45** |
 | Mill-turn identified | 6 / 13 | **13 / 13** |
 | Feature kinds recognized | 7 | **28** |
 | Rules with a check behind them | 13 | **95** |
-| Tests | 170 | **600+** |
+| Tests | 170 | **761** |
 | Corpus run | 213 parts, 0 errors | 213 parts, 0 errors |
 
 **What closed the classification gap.** Sheet detection was the whole of it,
@@ -626,9 +627,15 @@ rather than the surface type whether a sculpted face is formed -- metal for
 one gauge behind it, air past that -- which is what lets a drawn louver count
 as sheet despite being a spline.
 
-The remaining four are each a single part: one shell whose folds are modelled
-sharp, one enclosure that genuinely looks like sheet, and two on the
-turned/mill-turn boundary.
+A second route catches a shell whose folds were modelled square -- somebody
+who draws sheet metal without radiusing the folds has still drawn sheet
+metal, and the sharp folds are then reported as the defect they are. What
+separates that from a milled box is that a foldable blank has at most two of
+its panel pairs joined; a third join is a corner, and no flat blank folds
+into a corner.
+
+The three that remain are one part each: an enclosure that genuinely looks
+like sheet, and two on the turned/mill-turn boundary.
 
 ### The suppression problem, and what it cost to solve
 
@@ -693,10 +700,21 @@ checks each part against `geometry_oracle.json` -- face, edge and solid
 counts, volume, area and bounding box, measured from the originals. No CAD
 files are committed.
 
-That check earns its keep immediately. Of the first thirty-two written, the
+All 213 build. 208 match the recording exactly; the remaining five differ
+only in edge count, by between one and ten edges, and only on the lofted
+louvers whose crest runs out flush into the deck. That run-out is a
+near-tangential boolean and it leaves slivers -- the extras measure between
+3e-5 and 8e-4 mm and sit exactly at the run-outs -- and how many of those a
+kernel merges away is a version question. Everything that describes the part
+rather than its tessellation matches to seven or eight significant figures.
+They are listed individually rather than the tolerance being relaxed,
+because an unexplained edge count anywhere else is still worth failing on.
+
+The check earned its keep immediately. Of the first thirty-two written, the
 nine transcribed dimension-for-dimension matched exactly and every one where
-a dimension was guessed was caught. It is the difference between the same
-parts and merely similar ones.
+a dimension was guessed was caught -- including two that had been left in
+place and would otherwise have quietly become the wrong parts. It is the
+difference between the same corpus and merely a similar one.
 
 ### Setup counting, and why it took until Phase 5
 
@@ -755,7 +773,8 @@ run-out rules need. The tap drill table still names a thread once a helix has
 confirmed one.
 
 **Rule-card scale.** Ninety-five rules would have been unreadable as one flat
-list, so `RuleFamily` groups them and the process library sorts by family.
+list, so `RuleFamily` groups them into sixteen families and the process
+library sorts by family. No single process runs more than 54 of them.
 
 **GD&T.** Ported and dormant, as decided. The rules are written and tested --
 including tests that supply annotations directly and prove the logic fires --
@@ -764,21 +783,19 @@ none. `machining/annotations.py` is where that would arrive.
 
 ### Still open
 
-1. **`sharp_internal_edge` at 2.6x the reference.** Not a rule fault: it
+1. **`sharp_internal_edge` at 2.4x the reference.** Not a rule fault: it
    reports what no recognizer claimed, so the number tracks coverage. Closing
    it means improving recognition on specific parts, chiefly cavity
    recognition on moulded and micro-fluidic geometry.
-2. **The four classification stragglers**, each a single part: a sharp-fold
-   shell needs the second sheet detection route, and the rest sit on the
-   turned/mill-turn boundary.
-3. **The slit family is partly unreachable.** The pocket recognizer runs
-   first and the slit recognizer stands down on claimed faces, so a floored
-   flexure slit is emitted as a slot. The resolver's priority table already
-   ranks slits above slots, so the intent is there; the stand-down defeats it.
-4. **Parity vs. correctness** on the known contract bugs in section 6.7 --
+2. **The three classification stragglers**, each a single part, all on a
+   boundary that is genuinely ambiguous rather than wrong.
+3. **Parity vs. correctness** on the known contract bugs in section 6.7 --
    still worth a decision, though nothing has depended on it yet.
-5. **`POCKET_ASPECT_RATIO` means two different things.** The rule as defined
-   here is a plan-view aspect; the reference measures depth against the flute
-   length of the longest cutter that fits. The check follows the reference
-   and ignores the configured limits, which is a mismatch worth resolving one
-   way or the other.
+4. **Sheet rule metadata.** Several sheet rules have more thresholds
+   than their editor shape exposes -- a tab has both a width floor and an
+   aspect ceiling, a countersink both a depth and a land. The checks use the
+   reference's figures for the arms the editor cannot reach.
+5. **`POCKET_ASPECT_RATIO` had meant two different things,** now resolved to
+   the reference's reading (depth against cutter flute length). The old
+   plan-view aspect reading is gone; if a shop wants it, it is a new rule. The rule as defined
+

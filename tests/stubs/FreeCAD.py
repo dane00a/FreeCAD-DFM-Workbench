@@ -11,6 +11,7 @@ imported by tests that rely on this stub.
 """
 
 import math
+import sys
 import tempfile
 
 
@@ -19,17 +20,26 @@ ActiveDocument = None
 
 
 class Console:
+    """FreeCAD's report view, standing in as stderr.
+
+    Warnings and errors are re-raised as output rather than dropped. The
+    analyzer catches a failing recognizer so one bad pass cannot lose the
+    rest, which is right in the application and dangerous in a test: a
+    recognizer that throws on every shape would otherwise look exactly like
+    one that finds nothing.
+    """
+
     @staticmethod
     def PrintMessage(msg):
         pass
 
     @staticmethod
     def PrintWarning(msg):
-        pass
+        sys.stderr.write(str(msg))
 
     @staticmethod
     def PrintError(msg):
-        pass
+        sys.stderr.write(str(msg))
 
     @staticmethod
     def PrintDeveloperError(msg):

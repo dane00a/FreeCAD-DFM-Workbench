@@ -173,6 +173,39 @@ class AagBuilder:
                 normal.Reverse()
             return gp_Vec(normal).Dot(gp_Vec(node.sphere_center, point)) < 0.0
 
+        # A torus is a tube bent round a circle, so the same question is asked
+        # against the tube: does the outward normal lean away from the core
+        # circle or back toward it. A fillet at the foot of a boss leans in
+        # and bounds a void; the rounded rim of a shaft end leans out.
+        #
+        # This branch earns its keep. Fillets arrive as tori constantly, and
+        # falling through to the orientation flag here was the one place the
+        # non-portable answer still got through.
+        if node.surface_type is SurfaceType.TORUS and node.torus_axis is not None:
+            sample = _face_sample_point(face)
+            if sample is None:
+                return node.is_reversed
+            point, normal = sample
+            if face.Orientation() == TopAbs_REVERSED:
+                normal.Reverse()
+
+            axis = node.torus_axis
+            direction = gp_Vec(axis.Direction())
+            offset = gp_Vec(axis.Location(), point)
+            axial = direction.Multiplied(offset.Dot(direction))
+            radial = offset.Subtracted(axial)
+            if radial.Magnitude() < 1e-9:
+                return node.is_reversed
+            # The nearest point on the core circle, which is what the tube
+            # is swept about.
+            core = axis.Location().Translated(
+                radial.Normalized().Multiplied(node.torus_major_r)
+            )
+            outward_tube = gp_Vec(core, point)
+            if outward_tube.Magnitude() < 1e-9:
+                return node.is_reversed
+            return gp_Vec(normal).Dot(outward_tube) < 0.0
+
         return node.is_reversed
 
     def _classify_surface(self, node: AagNode, face: TopoDS_Face) -> None:

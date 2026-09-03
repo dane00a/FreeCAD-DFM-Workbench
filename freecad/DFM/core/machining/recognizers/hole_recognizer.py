@@ -30,7 +30,9 @@ from typing import Optional, Sequence
 from OCP.gp import gp_Dir, gp_Vec
 
 from ..aag import AagNode, AttributedAdjacencyGraph, Concavity, SurfaceType
-from ..features import FeatureInstance, FeatureType
+from ..features import BORE_TYPES, FeatureInstance, FeatureType
+from ..helix import candidate_axes, find_helices
+from ..threads import match_tap_drill
 from .base import (
     FeatureRecognizer,
     axes_are_coaxial,
@@ -87,6 +89,11 @@ class HoleRecognizer(FeatureRecognizer):
         taken: set[int] = set(claimed or ())
         found: list[FeatureInstance] = []
 
+        # Helices are measured once for the whole shape rather than per bore:
+        # the scan is over every spline edge in the part, and a tapped hole
+        # is far from the only reason to walk that list.
+        self._helices = find_helices(shape, candidate_axes(graph)) if shape else []
+
         # Smallest bore first, so a counterbore is always seeded from its
         # inner cylinder and can absorb the larger coaxial one. Seeded the
         # other way round, the outer cylinder would be emitted as a blind
@@ -105,6 +112,11 @@ class HoleRecognizer(FeatureRecognizer):
                 taken.update(feature.faces)
 
         merged = self._merge_split_bores(graph, found)
+        # After the merge, because a modelled thread splits the bore it is cut
+        # in: each fragment alone is not the hole, and the thread belongs to
+        # the whole of it.
+        for feature in merged:
+            self._try_thread(graph, feature)
         for index, feature in enumerate(merged):
             feature.instance_id = self.instance_id(index)
         return merged
@@ -173,6 +185,112 @@ class HoleRecognizer(FeatureRecognizer):
         self._try_countersink(graph, cylinder, feature, caps.cones)
         feature.parameters["hole_type"] = feature.type
         return feature
+
+    # -- threads ------------------------------------------------------------
+
+    def _try_thread(
+        self, graph: AttributedAdjacencyGraph, feature: FeatureInstance
+    ) -> bool:
+        """Promote a bore to a tapped hole, on modelled evidence only.
+
+        A hole whose diameter merely matches a tap drill is not evidence of a
+        thread. Most bores that size are clearance, reamed, dowel or pilot
+        holes, and inferring from diameter alone turns a plate of standard
+        drill sizes into a fully tapped part. So the thread has to actually
+        be in the model: a helix, coaxial with the bore, at about its radius.
+
+        The tap-drill table is still what names the thread once a helix has
+        confirmed one -- the bore diameter is the tap drill, by definition.
+        """
+        if not self._helices or feature.type not in BORE_TYPES:
+            return False
+        diameter = feature.number("diameter_mm") or 0.0
+        if diameter <= 0.0:
+            return False
+        cylinder = self._seed_cylinder(graph, feature)
+        if cylinder is None:
+            return False
+
+        # A bore that runs out into another cavity has no closed end to tap
+        # into. It is a port or a cross-drilling.
+        if feature.param("terminates_in_cavity"):
+            return False
+
+        # A bore interrupted by a *crossing* one picks up spline intersection
+        # curves, and a fluid passage opening into a cross-bore is a port
+        # rather than a tapped hole. Coaxial neighbours are exempt: a modelled
+        # thread splits the very bore it is cut in, and those fragments are
+        # the same hole rather than a crossing.
+        axis = cylinder.cyl_cone_axis
+        for neighbour, _ in neighbours(graph, cylinder.face_id):
+            if neighbour.surface_type is not SurfaceType.CYLINDER:
+                continue
+            if neighbour.cyl_cone_axis is None or axis is None:
+                return False
+            if not axes_are_coaxial(neighbour.cyl_cone_axis, axis):
+                return False
+
+        helix = self._helix_for(cylinder)
+        if helix is None:
+            return False
+
+        spec = match_tap_drill(diameter)
+        if spec is None:
+            # Without a standard size there is no designation, pitch or
+            # nominal diameter to report, and a thread the rules cannot
+            # reason about is worse than an honest plain bore.
+            return False
+
+        feature.type = FeatureType.THREADED_HOLE
+        feature.parameters["thread_designation"] = spec.designation
+        feature.parameters["thread_nominal_mm"] = spec.nominal_mm
+        feature.parameters["thread_pitch_mm"] = spec.pitch_mm
+        feature.parameters["thread_evidence"] = "modelled_helix"
+        # The axial reach of the helix is the tapped length. Worst-casing to
+        # the full hole depth would make the run-out rule fire on parts that
+        # took the trouble to model the thread properly.
+        if 0.0 < helix.axial_span <= (feature.number("depth_mm") or 0.0) + 0.5:
+            feature.parameters["thread_depth_mm"] = round(helix.axial_span, 6)
+        return True
+
+    @staticmethod
+    def _seed_cylinder(
+        graph: AttributedAdjacencyGraph, feature: FeatureInstance
+    ) -> Optional[AagNode]:
+        """The bore wall a hole feature was grown from.
+
+        The smallest coaxial cylinder among its faces: on a counterbore that
+        is the through bore rather than the enlarged mouth, which is the one
+        a tap would run in.
+        """
+        best: Optional[AagNode] = None
+        for face_id in feature.faces:
+            if not graph.has_node(face_id):
+                continue
+            node = graph.node(face_id)
+            if node.surface_type is not SurfaceType.CYLINDER:
+                continue
+            if node.cyl_cone_axis is None or not node.is_internal:
+                continue
+            if best is None or node.cyl_radius < best.cyl_radius:
+                best = node
+        return best
+
+    def _helix_for(self, cylinder: AagNode):
+        """The modelled thread cut on this bore, if there is one.
+
+        Matched by axis and radius: the helix runs at the thread crest, which
+        on an internal thread is a little inside the tap drill wall.
+        """
+        axis = cylinder.cyl_cone_axis
+        if axis is None:
+            return None
+        for helix in self._helices:
+            if not axes_are_coaxial(helix.axis, axis):
+                continue
+            if abs(helix.radius - cylinder.cyl_radius) <= 0.25 * cylinder.cyl_radius:
+                return helix
+        return None
 
     # -- guards -------------------------------------------------------------
 

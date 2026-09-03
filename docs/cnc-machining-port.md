@@ -248,6 +248,35 @@ Rib / Boss / Step (thin-feature and setup rules), Slit / ThroughCavity
 (misclassification fixes), and finally SphericalPocket / Channel / Draft /
 Pattern.
 
+### Phase 6 — A fixture generator, and no committed geometry
+
+**No CAD files are committed to this repository, and none should be.** The
+reference corpus is proprietary work belonging to a separate business; the
+fixtures are useful as *shapes to test against*, not as files to redistribute.
+`.gitignore` covers `*.step`, `*.stp` and friends, and the only fixture-derived
+data in the tree is `tests/fixtures/geometry_oracle.json` — face and edge
+counts, volume, area and bounding box per fixture. Measurements, not geometry:
+nothing in it can reconstruct a shape.
+
+The last phase replaces the borrowed corpus with one of our own. Port the C++
+fixture generator to Python so every fixture is *built* from OpenCascade
+primitives at test time rather than loaded from disk. The reference builds all
+211 of its generated fixtures that way already — verified: no file loads, no
+randomness, fully deterministic — so this is transcription rather than
+invention, and the existing structural oracle is exactly the tool for
+confirming each ported builder produces the same solid.
+
+Doing it last is deliberate: the fixtures are only worth porting once the
+recognizers and rules that consume them exist, and by then the oracle has been
+exercised enough to be trusted.
+
+Watch the six ordering constraints the generator's comments record — external
+blends go on the pristine solid before any cuts, countersinks are cut into the
+bare plate first because cone booleans against accumulated shapes silently drop
+the cone face, text glyphs must be fused before returning. Each of those
+produces a different-but-plausible solid when missed, which is precisely what
+the oracle catches.
+
 ### Deliberately deferred
 
 **`sharp_internal_edge`** — ~1150 lines with a five-sample × six-ray
@@ -515,6 +544,34 @@ lists optimization as open, and Python was expected to be 30–100x slower. At
 choices bought most of that: dropping the ~1,200 lines of viewer silhouette
 extraction, and taking edge UVs from each face's pcurve instead of a global
 inverse projection per edge.
+
+### Phase 1 and 2 results
+
+**Process classification.** Measured against the reference engine's own
+verdicts over 211 fixtures: 158 agree, and every one of the 53 disagreements is
+accounted for by a component not yet written — 45 sheet-metal parts, 7 needing
+feature-based refinement, 1 profile-extrusion blank. Agreement on the
+implemented scope is complete.
+
+**Hole recognition.** Compared against the reference's own feature output over
+the same corpus: **92% of parts get an identical hole count and 95% are within
+one.** The residual differences are sheet-metal parts and turned parts whose
+grooves belong to a recognizer not yet written, so they should close on their
+own as later phases land rather than needing the recognizer tuned.
+
+Recognition costs about 10s across all 211 fixtures — roughly 50ms per part,
+on top of the graph build.
+
+**Shipped so far:** 13 rules, 21 Rulebook entries, two CNC process definitions
+whose materials follow FreeCAD's own machining cards, and 170 tests.
+
+### Setup counting, and why it is not here yet
+
+The rule was written, measured, and taken out again. Approach directions have
+to come from *features* — a bore's axis is a direction whether or not its entry
+face is external — and the graph-only approximation counted external faces
+instead, which made a plain block report six setups and an ERROR. A rule that
+fires on a cube is worse than a missing rule, so it waits for the recognizers.
 
 ### The one open discrepancy
 

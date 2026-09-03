@@ -266,16 +266,16 @@ def dimpled_bracket(radius: float = 8.0) -> TopoDS_Shape:
     radius r minus the gauge, sharing a centre that sits on the panel.
     """
     centre = gp_Pnt(30.0, 25.0, 0.0)
-    below = _box((30 - radius - 1, 25 - radius - 1, -radius - 1), (30 + radius + 1, 25 + radius + 1, 0.0))
+    axis = gp_Ax2(centre, gp_Dir(0, 0, 1))
+    low = (30 - radius - 1, 25 - radius - 1, -radius - 1)
+    high = (30 + radius + 1, 25 + radius + 1)
     dome = _common(
-        BRepPrimAPI_MakeSphere(gp_Ax2(centre, gp_Dir(0, 0, 1)), radius).Shape(), below
+        BRepPrimAPI_MakeSphere(axis, radius).Shape(),
+        _box(low, high + (0.0,)),
     )
     recess = _common(
-        BRepPrimAPI_MakeSphere(gp_Ax2(centre, gp_Dir(0, 0, 1)), radius - GAUGE).Shape(),
-        _box(
-            (30 - radius - 1, 25 - radius - 1, -radius - 1),
-            (30 + radius + 1, 25 + radius + 1, GAUGE),
-        ),
+        BRepPrimAPI_MakeSphere(axis, radius - GAUGE).Shape(),
+        _box(low, high + (GAUGE,)),
     )
     return _cut(_fuse(bracket(), dome), recess)
 

@@ -27,7 +27,8 @@ from .base import MachiningCheck
 
 # A pocket floor is out of reach once the depth passes the flute length of the
 # longest tool that fits: past that the shank rubs the wall and the cutter
-# stops going down. Expressed as a ratio so a shop can warn before it bites.
+# stops going down. Carried as a ratio of depth to flute so the finding reads
+# as one number, but the value is physics rather than policy -- one is one.
 _FLUTE_REACH_LIMIT = 1.0
 
 
@@ -45,6 +46,10 @@ class PocketAspectRatioCheck(MachiningCheck):
     An extended-reach or reduced-neck cutter buys some of it back, at the cost
     of rigidity; that is a conversation to have deliberately rather than to
     discover at the machine.
+
+    Nothing here is tunable, which is why the material's numbers are not read.
+    A shop sets this rule by what it puts in the tool library, not by picking
+    a ratio: either something on the shelf reaches the floor or nothing does.
     """
 
     @property
@@ -52,11 +57,7 @@ class PocketAspectRatioCheck(MachiningCheck):
         return "Pocket Tool Reach Check"
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
-        target = self.safe_float(rule_config.target)
-        limit = self.safe_float(rule_config.limit)
-        if limit is None:
-            limit = _FLUTE_REACH_LIMIT
-
+        limit = _FLUTE_REACH_LIMIT
         results: list[CheckResult] = []
         for pocket in context.recognition.of_type(FeatureType.POCKET):
             depth = pocket.number("depth_mm") or 0.0
@@ -69,7 +70,7 @@ class PocketAspectRatioCheck(MachiningCheck):
                 continue
 
             ratio = depth / reach
-            graded = self.graded(ratio, target, limit, "max")
+            graded = self.graded(ratio, None, limit, "max")
             if graded is None:
                 continue
 
@@ -84,7 +85,7 @@ class PocketAspectRatioCheck(MachiningCheck):
                         feedback,
                         severity,
                         ratio,
-                        target if target is not None else limit,
+                        limit,
                         limit,
                         "",
                         f"This pocket is {depth:.0f} mm deep and {width:.1f} mm "

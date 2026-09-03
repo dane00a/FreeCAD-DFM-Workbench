@@ -35,7 +35,7 @@ from OCP.Bnd import Bnd_Box
 from OCP.gp import gp_Dir, gp_Pnt, gp_Vec
 
 from ..aag import AagNode, AttributedAdjacencyGraph, SurfaceType
-from ..features import FeatureInstance
+from ..features import SHEET_TYPES, FeatureInstance, FeatureType
 from ..process_classifier import PartProcessType
 from .base import FeatureRecognizer
 
@@ -43,11 +43,11 @@ from .base import FeatureRecognizer
 # The feature types this recognizer emits. Spelled out here until
 # `features.FeatureType` carries them: the strings are the contract, because
 # they are what rules match on and what a saved analysis stores.
-TAB = "TAB"
-NOTCH = "NOTCH"
+TAB = FeatureType.TAB
+NOTCH = FeatureType.NOTCH
 
 # Every sheet type, for reading back what the earlier sheet passes claimed.
-_SHEET_TYPES = frozenset({"BEND", TAB, NOTCH, "SHEET_FORMED"})
+_SHEET_TYPES = SHEET_TYPES
 
 
 # A sheared edge is one gauge across. The window is wide because the cut face

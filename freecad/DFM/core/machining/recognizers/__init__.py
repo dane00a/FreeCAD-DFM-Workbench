@@ -19,6 +19,7 @@ claims the earlier passes made on its strokes.
 """
 
 from .base import FeatureRecognizer
+from .bend_recognizer import BendRecognizer
 from .blend_recognizer import BlendRecognizer
 from .boss_recognizer import BossRecognizer
 from .channel_recognizer import ChannelRecognizer
@@ -30,6 +31,8 @@ from .marking_recognizer import MarkingRecognizer
 from .pattern_recognizer import PatternRecognizer
 from .pocket_recognizer import PocketRecognizer
 from .rib_recognizer import RibRecognizer
+from .sheet_formed_recognizer import SheetFormedRecognizer
+from .sheet_outline_recognizer import SheetOutlineRecognizer
 from .slit_recognizer import SlitRecognizer
 from .slot_recognizer import SlotRecognizer
 from .spherical_pocket_recognizer import SphericalPocketRecognizer
@@ -62,6 +65,13 @@ RECOGNIZER_PIPELINE: list[type[FeatureRecognizer]] = [
     UndercutRecognizer,
     DraftRecognizer,
     TurnedProfileRecognizer,
+    # The formed-sheet group. Gated on the classification, so it costs
+    # nothing on a machined part. Bends come first: they claim the fold
+    # cylinders before the hood pass can mistake one for a swept crest, and
+    # before the outline pass can read a hem as a connecting strip.
+    BendRecognizer,
+    SheetOutlineRecognizer,
+    SheetFormedRecognizer,
     # Late, so it can overrule the per-stroke claims the cavity and
     # protrusion passes made on engraved characters.
     MarkingRecognizer,
@@ -70,6 +80,7 @@ RECOGNIZER_PIPELINE: list[type[FeatureRecognizer]] = [
 ]
 
 __all__ = [
+    "BendRecognizer",
     "BlendRecognizer",
     "BossRecognizer",
     "ChannelRecognizer",
@@ -83,6 +94,8 @@ __all__ = [
     "PocketRecognizer",
     "RECOGNIZER_PIPELINE",
     "RibRecognizer",
+    "SheetFormedRecognizer",
+    "SheetOutlineRecognizer",
     "SlitRecognizer",
     "SlotRecognizer",
     "SphericalPocketRecognizer",

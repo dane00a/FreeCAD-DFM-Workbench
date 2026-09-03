@@ -46,7 +46,7 @@ from OCP.TopAbs import TopAbs_OUT
 
 from ...utils.geometry import FaceIndex
 from ..aag import AagNode, AttributedAdjacencyGraph, SurfaceType
-from ..features import FeatureInstance
+from ..features import SHEET_TYPES, FeatureInstance, FeatureType
 from ..process_classifier import PartProcessType
 from .base import FeatureRecognizer
 
@@ -55,14 +55,14 @@ from .base import FeatureRecognizer
 # as a `subtype` parameter. Spelled out here until `features.FeatureType`
 # carries it: the string is the contract, because it is what rules match on
 # and what a saved analysis stores.
-SHEET_FORMED = "SHEET_FORMED"
+SHEET_FORMED = FeatureType.SHEET_FORMED
 
 EMBOSS = "emboss"
 LOUVER = "louver"
 LANCE = "lance"
 
 # Every sheet type, for reading back what the earlier sheet passes claimed.
-_SHEET_TYPES = frozenset({"BEND", "TAB", "NOTCH", SHEET_FORMED})
+_SHEET_TYPES = SHEET_TYPES
 
 
 # The two skins of drawn sheet are dead anti-parallel and exactly one gauge

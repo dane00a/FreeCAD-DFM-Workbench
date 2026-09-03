@@ -29,7 +29,7 @@ from typing import Optional, Sequence
 from OCP.gp import gp_Ax1, gp_Pnt, gp_Vec
 
 from ..aag import AagNode, AttributedAdjacencyGraph, Concavity, SurfaceType
-from ..features import FeatureInstance
+from ..features import FeatureInstance, FeatureType
 from ..process_classifier import PartProcessType
 from .base import FeatureRecognizer, axes_are_coaxial, cylinder_length, neighbours
 
@@ -37,7 +37,7 @@ from .base import FeatureRecognizer, axes_are_coaxial, cylinder_length, neighbou
 # The feature type this recognizer emits. Spelled out here until
 # `features.FeatureType` carries it: the string is the contract, because it is
 # what rules match on and what a saved analysis stores.
-BEND = "BEND"
+BEND = FeatureType.BEND
 
 
 # The two cylinders of one bend are the same fold seen from both sides, so

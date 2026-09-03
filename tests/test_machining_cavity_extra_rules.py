@@ -155,14 +155,17 @@ class TestPocketAspectRatio(unittest.TestCase):
         # Same 8mm width, well inside the tool's reach.
         self.assertEqual(check(make_pocket(8.0, 12.0, 15.0), self.RULE), [])
 
-    def test_the_material_can_warn_before_the_tool_runs_out(self):
-        # Warning at four fifths of the flute, error at the flute itself.
-        shape = make_pocket(8.0, 12.0, 22.0)  # 22 of 24mm
+    def test_the_material_cannot_move_the_flute_length(self):
+        # The limit is the tool, not a policy number, so the material's
+        # figures are ignored either way round. A pocket 22mm deep with 24mm
+        # of flute is reachable however the numbers are set; one 35mm deep
+        # is not.
+        reachable = make_pocket(8.0, 12.0, 22.0)
+        self.assertEqual(check(reachable, self.RULE, target="0.5", limit="0.6"), [])
         self.assertEqual(
-            severities(check(shape, self.RULE, target="0.8", limit="1.0")),
-            [Severity.WARNING],
+            len(check(make_pocket(8.0, 12.0, 35.0), self.RULE, target="8.0", limit="15.0")),
+            1,
         )
-        self.assertEqual(check(shape, self.RULE, target="0.95", limit="1.0"), [])
 
     def test_the_answer_depends_on_the_tool_library(self):
         # A shop whose longest 8mm cutter is a stubby one cannot reach a

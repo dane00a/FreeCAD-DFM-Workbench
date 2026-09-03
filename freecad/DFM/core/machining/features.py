@@ -75,6 +75,14 @@ class FeatureType:
     UNDERCUT = "UNDERCUT"
     FREEFORM_SURFACE = "FREEFORM_SURFACE"
 
+    # Formed sheet. A bend is the fold itself; a tab and a notch are cuts in
+    # the outline; a formed feature is anything drawn out of the plane, with
+    # the operation -- emboss, louver, lance -- riding as a parameter.
+    BEND = "BEND"
+    TAB = "TAB"
+    NOTCH = "NOTCH"
+    SHEET_FORMED = "SHEET_FORMED"
+
     # Other
     PATTERN = "PATTERN"
     MARKING_TEXT = "MARKING_TEXT"
@@ -115,6 +123,17 @@ GROOVE_TYPES = frozenset(
 )
 
 BLEND_TYPES = frozenset({FeatureType.FILLET, FeatureType.CHAMFER})
+
+# Everything only a press or a brake makes. A part carrying any of these was
+# formed, not cut, and the machining rules stand down on it.
+SHEET_TYPES = frozenset(
+    {
+        FeatureType.BEND,
+        FeatureType.TAB,
+        FeatureType.NOTCH,
+        FeatureType.SHEET_FORMED,
+    }
+)
 
 
 @dataclass

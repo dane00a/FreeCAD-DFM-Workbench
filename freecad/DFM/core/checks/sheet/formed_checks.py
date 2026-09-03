@@ -23,7 +23,7 @@ from OCP.Bnd import Bnd_Box
 from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
-from OCP.gp import gp_Pnt, gp_Pnt2d
+from OCP.gp import gp_Pnt2d
 from OCP.Precision import Precision
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_OUT
 from OCP.TopExp import TopExp_Explorer

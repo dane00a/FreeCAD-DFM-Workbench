@@ -209,6 +209,7 @@ class MarkingRecognizer(FeatureRecognizer):
         # passes -- as a slot, a boss, an undercut -- and honouring those
         # claims would leave nothing to recognize. Overruling them is the
         # whole point of running this late.
+        _CORNER_CACHE.clear()
         hosts = [
             node
             for node in graph.nodes_by_surface_type(SurfaceType.PLANE)
@@ -932,6 +933,36 @@ def _link_by_proximity(glyphs: list[_Glyph], radius: float) -> list[list[_Glyph]
     return [clusters[key] for key in sorted(clusters)]
 
 
+#: Corner coordinates by box identity. Every pass here measures every
+#: candidate face against every host plane, so the same eight corners get
+#: unpacked from the same box hundreds of times over -- on a bladed disk that
+#: alone was five seconds of OpenCascade accessor calls.
+#:
+#: Keyed by identity and cleared at the start of each run. The graph holds
+#: its boxes for the whole of one analysis so they cannot be collected
+#: underneath it, but across analyses a freed box could hand its address to a
+#: new one, and a stale entry would then be silently wrong.
+_CORNER_CACHE: dict[int, tuple] = {}
+
+
+def _corners(box: Bnd_Box) -> tuple:
+    key = id(box)
+    cached = _CORNER_CACHE.get(key)
+    if cached is None:
+        if box.IsVoid():
+            cached = ()
+        else:
+            xmin, ymin, zmin, xmax, ymax, zmax = box.Get()
+            cached = tuple(
+                (x, y, z)
+                for x in (xmin, xmax)
+                for y in (ymin, ymax)
+                for z in (zmin, zmax)
+            )
+        _CORNER_CACHE[key] = cached
+    return cached
+
+
 def _bbox_signed_range(
     box: Bnd_Box, origin: gp_Pnt, normal: gp_Dir
 ) -> tuple[float, float]:
@@ -939,18 +970,19 @@ def _bbox_signed_range(
 
     Negative is into the material when the normal is the host's outward one.
     """
-    if box.IsVoid():
+    corners = _corners(box)
+    if not corners:
         return (0.0, 0.0)
-    xmin, ymin, zmin, xmax, ymax, zmax = box.Get()
-    offsets = [
-        (x - origin.X()) * normal.X()
-        + (y - origin.Y()) * normal.Y()
-        + (z - origin.Z()) * normal.Z()
-        for x in (xmin, xmax)
-        for y in (ymin, ymax)
-        for z in (zmin, zmax)
-    ]
-    return (min(offsets), max(offsets))
+    ox, oy, oz = origin.X(), origin.Y(), origin.Z()
+    nx, ny, nz = normal.X(), normal.Y(), normal.Z()
+    low = high = None
+    for x, y, z in corners:
+        offset = (x - ox) * nx + (y - oy) * ny + (z - oz) * nz
+        if low is None or offset < low:
+            low = offset
+        if high is None or offset > high:
+            high = offset
+    return (low, high)
 
 
 def _bbox_diag(box: Bnd_Box) -> float:

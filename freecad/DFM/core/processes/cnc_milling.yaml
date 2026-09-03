@@ -14,12 +14,32 @@ active_rules:
 - HOLE_WEB_THICKNESS
 - HOLE_FLAT_BOTTOM
 - HOLE_INTERSECTING
+- POCKET_DEPTH_RATIO
+- POCKET_CORNER_RADIUS
+- POCKET_NARROW_OPENING
+- SLOT_DEPTH_RATIO
+- SLOT_OVERHANG
 - THIN_WALL
 - NO_DATUM_FACE
 - NO_PARALLEL_DATUM_PAIR
 - THIN_CLAMPING_DIMENSION
 - SMALL_PART_HOLDING
 rule_feedback:
+    POCKET_DEPTH_RATIO:
+        warning_msg: ''
+        error_msg: ''
+    POCKET_CORNER_RADIUS:
+        warning_msg: ''
+        error_msg: ''
+    POCKET_NARROW_OPENING:
+        warning_msg: ''
+        error_msg: ''
+    SLOT_DEPTH_RATIO:
+        warning_msg: ''
+        error_msg: ''
+    SLOT_OVERHANG:
+        warning_msg: ''
+        error_msg: ''
     PART_ASPECT_RATIO:
         warning_msg: ''
         error_msg: ''
@@ -60,6 +80,11 @@ rule_feedback:
         warning_msg: ''
         error_msg: ''
 rule_criticality:
+    POCKET_DEPTH_RATIO: HIGH
+    POCKET_CORNER_RADIUS: MEDIUM
+    POCKET_NARROW_OPENING: HIGH
+    SLOT_DEPTH_RATIO: MEDIUM
+    SLOT_OVERHANG: LOW
     HOLE_DEPTH_RATIO: HIGH
     HOLE_EDGE_DISTANCE: HIGH
     HOLE_WEB_THICKNESS: MEDIUM
@@ -102,6 +127,19 @@ materials:
             HOLE_FLAT_BOTTOM:
                 binary_severity: WARNING
             HOLE_INTERSECTING:
+                binary_severity: WARNING
+            POCKET_DEPTH_RATIO:
+                target: '4.0'
+                limit: '6.0'
+            POCKET_CORNER_RADIUS:
+                target: 'N/A'
+                limit: '0.0'
+            POCKET_NARROW_OPENING:
+                binary_severity: WARNING
+            SLOT_DEPTH_RATIO:
+                target: 'N/A'
+                limit: '3.0'
+            SLOT_OVERHANG:
                 binary_severity: WARNING
             THIN_WALL:
                 target: '1.5'

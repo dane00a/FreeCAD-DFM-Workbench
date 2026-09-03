@@ -197,6 +197,49 @@ class Rulebook(Enum):
         family=RuleFamily.PART,
     )
 
+    # -- machining: pockets and slots ---------------------------------------
+    POCKET_DEPTH_RATIO = RuleType(
+        "Pocket Depth Ratio",
+        shape=RuleShape.TARGET_AND_LIMIT,
+        unit="",
+        comparison="max",
+        field_labels=("Aim under", "At most"),
+        description="Pocket depth as a multiple of its narrowest width.",
+        family=RuleFamily.POCKET,
+    )
+    POCKET_CORNER_RADIUS = RuleType(
+        "Pocket Corner Radius",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="min",
+        field_labels=("At least",),
+        description="Inside corner radius, which a rotating cutter cannot make sharp.",
+        family=RuleFamily.POCKET,
+    )
+    POCKET_NARROW_OPENING = RuleType(
+        "Pocket Too Narrow",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Pocket narrower than the smallest cutter that can clear it.",
+        family=RuleFamily.POCKET,
+    )
+    SLOT_DEPTH_RATIO = RuleType(
+        "Slot Depth Ratio",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="",
+        comparison="max",
+        field_labels=("At most",),
+        description="Slot depth as a multiple of its width.",
+        family=RuleFamily.SLOT,
+    )
+    SLOT_OVERHANG = RuleType(
+        "Slot Cutter Overhang",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="Long deep slot where the cutter runs at full stickout.",
+        family=RuleFamily.SLOT,
+    )
+
     # -- machining: thin features -------------------------------------------
     THIN_WALL = RuleType(
         "Thin Wall",

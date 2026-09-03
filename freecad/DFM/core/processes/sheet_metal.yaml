@@ -1,0 +1,237 @@
+name: Sheet Metal Fabrication
+category: Sheet Metal
+description: 'Parts cut from flat stock and folded on a press brake. Nothing is cut from solid,
+  so the machining rules do not apply: what matters instead is what the die and the brake
+  can do -- a minimum bend radius, a flange long enough to grip, a hole big enough to punch
+  without breaking the tool, and a draw depth the material will stretch to.'
+active_rules:
+- SHEET_BEND_RADIUS_SMALL
+- SHEET_FLANGE_SHORT
+- SHEET_HOLE_NEAR_BEND
+- SHEET_HOLE_SMALL
+- SHEET_HOLE_PITCH
+- SHEET_COUNTERSINK_DEEP
+- SHEET_CLOSED_FLANGE_LOOP
+- SHEET_BEND_ANGLE_EXTREME
+- SHEET_BEND_LONGER_THAN_BODY
+- SHEET_THICKNESS_OUT_OF_RANGE
+- SHEET_BEND_RELIEF_MISSING
+- SHEET_CORNER_RELIEF_MISSING
+- SHEET_TAB_NARROW
+- SHEET_NOTCH_NARROW
+- SHEET_HEM_DIMENSIONS
+- SHEET_FORMED_FEATURE
+- SHEET_EMBOSS_DEEP
+- SHEET_LOUVER_TALL
+- SHEET_FORMED_PITCH
+- SHEET_SHARP_FOLD
+- SHEET_FORMED_NEAR_BEND
+- SHEET_FEATURE_COMPLEXITY
+- SHEET_MACHINED_FEATURE
+- PART_ASPECT_RATIO
+- MINIMUM_FEATURE_SIZE
+- PART_MARKING
+rule_feedback:
+  SHEET_BEND_RADIUS_SMALL:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_FLANGE_SHORT:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_HOLE_NEAR_BEND:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_HOLE_SMALL:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_HOLE_PITCH:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_COUNTERSINK_DEEP:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_CLOSED_FLANGE_LOOP:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_BEND_ANGLE_EXTREME:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_BEND_LONGER_THAN_BODY:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_THICKNESS_OUT_OF_RANGE:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_BEND_RELIEF_MISSING:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_CORNER_RELIEF_MISSING:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_TAB_NARROW:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_NOTCH_NARROW:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_HEM_DIMENSIONS:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_FORMED_FEATURE:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_EMBOSS_DEEP:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_LOUVER_TALL:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_FORMED_PITCH:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_SHARP_FOLD:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_FORMED_NEAR_BEND:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_FEATURE_COMPLEXITY:
+    warning_msg: ''
+    error_msg: ''
+  SHEET_MACHINED_FEATURE:
+    warning_msg: ''
+    error_msg: ''
+  PART_ASPECT_RATIO:
+    warning_msg: ''
+    error_msg: ''
+  MINIMUM_FEATURE_SIZE:
+    warning_msg: ''
+    error_msg: ''
+  PART_MARKING:
+    warning_msg: ''
+    error_msg: ''
+rule_criticality:
+  SHEET_BEND_RADIUS_SMALL: HIGH
+  SHEET_FLANGE_SHORT: HIGH
+  SHEET_HOLE_NEAR_BEND: HIGH
+  SHEET_HOLE_SMALL: HIGH
+  SHEET_HOLE_PITCH: MEDIUM
+  SHEET_COUNTERSINK_DEEP: MEDIUM
+  SHEET_CLOSED_FLANGE_LOOP: HIGH
+  SHEET_BEND_ANGLE_EXTREME: LOW
+  SHEET_BEND_LONGER_THAN_BODY: MEDIUM
+  SHEET_THICKNESS_OUT_OF_RANGE: MEDIUM
+  SHEET_BEND_RELIEF_MISSING: HIGH
+  SHEET_CORNER_RELIEF_MISSING: HIGH
+  SHEET_TAB_NARROW: MEDIUM
+  SHEET_NOTCH_NARROW: MEDIUM
+  SHEET_HEM_DIMENSIONS: MEDIUM
+  SHEET_FORMED_FEATURE: LOW
+  SHEET_EMBOSS_DEEP: HIGH
+  SHEET_LOUVER_TALL: MEDIUM
+  SHEET_FORMED_PITCH: MEDIUM
+  SHEET_SHARP_FOLD: HIGH
+  SHEET_FORMED_NEAR_BEND: MEDIUM
+  SHEET_FEATURE_COMPLEXITY: LOW
+  SHEET_MACHINED_FEATURE: MEDIUM
+  PART_ASPECT_RATIO: MEDIUM
+  MINIMUM_FEATURE_SIZE: HIGH
+  PART_MARKING: LOW
+materials:
+  Default:
+    category: Default
+    is_active: true
+    rule_limits:
+      SHEET_BEND_RADIUS_SMALL:
+        target: '1.0'
+        limit: '0.5'
+      SHEET_FLANGE_SHORT:
+        target: '4.0'
+        limit: '2.5'
+      SHEET_HOLE_NEAR_BEND:
+        target: N/A
+        limit: '2.5'
+      SHEET_HOLE_SMALL:
+        target: N/A
+        limit: '1.0'
+      SHEET_HOLE_PITCH:
+        target: N/A
+        limit: '2.0'
+      SHEET_COUNTERSINK_DEEP:
+        binary_severity: WARNING
+      SHEET_CLOSED_FLANGE_LOOP:
+        binary_severity: WARNING
+      SHEET_BEND_ANGLE_EXTREME:
+        target: N/A
+        limit: '150.0'
+      SHEET_BEND_LONGER_THAN_BODY:
+        binary_severity: WARNING
+      SHEET_THICKNESS_OUT_OF_RANGE:
+        target: '0.5'
+        limit: '6.0'
+      SHEET_BEND_RELIEF_MISSING:
+        binary_severity: WARNING
+      SHEET_CORNER_RELIEF_MISSING:
+        binary_severity: WARNING
+      SHEET_TAB_NARROW:
+        target: N/A
+        limit: '2.0'
+      SHEET_NOTCH_NARROW:
+        target: N/A
+        limit: '1.0'
+      SHEET_HEM_DIMENSIONS:
+        target: N/A
+        limit: '4.0'
+      SHEET_FORMED_FEATURE:
+        binary_severity: INFO
+      SHEET_EMBOSS_DEEP:
+        target: N/A
+        limit: '3.0'
+      SHEET_LOUVER_TALL:
+        target: N/A
+        limit: '3.0'
+      SHEET_FORMED_PITCH:
+        target: N/A
+        limit: '6.0'
+      SHEET_SHARP_FOLD:
+        binary_severity: WARNING
+      SHEET_FORMED_NEAR_BEND:
+        target: N/A
+        limit: '6.0'
+      SHEET_FEATURE_COMPLEXITY:
+        target: '12'
+        limit: '25'
+      SHEET_MACHINED_FEATURE:
+        binary_severity: INFO
+      PART_ASPECT_RATIO:
+        target: '8.0'
+        limit: N/A
+      MINIMUM_FEATURE_SIZE:
+        target: N/A
+        limit: '0.5'
+      PART_MARKING:
+        binary_severity: INFO
+  Aluminum (Soft Wrought Alloy):
+    category: Aluminium
+    is_active: true
+    rule_limits:
+      SHEET_BEND_RADIUS_SMALL:
+        target: '0.8'
+        limit: '0.4'
+      SHEET_EMBOSS_DEEP:
+        target: N/A
+        limit: '4.0'
+  Austenitic Stainless Steel:
+    category: Steel
+    is_active: true
+    rule_limits:
+      SHEET_BEND_RADIUS_SMALL:
+        target: '1.5'
+        limit: '1.0'
+      SHEET_EMBOSS_DEEP:
+        target: N/A
+        limit: '2.0'
+  Mild Steel:
+    category: Steel
+    is_active: true
+    rule_limits: {}

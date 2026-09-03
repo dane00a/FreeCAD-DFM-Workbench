@@ -81,19 +81,19 @@ def build_step_feature() -> TopoDS_Shape:
 
 @fixture("thin_wall")
 def build_thin_wall() -> TopoDS_Shape:
-    """Two pockets leaving a 1 mm rib between them."""
-    left = cut(plate(), box(5, 5, 5, 19.5, 40.0, 25.0))
-    return cut(left, box(25.5, 5, 5, 19.5, 40.0, 25.0))
+    """Two bores 11 mm apart on 10 mm diameters: a 1 mm web between them."""
+    drilled = cut(box(0, 0, 0, 60.0, 50.0, 25.0), cylinder(20, 25, -1, 5.0, 27.0))
+    return cut(drilled, cylinder(31, 25, -1, 5.0, 27.0))
 
 
 @fixture("deep_hole")
 def build_deep_hole() -> TopoDS_Shape:
-    """The same 10 mm drill, in a plate deep enough for it to matter.
+    """A 6 mm drill through 50 mm of plate.
 
-    80 mm at 10 mm across is eight diameters: past the point where a drill
-    needs pecking and starts to wander.
+    Eight diameters deep: past the point where a drill needs pecking and
+    starts to wander off line.
     """
-    return cut(box(0, 0, 0, 50.0, 50.0, 80.0), cylinder(25, 25, -1, 5.0, 82.0))
+    return cut(box(0, 0, 0, 50.0, 50.0, 50.0), cylinder(25, 25, -1, 3.0, 52.0))
 
 
 @fixture("nonstandard_hole")

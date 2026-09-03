@@ -79,7 +79,11 @@ class MachiningAnalyzer(BaseAnalyzer):
         # slot in it is a mill-turn part, and a shell that looked like sheet
         # is really milled if it holds anything cut into solid stock.
         part_process = refine_part_process_with_features(
-            part_process, recognition.features, graph
+            part_process,
+            recognition.features,
+            graph,
+            shape,
+            declared_blank=self.config.blank_form,
         )
 
         context = MachiningContext(

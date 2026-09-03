@@ -548,6 +548,8 @@ def refine_part_process_with_features(
     base: PartProcessResult,
     features,
     graph: Optional[AttributedAdjacencyGraph] = None,
+    shape=None,
+    declared_blank: str = "",
 ) -> PartProcessResult:
     """Revisit the classification now that the features are known.
 
@@ -561,11 +563,21 @@ def refine_part_process_with_features(
     anything that had to be cut into solid stock.
     """
     if base.type is PartProcessType.SHEET_METAL:
-        return _confirm_sheet(base, features, graph)
+        return _confirm_sheet(base, features, graph, shape, declared_blank)
     if base.type is not PartProcessType.TURNED:
         return base
 
     for feature in features:
+        # A rib is prismatic *unless* it is the web of a revolved part. The
+        # web between two flanges of a pulley is faced and grooved on the
+        # lathe, and the rib recognizer reads it as a rib because that is
+        # what it looks like: two opposed faces with material between. Sent
+        # through the same on-axis test as a boss it comes out turned.
+        if feature.type is FeatureType.RIB:
+            if _milled_protrusion(feature, base, graph, on_axis_types=(FeatureType.RIB,)):
+                base.type = PartProcessType.MILL_TURN
+                return base
+            continue
         if feature.type in _PRISMATIC_TYPES:
             base.type = PartProcessType.MILL_TURN
             return base
@@ -575,16 +587,21 @@ def refine_part_process_with_features(
     return base
 
 
-def _milled_protrusion(feature, base: PartProcessResult, graph) -> bool:
-    """Whether a boss or step could not have come off a lathe.
+def _milled_protrusion(
+    feature,
+    base: PartProcessResult,
+    graph,
+    on_axis_types=(FeatureType.BOSS, FeatureType.STEP),
+) -> bool:
+    """Whether a protrusion could not have come off a lathe.
 
-    A revolved boss has annular flats and coaxial curves. A chordal shelf, a
-    rectangular pad, an off-axis boss -- any of those needs a mill. Blend
-    faces carry no signal either way and are skipped.
+    A revolved boss, step or web has annular flats and coaxial curves. A
+    chordal shelf, a rectangular pad, an off-axis boss -- any of those needs
+    a mill. Blend faces carry no signal either way and are skipped.
     """
     if graph is None or base.axis_of_revolution is None:
         return False
-    if feature.type not in (FeatureType.BOSS, FeatureType.STEP):
+    if feature.type not in on_axis_types:
         return False
 
     axis = base.axis_of_revolution
@@ -604,7 +621,13 @@ def _milled_protrusion(feature, base: PartProcessResult, graph) -> bool:
     return False
 
 
-def _confirm_sheet(base: PartProcessResult, features, graph) -> PartProcessResult:
+def _confirm_sheet(
+    base: PartProcessResult,
+    features,
+    graph,
+    shape=None,
+    _declared_blank: str = "",
+) -> PartProcessResult:
     """Keep the sheet verdict only if nothing had to be cut into solid stock.
 
     The geometric detector keys on a uniform shell with concentric bends, and
@@ -619,6 +642,20 @@ def _confirm_sheet(base: PartProcessResult, features, graph) -> PartProcessResul
     face of a formed feature has a matching skin exactly one gauge behind it,
     and a machined face sits on solid stock with nothing behind it at all.
     """
+    # A declared solid blank settles it outright. A thin-walled enclosure
+    # milled from billet is a uniform-gauge shell with concentric corner
+    # radii, which is the same thing a folded box is by every local
+    # measurement -- probing the material confirms the wall really is one
+    # gauge thick with air behind it. What separates them is not in the
+    # geometry at all: it is knowing what stock was ordered. The shop can
+    # say so, and when it has, that is the answer.
+    declared = _declared_blank
+    if declared and declared != "sheet_metal":
+        base.type = PartProcessType.MILLED
+        base.blank = declared
+        base.sheet_thickness_mm = 0.0
+        return base
+
     gauge = base.sheet_thickness_mm
     for feature in features:
         if feature.type not in _SOLID_STOCK_TYPES:
@@ -634,7 +671,9 @@ def _confirm_sheet(base: PartProcessResult, features, graph) -> PartProcessResul
         ):
             continue
 
-        if feature.type in _FORMABLE_TYPES and _carries_skin(feature, graph, gauge):
+        if feature.type in _FORMABLE_TYPES and _carries_skin(
+            feature, graph, gauge, shape
+        ):
             continue
 
         # A rib whose thickness *is* the gauge is the sheet's own wall, seen
@@ -662,7 +701,7 @@ def _confirm_sheet(base: PartProcessResult, features, graph) -> PartProcessResul
     return base
 
 
-def _carries_skin(feature, graph, gauge: float) -> bool:
+def _carries_skin(feature, graph, gauge: float, shape=None) -> bool:
     """Whether any face of a feature has material exactly one gauge behind it.
 
     Any face is enough, not the largest: a step whose shear wall outweighs
@@ -680,13 +719,13 @@ def _carries_skin(feature, graph, gauge: float) -> bool:
             SurfaceType.CYLINDER,
         ):
             continue
-        if has_constant_gauge_skin(graph, node, gauge):
+        if has_constant_gauge_skin(graph, node, gauge, shape):
             return True
     return False
 
 
 def has_constant_gauge_skin(
-    graph: AttributedAdjacencyGraph, node: AagNode, gauge: float
+    graph: AttributedAdjacencyGraph, node: AagNode, gauge: float, shape=None
 ) -> bool:
     """Whether a face has material exactly one gauge behind it.
 
@@ -704,6 +743,17 @@ def has_constant_gauge_skin(
     """
     if gauge <= 0.0:
         return False
+
+    # Given the solid, ask the material directly: metal at half a gauge
+    # behind the face and air at one and a half. That is what forming leaves
+    # and machining does not, and it is the only test that separates the two
+    # -- a gland milled into a thick flange has a face a gauge behind it
+    # just as an emboss plateau does, and looking only for that face reads a
+    # machined enclosure as formed.
+    if shape is not None:
+        probed = _probe_gauge_skin(node, gauge, shape)
+        if probed is not None:
+            return probed
 
     if node.surface_type is SurfaceType.SPHERE:
         return _concentric_partner(
@@ -1063,3 +1113,39 @@ def _folds_rather_than_carvings(graph, groups) -> bool:
         return False
     # Three joined pairs is a carved corner, not a folded blank.
     return connected_pairs < 3
+
+
+def _probe_gauge_skin(node: AagNode, gauge: float, shape) -> Optional[bool]:
+    """Whether the material behind a face is exactly one gauge thick.
+
+    Returns None when the face cannot be sampled, so the caller falls back
+    to the topological test rather than treating "cannot tell" as "not
+    formed".
+    """
+    from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+    from OCP.TopAbs import TopAbs_IN
+
+    from .aag_builder import _face_sample_point
+
+    try:
+        face_index = FaceIndex(shape)
+        face = face_index.face_at(node.face_id)
+    except Exception:
+        return None
+    sample = _face_sample_point(face)
+    if sample is None:
+        return None
+    point, normal = sample
+    if node.is_reversed:
+        normal.Reverse()
+
+    inward = gp_Vec(normal).Multiplied(-1.0)
+    try:
+        classifier = BRepClass3d_SolidClassifier(shape)
+        classifier.Perform(point.Translated(inward.Multiplied(0.5 * gauge)), 1e-6)
+        near_inside = classifier.State() == TopAbs_IN
+        classifier.Perform(point.Translated(inward.Multiplied(1.5 * gauge)), 1e-6)
+        far_inside = classifier.State() == TopAbs_IN
+    except Exception:
+        return None
+    return near_inside and not far_inside

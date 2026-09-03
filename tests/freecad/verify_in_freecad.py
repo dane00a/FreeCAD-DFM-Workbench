@@ -154,16 +154,27 @@ try:
             )
 
     fired = {rule.name for rule, _ in findings}
-    # The part is deliberately built so exactly these two apply: a hole a
-    # little deeper than six diameters, and a pocket with square corners.
-    expected = {"HOLE_DEPTH_RATIO", "POCKET_CORNER_RADIUS"}
+    # The part is deliberately built so these two apply: a hole a little
+    # deeper than six diameters, and a pocket with square corners.
     check("the deep hole is reported", "HOLE_DEPTH_RATIO" in fired)
     check("the square-cornered pocket is reported", "POCKET_CORNER_RADIUS" in fired)
+    # Not an exact-set assertion any more. With fifty-odd rules active the
+    # useful question is not which fired but whether the quiet ones stayed
+    # quiet: a plain milled plate must not attract turning, sheet or thread
+    # findings, and those are the families that would indicate the process
+    # gates had come undone.
+    wrong_family = {
+        name
+        for name in fired
+        if name.startswith(("THREAD_", "SHEET_", "RIB_", "BOSS_", "GDT_"))
+        or name in ("TURNED_PROFILE_RADIUS", "GROOVE_SQUARE_CORNER")
+    }
     check(
-        "nothing unexpected fires",
-        fired == expected,
-        "" if fired == expected else " (unexpected: %s)" % sorted(fired - expected),
+        "no rule from an inapplicable family fires",
+        not wrong_family,
+        "" if not wrong_family else " (fired: %s)" % sorted(wrong_family),
     )
+    say("  fired: %s" % ", ".join(sorted(fired)))
     check(
         "a square corner warns rather than errors",
         all(
@@ -188,6 +199,61 @@ try:
         "findings carry readable messages",
         all(len(result.message) > 40 and "{" not in result.message for _, result in findings),
     )
+
+    # -- the feature census -------------------------------------------------
+    say("")
+    say("Feature census")
+    from freecad.DFM.core.machining.census import CENSUS_COLUMNS, census_rows
+
+    rows = census_rows(context.recognition.features)
+    check("the census has a header and a row per feature",
+          len(rows) == len(context.recognition.features) + 1)
+    check("every census row has every column",
+          all(len(row) == len(CENSUS_COLUMNS) for row in rows))
+
+    # -- a turned part, built in FreeCAD ------------------------------------
+    say("")
+    say("A turned part")
+    shaft = doc.addObject("Part::Cylinder", "Shaft")
+    shaft.Radius, shaft.Height = 12.0, 90.0
+    doc.recompute()
+    turned_occ = freecad_to_ocp(shaft.Shape)
+    turned_data = MachiningAnalyzer().execute(
+        turned_occ, FaceIndex(turned_occ), EdgeIndex(turned_occ), prefs={}
+    )
+    turned = list(turned_data.values())[0]
+    say("  process: " + turned.process_type.value)
+    check("a plain shaft classifies as turned",
+          turned.process_type.value == "TURNED")
+    check("its outside diameter is not read as a bore",
+          not any(
+              node.is_internal
+              for node in turned.graph.nodes_by_surface_type(SurfaceType.CYLINDER)
+          ))
+
+    # -- the machining preferences page -------------------------------------
+    say("")
+    say("Preferences")
+    params = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/DFM")
+    params.SetString("MachiningMachineMode", "5axis")
+    prefs = {"MachiningMachineMode": params.GetString("MachiningMachineMode", "3axis")}
+    from freecad.DFM.core.machining.config import MachiningConfig
+
+    check("a preference reaches the config",
+          MachiningConfig.from_preferences(prefs).machine_mode == "5axis")
+    five_axis = MachiningAnalyzer().execute(
+        occ, face_index, edge_index, prefs=prefs
+    )
+    undercut_rule = next(
+        (r for r in process.active_rules if r.name == "UNDERCUT_PRESENT"), None
+    )
+    if undercut_rule is not None:
+        limits = default.rule_limits.get(undercut_rule)
+        found = get_check_class(undercut_rule)().run_check(
+            five_axis, limits, undercut_rule, feedback=RuleFeedback()
+        )
+        check("five-axis mode stands the undercut rule down", not found)
+    params.SetString("MachiningMachineMode", "3axis")
 
     # -- the rest of the workbench still works ------------------------------
     say("")

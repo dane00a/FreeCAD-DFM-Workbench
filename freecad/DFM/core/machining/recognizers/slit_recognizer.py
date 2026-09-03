@@ -129,15 +129,17 @@ class SlitRecognizer(FeatureRecognizer):
         claimed: Optional[set[int]] = None,
         prior: Optional[Sequence[FeatureInstance]] = None,
     ) -> list[FeatureInstance]:
-        # A floor the slot recognizer already read is settled geometry. The
-        # reference only stands down for prior slots; here the whole claimed
-        # set is honoured, because this port's slot recognizer already reads
-        # channels open at both ends and re-reading one would double-report
-        # the same cut.
-        taken: set[int] = set(claimed or ())
-        for feature in prior or ():
-            if feature.type in (FeatureType.SLOT, FeatureType.POCKET):
-                taken.update(feature.faces)
+        # `claimed` is deliberately ignored. A flexure slit with a floor is
+        # read as a slot by the pocket and slot passes, which run first, so
+        # standing down on claimed faces means the slit reading never happens
+        # -- and a slit is the more specific answer: it is cut with a saw or
+        # a wire, not an end mill, and a rule says so.
+        #
+        # The resolver settles the overlap, and its priority table already
+        # ranks the slit family above both slots and pockets for exactly this
+        # reason. Honouring the claim set here defeated that ordering before
+        # it ever ran.
+        taken: set[int] = set()
 
         found = self._floored_slits(graph, taken)
         found.extend(self._penetrating_slits(graph, found, taken))

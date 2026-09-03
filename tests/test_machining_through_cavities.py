@@ -31,13 +31,14 @@ from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS, TopoDS_Shape
 
 from freecad.DFM.core.machining import AagBuilder
+from freecad.DFM.core.analyzers.machining_analyzer import MachiningAnalyzer
 from freecad.DFM.core.machining.features import FeatureType
 from freecad.DFM.core.machining.recognizers import (
     SlitRecognizer,
     SphericalPocketRecognizer,
     ThroughCavityRecognizer,
 )
-from freecad.DFM.core.utils.geometry import FaceIndex
+from freecad.DFM.core.utils.geometry import EdgeIndex, FaceIndex
 
 
 # =============================================================================
@@ -360,12 +361,31 @@ class TestSlitRecognition(unittest.TestCase):
         opening over."""
         self.assertEqual(slits_in(make_blind_shaft()), [])
 
-    def test_a_claimed_floor_is_left_alone(self):
-        """What an earlier recognizer spoke for is settled geometry."""
+    def test_a_claimed_floor_is_still_read_as_a_slit(self):
+        """A slit competes with the slot reading rather than deferring to it.
+
+        A flexure slit with a floor is read as a slot by the passes that run
+        first, so standing down on claimed faces would mean the slit reading
+        never happened at all. Slit is the more specific answer -- it is cut
+        with a saw or a wire rather than an end mill, and a rule says so --
+        and the resolver's priority table ranks the family above slots and
+        pockets for exactly that reason.
+        """
         shape = make_floored_slit()
         graph = AagBuilder(shape, FaceIndex(shape)).build()
         floor = slits_in(shape)[0].faces[0]
-        self.assertEqual(SlitRecognizer().recognize(graph, shape, {floor}), [])
+        self.assertTrue(SlitRecognizer().recognize(graph, shape, {floor}))
+
+    def test_the_slit_survives_the_whole_pipeline(self):
+        # The point of the above: through the analyzer, with every recognizer
+        # and the resolver running, a floored slit comes out a slit.
+        shape = make_floored_slit()
+        context = list(
+            MachiningAnalyzer()
+            .execute(shape, FaceIndex(shape), EdgeIndex(shape), prefs={})
+            .values()
+        )[0]
+        self.assertTrue(context.recognition.of_type(FeatureType.FLEXURE_SLIT))
 
 
 class TestSphericalPocketRecognition(unittest.TestCase):

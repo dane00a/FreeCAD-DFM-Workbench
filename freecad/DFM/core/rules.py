@@ -282,13 +282,11 @@ class Rulebook(Enum):
     )
     CUTTER_RADIUS_SUBOPTIMAL = RuleType(
         "Cutter Radius Suboptimal",
-        shape=RuleShape.LIMIT_ONLY,
-        unit="mm",
-        comparison="min",
-        field_labels=("At least",),
+        shape=RuleShape.BINARY,
+        unit=None,
         description=(
             "Internal corner radius that needs a specialty cutter rather than "
-            "a standard end mill."
+            "a standard end mill. Achievable, but not off the shelf."
         ),
         family=RuleFamily.BLEND,
     )
@@ -324,7 +322,7 @@ class Rulebook(Enum):
         shape=RuleShape.TARGET_AND_LIMIT,
         unit="mm",
         comparison="min",
-        description="Material left in the wall of a hollow boss.",
+        description="Boss diameter, below which its wall is too thin to machine.",
         family=RuleFamily.BOSS,
     )
     BOSS_UNDERCUT = RuleType(
@@ -459,11 +457,13 @@ class Rulebook(Enum):
 
     # -- machining: more cavity policy --------------------------------------
     POCKET_ASPECT_RATIO = RuleType(
-        "Pocket Aspect Ratio",
-        shape=RuleShape.TARGET_AND_LIMIT,
-        unit="",
-        comparison="max",
-        description="Pocket length against its width, for a long narrow cavity.",
+        "Pocket Reach",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description=(
+            "Pocket deeper than the flute length of the longest cutter that "
+            "will fit in it."
+        ),
         family=RuleFamily.POCKET,
     )
     SLOT_NONSTANDARD_WIDTH = RuleType(

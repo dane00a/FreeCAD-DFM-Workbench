@@ -337,8 +337,7 @@ materials:
         target: N/A
         limit: N/A
       CUTTER_RADIUS_SUBOPTIMAL:
-        target: N/A
-        limit: N/A
+        binary_severity: INFO
       CHAMFER_NONSTANDARD_ANGLE:
         binary_severity: INFO
       METAL_SEAL_WITNESS:
@@ -387,14 +386,13 @@ materials:
       HOLE_INTERSECTS_CAVITY:
         binary_severity: WARNING
       POCKET_ASPECT_RATIO:
-        target: '8.0'
-        limit: '15.0'
+        binary_severity: ERROR
       SLOT_NONSTANDARD_WIDTH:
         binary_severity: INFO
       FLEXURE_SLIT_PROCESS:
         binary_severity: INFO
       BROACHED_SLOT_PROCESS:
-        binary_severity: INFO
+        binary_severity: WARNING
       MINIMUM_FEATURE_SIZE:
         target: N/A
         limit: '0.5'

@@ -235,8 +235,7 @@ materials:
         target: N/A
         limit: N/A
       CUTTER_RADIUS_SUBOPTIMAL:
-        target: N/A
-        limit: N/A
+        binary_severity: INFO
       CHAMFER_NONSTANDARD_ANGLE:
         binary_severity: INFO
       METAL_SEAL_WITNESS:

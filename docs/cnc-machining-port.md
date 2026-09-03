@@ -248,7 +248,44 @@ Rib / Boss / Step (thin-feature and setup rules), Slit / ThroughCavity
 (misclassification fixes), and finally SphericalPocket / Channel / Draft /
 Pattern.
 
-### Phase 6 — A fixture generator, and no committed geometry
+### Phase 6 — Verification inside FreeCAD
+
+Everything up to here is tested headlessly against OpenCascade, which proves
+the geometry and the rules but not that the workbench *works*. The analysis has
+never run against a real `Part::Feature` in a real document, the findings have
+never been drawn in a viewport, and the process library has never rendered
+sixty rule cards.
+
+**What FreeCAD needs first.** The workbench imports OCP throughout, and
+FreeCAD's bundled Python does not have it, so the addon cannot load at all
+until it does:
+
+```
+& "C:\Program Files\FreeCAD 1.1\bin\python.exe" -m pip install "cadquery-ocp==7.8.1.1" gmsh
+New-Item -ItemType Junction -Path "$env:APPDATA\FreeCAD\v1-1\Mod\DFM" -Target <repo>
+```
+
+The version is pinned to match the OpenCascade FreeCAD bundles. `cadquery-ocp`
+brings its own OpenCascade libraries, so confirm FreeCAD still starts.
+
+**What can be automated.** `freecadcmd.exe` runs a script with FreeCAD loaded
+but no GUI, which covers most of it: build a document, add solids, run the
+analyzer over `obj.Shape`, assert on the findings. That is the end-to-end path
+the task panel drives, minus the panel.
+
+**What cannot.** Anything needing a live viewport -- the highlight overlay, the
+annotation, the camera animation -- and anything needing a user to click. Those
+get verified by building the widgets offscreen and asserting on their state
+rather than on pixels, and beyond that by hand.
+
+**Worth checking specifically**, because each is a place the headless tests are
+blind: that a `Part::Feature` shape behaves like the OCP shapes the tests use;
+that findings highlight the faces they name; that the process library stays
+usable at sixty rules; that a large real part completes in reasonable time; and
+that nothing regressed for the existing injection-moulding and printing
+processes.
+
+### Phase 7 — A fixture generator, and no committed geometry
 
 **No CAD files are committed to this repository, and none should be.** The
 reference corpus is proprietary work belonging to a separate business; the

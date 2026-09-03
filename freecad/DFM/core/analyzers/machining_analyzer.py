@@ -13,13 +13,17 @@ changes are needed to make that happen.
 
 from typing import Any, Callable, Optional
 
+import FreeCAD as App  # type: ignore
+
 from OCP.TopoDS import TopoDS_Shape
 
 from ...core.base.base_analyzer import BaseAnalyzer
 from ...core.machining.aag_builder import AagBuilder
 from ...core.machining.config import MachiningConfig
 from ...core.machining.context import MachiningContext
+from ...core.machining.features import RecognitionResult
 from ...core.machining.process_classifier import classify_part_process
+from ...core.machining.recognizers import RECOGNIZER_PIPELINE
 from ...core.registries import register_analyzer
 from ...core.utils.geometry import EdgeIndex, FaceIndex
 
@@ -63,6 +67,7 @@ class MachiningAnalyzer(BaseAnalyzer):
             return {}
 
         part_process = classify_part_process(graph, self.config.thresholds, shape)
+        recognition = self._recognize(graph, shape, check_abort)
 
         context = MachiningContext(
             shape=shape,
@@ -70,5 +75,33 @@ class MachiningAnalyzer(BaseAnalyzer):
             face_index=face_index,
             config=self.config,
             part_process=part_process,
+            recognition=recognition,
         )
         return {CONTEXT_KEY: context}
+
+    def _recognize(self, graph, shape, check_abort) -> RecognitionResult:
+        """Run the recognizers in order, each told what the others claimed.
+
+        The order is load-bearing: a later recognizer is given the faces
+        already spoken for, so a groove does not re-recognize the bore it
+        sits in.
+        """
+        result = RecognitionResult()
+        claimed: set[int] = set()
+
+        for recognizer_class in RECOGNIZER_PIPELINE:
+            if check_abort and check_abort():
+                break
+            recognizer = recognizer_class()
+            try:
+                found = recognizer.recognize(graph, shape, claimed, result.features)
+            except Exception as exc:  # one bad recognizer must not lose the rest
+                App.Console.PrintWarning(
+                    f"DFM: {recognizer.name} failed on this shape: {exc}\n"
+                )
+                continue
+            result.extend(found)
+            for feature in found:
+                claimed.update(feature.faces)
+
+        return result

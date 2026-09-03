@@ -269,3 +269,165 @@ class TestInterruptedAndOpposedBores(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# =============================================================================
+
+
+from freecad.DFM.core.analyzers.machining_analyzer import MachiningAnalyzer
+from freecad.DFM.core.models import Severity
+from freecad.DFM.core.processes.process import RuleFeedback, RuleLimit
+from freecad.DFM.core.registries import get_check_class
+from freecad.DFM.core.rules import Rulebook
+from freecad.DFM.core.utils.geometry import EdgeIndex
+
+
+def hole_check(shape, rule, target="N/A", limit="N/A", severity="WARNING"):
+    face_index, edge_index = FaceIndex(shape), EdgeIndex(shape)
+    data = MachiningAnalyzer().execute(shape, face_index, edge_index, prefs={})
+    check_class = get_check_class(rule)
+    assert check_class is not None
+    return check_class().run_check(
+        data,
+        RuleLimit(target=target, limit=limit, binary_severity=severity),
+        rule,
+        feedback=RuleFeedback(),
+    )
+
+
+def _severities(findings):
+    return [f.severity for f in findings]
+
+
+def make_shaft_with_axial_bore(bore_radius: float, depth: float) -> TopoDS_Shape:
+    """A turned bar with a bore down its own axis: boring-bar work."""
+    bar = _cylinder(0, 0, 0, 0, 0, 1, 20.0, 100.0)
+    return _cut(bar, _cylinder(0, 0, 100.0 - depth, 0, 0, 1, bore_radius, depth + 1.0))
+
+
+class TestHoleDepthRatio(unittest.TestCase):
+    RULE = Rulebook.HOLE_DEPTH_RATIO
+
+    def test_shallow_hole_is_clean(self):
+        self.assertEqual(hole_check(make_through_hole(), self.RULE), [])
+
+    def test_deep_hole_warns(self):
+        deep = _cut(block(), _cylinder(40, 30, -1, 0, 0, 1, 2.0, 40.0))  # 7.5x
+        self.assertEqual(_severities(hole_check(deep, self.RULE)), [Severity.WARNING])
+
+    def test_very_deep_hole_errors(self):
+        deeper = _cut(block(), _cylinder(40, 30, -1, 0, 0, 1, 1.2, 40.0))  # 12.5x
+        self.assertEqual(_severities(hole_check(deeper, self.RULE)), [Severity.ERROR])
+
+    def test_threshold_pair(self):
+        under = _cut(block(), _cylinder(40, 30, -1, 0, 0, 1, 2.6, 40.0))  # 5.8x
+        over = _cut(block(), _cylinder(40, 30, -1, 0, 0, 1, 2.4, 40.0))  # 6.3x
+        self.assertEqual(hole_check(under, self.RULE, "6.0", "10.0"), [])
+        self.assertEqual(
+            _severities(hole_check(over, self.RULE, "6.0", "10.0")), [Severity.WARNING]
+        )
+
+    def test_axial_bore_in_a_turned_part_uses_boring_limits(self):
+        # 5:1 is comfortable for a drill and already marginal for a boring
+        # bar, so the same proportions must read differently on a lathe.
+        shaft = make_shaft_with_axial_bore(5.0, 50.0)  # 50 deep on 10 dia
+        findings = hole_check(shaft, self.RULE)
+        self.assertTrue(findings, "a 5:1 bored hole should be reported on a lathe")
+        self.assertIn("boring bar", findings[0].message)
+
+
+class TestHoleFlatBottom(unittest.TestCase):
+    RULE = Rulebook.HOLE_FLAT_BOTTOM
+
+    def test_flat_bottomed_blind_hole_is_reported(self):
+        self.assertTrue(hole_check(make_blind_hole(), self.RULE))
+
+    def test_drill_pointed_hole_is_not_reported(self):
+        self.assertEqual(hole_check(make_drilled_blind_hole(), self.RULE), [])
+
+    def test_through_hole_has_no_bottom(self):
+        self.assertEqual(hole_check(make_through_hole(), self.RULE), [])
+
+    def test_shallow_wide_recess_is_a_spot_face(self):
+        # Wider than it is deep, and wide enough for a rigid cutter: one
+        # plunge, not a concern.
+        spot = _cut(block(), _cylinder(40, 30, 26, 0, 0, 1, 8.0, 10.0))
+        self.assertEqual(hole_check(spot, self.RULE), [])
+
+    def test_large_bore_is_expected_to_be_faced_flat(self):
+        big = _cut(block(), _cylinder(40, 30, 10, 0, 0, 1, 9.0, 25.0))
+        self.assertEqual(hole_check(big, self.RULE), [])
+
+
+class TestHoleEdgeDistance(unittest.TestCase):
+    RULE = Rulebook.HOLE_EDGE_DISTANCE
+
+    def test_central_hole_is_clean(self):
+        self.assertEqual(hole_check(make_through_hole(), self.RULE), [])
+
+    def test_hole_near_the_edge_is_reported(self):
+        near = _cut(block(), _cylinder(3.5, 30, -1, 0, 0, 1, 3.0, 40.0))
+        findings = hole_check(near, self.RULE)
+        self.assertEqual(len(findings), 1)
+        self.assertAlmostEqual(findings[0].value, 0.5, places=2)
+
+    def test_limit_is_configurable(self):
+        hole = _cut(block(), _cylinder(8.0, 30, -1, 0, 0, 1, 3.0, 40.0))  # 5mm wall
+        self.assertEqual(hole_check(hole, self.RULE, limit="2.0"), [])
+        self.assertTrue(hole_check(hole, self.RULE, limit="8.0"))
+
+
+class TestHoleWebThickness(unittest.TestCase):
+    RULE = Rulebook.HOLE_WEB_THICKNESS
+
+    def test_well_spaced_holes_are_clean(self):
+        spaced = _cut(
+            _cut(block(), _cylinder(20, 30, -1, 0, 0, 1, 4.0, 40.0)),
+            _cylinder(60, 30, -1, 0, 0, 1, 4.0, 40.0),
+        )
+        self.assertEqual(hole_check(spaced, self.RULE), [])
+
+    def test_thin_web_between_holes_is_reported(self):
+        close = _cut(
+            _cut(block(), _cylinder(30, 30, -1, 0, 0, 1, 4.0, 40.0)),
+            _cylinder(38.5, 30, -1, 0, 0, 1, 4.0, 40.0),
+        )
+        findings = hole_check(close, self.RULE)
+        self.assertEqual(len(findings), 1)
+        self.assertAlmostEqual(findings[0].value, 0.5, places=2)
+
+    def test_crossing_holes_are_not_a_web(self):
+        # Non-parallel bores leave no web of constant thickness; that is the
+        # intersecting-holes rule's concern instead.
+        self.assertEqual(hole_check(make_cross_drilled(), self.RULE), [])
+
+
+class TestHoleIntersecting(unittest.TestCase):
+    RULE = Rulebook.HOLE_INTERSECTING
+
+    def test_separate_holes_do_not_intersect(self):
+        spaced = _cut(
+            _cut(block(), _cylinder(20, 30, -1, 0, 0, 1, 4.0, 40.0)),
+            _cylinder(60, 30, -1, 0, 0, 1, 4.0, 40.0),
+        )
+        self.assertEqual(hole_check(spaced, self.RULE), [])
+
+    def test_cross_drilled_pair_is_reported(self):
+        findings = hole_check(make_cross_drilled(), self.RULE)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("deflect", findings[0].message)
+
+    def test_a_network_collapses_to_one_note(self):
+        # A manifold is a deliberate design, not twenty accidents. Past the
+        # threshold the finding becomes a single informational note.
+        shape = block()
+        # Four vertical passages, crossed by two horizontal galleries that
+        # each break into all four: eight intersections, as a manifold has.
+        for y in (12, 24, 36, 48):
+            shape = _cut(shape, _cylinder(40, y, -1, 0, 0, 1, 3.0, 40.0))
+        for z in (8, 22):
+            shape = _cut(shape, _cylinder(40, -1, z, 0, 1, 0, 3.0, 70.0))
+        findings = hole_check(shape, self.RULE)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].severity, Severity.INFO)
+        self.assertIn("manifold", findings[0].message)

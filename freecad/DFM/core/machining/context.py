@@ -25,6 +25,7 @@ from OCP.TopoDS import TopoDS_Shape
 from ..utils.geometry import FaceIndex
 from .aag import AttributedAdjacencyGraph, SurfaceType
 from .config import MachiningConfig
+from .features import FeatureInstance, RecognitionResult
 from .process_classifier import PartProcessResult, PartProcessType
 
 
@@ -38,14 +39,17 @@ class MachiningContext:
     config: MachiningConfig
     part_process: PartProcessResult
 
-    # Populated once feature recognition lands.
-    features: list = field(default_factory=list)
+    recognition: "RecognitionResult" = field(default_factory=lambda: RecognitionResult())
 
     _volume: Optional[float] = None
     _bbox_dims: Optional[tuple[float, float, float]] = None
     _plane_bbox_dims: Optional[tuple[float, float, float]] = None
 
     # -- convenience --------------------------------------------------------
+
+    @property
+    def features(self) -> list:
+        return self.recognition.features
 
     @property
     def process_type(self) -> PartProcessType:
@@ -103,6 +107,24 @@ class MachiningContext:
                 xmin, ymin, zmin, xmax, ymax, zmax = box.Get()
                 self._plane_bbox_dims = (xmax - xmin, ymax - ymin, zmax - zmin)
         return self._plane_bbox_dims
+
+    def plane_bbox_bounds(self):
+        """(lows, highs) of the plane-only box, or None when there are none.
+
+        Rules that ask how close a feature sits to the outside of the part
+        need the actual faces of the envelope, not just its size.
+        """
+        box = Bnd_Box()
+        found = False
+        for node in self.graph.nodes:
+            if node.surface_type is not SurfaceType.PLANE or node.bbox.IsVoid():
+                continue
+            box.Add(node.bbox)
+            found = True
+        if not found or box.IsVoid():
+            return None
+        xmin, ymin, zmin, xmax, ymax, zmax = box.Get()
+        return ((xmin, ymin, zmin), (xmax, ymax, zmax))
 
     def bbox_diagonal(self) -> float:
         dx, dy, dz = self.bbox_dims()

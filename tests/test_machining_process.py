@@ -238,13 +238,18 @@ class TestMachiningConfig(unittest.TestCase):
         self.assertIn(5.105, IMPERIAL_DRILL_SIZES_MM)  # #7, the 1/4-20 tap drill
         self.assertIn(6.528, IMPERIAL_DRILL_SIZES_MM)  # F, the 5/16-18 tap drill
 
-    def test_rule_and_category_disabling(self):
-        config = MachiningConfig(
-            disabled_rules=["hole_deep_risk"], disabled_categories=["setup"]
-        )
-        self.assertTrue(config.is_rule_disabled("hole_deep_risk"))
-        self.assertFalse(config.is_rule_disabled("pocket_deep_risk"))
-        self.assertTrue(config.is_category_disabled("setup"))
+    def test_a_rule_is_silenced_by_its_process_not_by_the_config(self):
+        """There is no global mute, and there should not be one.
+
+        A rule runs because a process names it. Turning one off is done in
+        the Process Library, per process, which is the distinction that
+        matters -- and a second global switch would give two answers to the
+        same question.
+        """
+        config = MachiningConfig()
+        self.assertFalse(hasattr(config, "disabled_rules"))
+        self.assertFalse(hasattr(config, "is_rule_disabled"))
+        self.assertFalse(hasattr(config, "is_category_disabled"))
 
 
 # =============================================================================

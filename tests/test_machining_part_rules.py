@@ -58,10 +58,24 @@ def block() -> TopoDS_Shape:
 def l_bracket() -> TopoDS_Shape:
     """Two slabs meeting at a right angle, with nothing else on the part.
 
-    The inside corner is genuinely sharp and no feature owns it, so this is
-    the case the rule exists for.
+    The inside corner is sharp and no feature owns it -- and it is also the
+    easiest fillet in machining. An end mill comes straight down the face of
+    one slab, its side cuts the wall and its flat bottom cuts the floor, and
+    the corner it leaves is its own radius. Nothing has to be done about it,
+    which is why the rule stays quiet here.
     """
     return _fuse(_box((0, 0, 0), (80, 80, 10)), _box((0, 0, 0), (10, 80, 60)))
+
+
+def micro_mesa() -> TopoDS_Shape:
+    """A pad a seventh of a millimetre proud of a plate.
+
+    No cutter exists at that scale, so nothing can form the corners at its
+    base whatever the access -- and no boss rule speaks for it either,
+    because facing the surround down is trivial. The corner is all there is
+    to report, and it has to be reported.
+    """
+    return _fuse(_box((0, 0, 0), (40, 40, 10)), _box((10, 10, 10), (30, 30, 10.15)))
 
 
 def square_pocket() -> TopoDS_Shape:
@@ -127,13 +141,25 @@ class TestMinimumFeatureSize(unittest.TestCase):
 class TestSharpInternalEdge(unittest.TestCase):
     RULE = Rulebook.SHARP_INTERNAL_EDGE
 
-    def test_an_unclaimed_inside_corner_is_reported(self):
-        findings = rule_check(l_bracket(), self.RULE)
-        self.assertTrue(findings, "the inside angle of an L bracket is a sharp corner")
+    def test_a_corner_a_cutter_can_reach_is_not_a_finding(self):
+        """The open inside angle of an L bracket is nobody's problem.
+
+        It is sharp, and no feature owns it, and it is still not worth a
+        word: the tool that faces either slab forms the corner in the same
+        pass. Reporting it taught a machinist nothing and buried the
+        corners that were real.
+        """
+        self.assertEqual(rule_check(l_bracket(), self.RULE), [])
+
+    def test_a_corner_no_tool_can_form_is_reported(self):
+        findings = rule_check(micro_mesa(), self.RULE)
+        self.assertTrue(findings, "no cutter can form a 0.15 mm mesa base")
 
     def test_the_message_offers_a_way_out(self):
-        message = rule_check(l_bracket(), self.RULE)[0].message
-        self.assertTrue(any(term in message for term in ("radius", "EDM", "relief")))
+        message = rule_check(micro_mesa(), self.RULE)[0].message
+        self.assertTrue(
+            any(term in message for term in ("radius", "EDM", "relief", "etching"))
+        )
 
     def test_a_recognized_cavity_speaks_for_its_own_corners(self):
         # Two crossing slots read as one through-cavity, and the cavity rules
@@ -141,24 +167,22 @@ class TestSharpInternalEdge(unittest.TestCase):
         # them. A per-edge duplicate would only crowd them out.
         self.assertEqual(rule_check(crossing_slots(), self.RULE), [])
 
-    def test_the_rule_reports_only_what_nothing_else_claims(self):
-        # This is the shape of the rule: it fires on the residue left after
-        # every recognizer has taken what it understands. Its count on a part
-        # is therefore a reading of how well the part was recognized, which
-        # is worth knowing when interpreting it.
-        findings = rule_check(l_bracket(), self.RULE)
+    def test_being_unclaimed_is_not_by_itself_enough_to_report(self):
+        """Two conditions, not one.
+
+        The rule fires on the residue no recognizer claimed -- and then only
+        on the part of that residue a tool cannot reach or cannot form. The
+        L bracket is the whole of the first and none of the second: not one
+        feature is recognized on it, and there is still nothing to say.
+        """
+        shape = l_bracket()
         context = list(
             MachiningAnalyzer()
-            .execute(
-                l_bracket(),
-                FaceIndex(l_bracket()),
-                EdgeIndex(l_bracket()),
-                prefs={},
-            )
+            .execute(shape, FaceIndex(shape), EdgeIndex(shape), prefs={})
             .values()
         )[0]
         self.assertEqual(context.recognition.features, [])
-        self.assertTrue(findings)
+        self.assertEqual(rule_check(shape, self.RULE), [])
 
     def test_a_pocket_does_not_double_report(self):
         # A pocket's corners are square too, but the corner-radius rule

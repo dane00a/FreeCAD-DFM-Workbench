@@ -61,6 +61,7 @@ active_rules:
 - NO_ORTHOGONAL_DATUM_TRIO
 - TOOL_ACCESS_SPECIAL_SETUP
 - SURFACE_FINISH_CONFLICT
+- SHEET_INTENT_SHARP_CORNERS
 rule_feedback:
   UNDERCUT_PRESENT:
     warning_msg: ''
@@ -227,6 +228,9 @@ rule_feedback:
   SURFACE_FINISH_CONFLICT:
     warning_msg: ''
     error_msg: ''
+  SHEET_INTENT_SHARP_CORNERS:
+    warning_msg: ''
+    error_msg: ''
 rule_criticality:
   UNDERCUT_PRESENT: HIGH
   TOOL_ACCESS_BLOCKED: CRITICAL
@@ -283,6 +287,7 @@ rule_criticality:
   NO_ORTHOGONAL_DATUM_TRIO: MEDIUM
   TOOL_ACCESS_SPECIAL_SETUP: MEDIUM
   SURFACE_FINISH_CONFLICT: LOW
+  SHEET_INTENT_SHARP_CORNERS: LOW
 materials:
   Default:
     category: Default
@@ -422,6 +427,8 @@ materials:
       TOOL_ACCESS_SPECIAL_SETUP:
         binary_severity: WARNING
       SURFACE_FINISH_CONFLICT:
+        binary_severity: INFO
+      SHEET_INTENT_SHARP_CORNERS:
         binary_severity: INFO
   Aluminum (Soft Wrought Alloy):
     category: Aluminium

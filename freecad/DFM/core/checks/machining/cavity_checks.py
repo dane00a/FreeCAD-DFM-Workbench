@@ -106,7 +106,15 @@ class PocketCornerRadiusCheck(MachiningCheck):
         achievable = context.config.smallest_internal_corner_radius()
         results: list[CheckResult] = []
 
-        for cavity in context.recognition.of_type(FeatureType.POCKET, FeatureType.SLOT):
+        # Every cavity the recognizers measure a corner radius on, not just
+        # the ones called pockets. A cavity cut clean through the part has
+        # exactly the same square corners as a blind one and is milled the
+        # same way -- and while it was left out, nothing spoke for those
+        # corners at all: the sharp-edge rule stood down because the cavity
+        # was a recognized feature, and this rule never looked at it.
+        for cavity in context.recognition.of_type(
+            FeatureType.POCKET, FeatureType.SLOT, FeatureType.THROUGH_CAVITY
+        ):
             # A slot open at its end has no inside corner there to speak of.
             if cavity.param("is_open") and cavity.type == FeatureType.SLOT:
                 continue

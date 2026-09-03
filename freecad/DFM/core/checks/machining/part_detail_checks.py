@@ -25,6 +25,12 @@ from __future__ import annotations
 import math
 
 from ...machining.aag import Concavity, SurfaceType
+from .corner_access import (
+    ShapeProbe,
+    is_cutter_formed,
+    is_reachable,
+    second_smallest_extent,
+)
 from ...machining.features import BORE_TYPES, FeatureType
 from ...models import CheckResult, Severity
 from ...registries import register_check
@@ -218,6 +224,10 @@ class SharpInternalEdgeCheck(MachiningCheck):
         covered = self._covered_faces(context, graph, minimum_size)
         axis = self._rotation_axis(context)
         diagonal = self._part_diagonal(context)
+        # Ray casting needs the solid itself. Built once and reused, because
+        # the face walk it does at construction would otherwise happen for
+        # every edge on the part.
+        probe = ShapeProbe(context.shape, graph)
 
         results: list[CheckResult] = []
         for edge in graph.edges:
@@ -239,7 +249,7 @@ class SharpInternalEdgeCheck(MachiningCheck):
             first = graph.node(edge.face_id_a)
             second = graph.node(edge.face_id_b)
 
-            if self._cutter_formed(first, second, deviation, minimum_size):
+            if self._corner_radius_arc(first, second, deviation, minimum_size):
                 continue
             if axis is not None and self._both_turned(first, second, axis):
                 continue
@@ -262,6 +272,26 @@ class SharpInternalEdgeCheck(MachiningCheck):
             # Two cavities meeting each other -- an undercut shoulder against
             # the slot it overhangs. Different features, but both have rules.
             if a_rim and b_rim:
+                continue
+
+            # Everything above is bookkeeping: whose feature is this, and
+            # has something else already spoken for it. What is left is a
+            # corner nobody owns, and the question becomes a physical one --
+            # can a tool get to it, and did one already make it in passing.
+            # Both cast rays, so they are asked last, of the few edges that
+            # get this far.
+            if is_cutter_formed(probe, edge, first, second, deviation, minimum_size):
+                continue
+
+            # A corner at a scale no cutter can work is reported whatever the
+            # access, and reported generically: an array of micro-features
+            # produces one finding per edge otherwise, all saying the same
+            # thing about a part that needs EDM rather than a smaller mill.
+            sub_pitch = (
+                second_smallest_extent(first) < minimum_size
+                or second_smallest_extent(second) < minimum_size
+            )
+            if not sub_pitch and is_reachable(probe, edge, first, second):
                 continue
 
             angle = math.degrees(edge.dihedral_angle)
@@ -309,20 +339,37 @@ class SharpInternalEdgeCheck(MachiningCheck):
         return faces
 
     @staticmethod
-    def _is_tiny_protrusion(feature, minimum_size: float) -> bool:
-        """A boss or rib below the tool floor, which no rule speaks for.
+    def _unspoken_for(feature, minimum_size: float) -> bool:
+        """Whether the feature's own rule declines to speak about its corners.
 
-        Its height is trivially machinable -- face the surround down -- so
-        the boss and rib rules stay quiet. What cannot be made is its base
-        corners at that scale, so those edges must keep firing.
+        This rule stands down on a recognized feature because the rule that
+        owns the feature is expected to report its corners instead. Where
+        that expectation is false the corner is reported by nobody at all,
+        which is worse than reporting it twice -- and it is silent, so it
+        looks like a clean part.
+
+        Two cases, and both are the owning rule explicitly declining:
+
+        A boss or rib below the tool floor gets no boss or rib finding,
+        because its height is trivially machinable -- face the surround
+        down. What cannot be made is its base corners at that scale.
+
+        A slot open at both ends gets no corner finding, because the corner
+        rule is right that a cutter entering one end and leaving the other
+        never has to round anything. But when the recognizer reads a closed
+        pocket as a pair of overlapping open slots -- which it does where a
+        bore crosses the cavity -- the corners are real and nothing is left
+        to say so.
         """
-        if feature.type not in (FeatureType.BOSS, FeatureType.RIB):
-            return False
-        height = feature.number("height_mm")
-        width = feature.number("width_mm")
-        return (height is not None and height < minimum_size) or (
-            width is not None and width < minimum_size
-        )
+        if feature.type in (FeatureType.BOSS, FeatureType.RIB):
+            height = feature.number("height_mm")
+            width = feature.number("width_mm")
+            return (height is not None and height < minimum_size) or (
+                width is not None and width < minimum_size
+            )
+        if feature.type == FeatureType.SLOT:
+            return bool(feature.param("is_open"))
+        return False
 
     def _face_owners(self, context, minimum_size: float) -> dict[int, set[str]]:
         """Which features each face belongs to, for the same-feature test."""
@@ -330,7 +377,7 @@ class SharpInternalEdgeCheck(MachiningCheck):
         for feature in context.recognition.features:
             if feature.type not in _OWNS_ITS_CORNERS:
                 continue
-            if self._is_tiny_protrusion(feature, minimum_size):
+            if self._unspoken_for(feature, minimum_size):
                 continue
             for face_id in feature.faces:
                 owners.setdefault(face_id, set()).add(feature.instance_id)
@@ -349,16 +396,29 @@ class SharpInternalEdgeCheck(MachiningCheck):
         One hop only. Two would reach unrelated features across the part and
         silence corners that genuinely need reporting.
         """
+        # A bore keeps its claim on every face it takes, including a planar
+        # one. An off-cardinal hole leaves a small flat lip that is
+        # genuinely part of the hole, and the curved-opening test cannot
+        # see it because that test gates on surface type. Letting a bore
+        # stand down wherever a cavity also claims the face was tried and
+        # measured: it recovers four corners on one fixture and loses
+        # sixteen to a manifold full of cross-drilled channels.
         covered: set[int] = set()
         for feature in context.recognition.features:
             if feature.type not in _CARRIES_ITS_RIM:
                 continue
-            if self._is_tiny_protrusion(feature, minimum_size):
+            if self._unspoken_for(feature, minimum_size):
                 continue
             covered.update(feature.faces)
 
+        # The expansion reaches walls the recognizer missed, so it has to
+        # obey the same rule as the direct set: a cavity whose own rule
+        # declines to speak about it cannot lend that silence to a
+        # neighbouring face either.
         pocket_like: set[int] = set()
         for feature in context.recognition.of_type(*sorted(_POCKET_LIKE)):
+            if self._unspoken_for(feature, minimum_size):
+                continue
             pocket_like.update(feature.faces)
 
         neighbours: set[int] = set()
@@ -405,7 +465,7 @@ class SharpInternalEdgeCheck(MachiningCheck):
         return first.surface_type in curved or second.surface_type in curved
 
     @staticmethod
-    def _cutter_formed(first, second, deviation: float, minimum_size: float) -> bool:
+    def _corner_radius_arc(first, second, deviation: float, minimum_size: float) -> bool:
         """The arc where a corner radius meets the floor it was cut into.
 
         The tool that swept the corner radius formed this junction in the

@@ -658,16 +658,16 @@ class MachiningConfig:
     )
     thresholds: RuleThresholds = field(default_factory=RuleThresholds)
 
-    disabled_rules: list[str] = field(default_factory=list)
-    disabled_categories: list[str] = field(default_factory=list)
+    # There is deliberately no rule-muting list here. The reference engine
+    # carries one because it runs every rule it owns against every part and
+    # needs a way to shut some up. This workbench does not: a rule runs
+    # because a process names it in `active_rules`, and the Process Library
+    # is where a shop turns one off -- per process, which is the distinction
+    # that actually matters, since a rule worth hearing about a milled part
+    # is often nonsense about a turned one. A second, global mute would give
+    # two answers to the same question and no way to tell which won.
 
     # -- queries ------------------------------------------------------------
-
-    def is_rule_disabled(self, rule_id: str) -> bool:
-        return rule_id in self.disabled_rules
-
-    def is_category_disabled(self, category: str) -> bool:
-        return category in self.disabled_categories
 
     def tool_unit_enabled(self, tool: ToolEntry) -> bool:
         """Whether a size-matching rule should consider this tool."""

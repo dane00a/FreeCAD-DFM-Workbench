@@ -202,12 +202,16 @@ class TestThreadRunout(unittest.TestCase):
         self.assertIn("M8x1.25", message)
         self.assertIn("1.25 mm pitch", message)
 
-    def test_the_requirement_is_configurable(self):
-        # A shop content with a millimetre of run-out accepts the same hole
-        # that a shop wanting six does not.
+    def test_a_configured_minimum_raises_the_bar(self):
+        # A shop insisting on six millimetres of run-out turns down a hole
+        # the pitch alone would have passed.
+        self.assertTrue(rule_check(tapped_hole(block()), self.RULE, limit="6.0"))
+
+    def test_a_configured_minimum_never_lowers_it(self):
+        # One millimetre is less than an M8 tap's lead needs, and setting it
+        # does not licence tapping closer than the pitch demands.
         shape = tapped_hole(block(), hole_depth=16.0)
-        self.assertEqual(rule_check(shape, self.RULE, limit="1.0"), [])
-        self.assertTrue(rule_check(shape, self.RULE, limit="6.0"))
+        self.assertTrue(rule_check(shape, self.RULE, limit="1.0"))
 
     def test_a_through_hole_runs_out_into_fresh_air(self):
         # Tapped clean through a 30 mm block: there is no bottom to reach.
@@ -242,7 +246,9 @@ class TestThreadShoulderProximity(unittest.TestCase):
         self.assertEqual(
             rule_check(tapped_hole(block_with_pad(4.5)), self.RULE, limit="0.5"), []
         )
-        self.assertTrue(rule_check(tapped_hole(block_with_pad(6.0)), self.RULE, limit="4.0"))
+        self.assertTrue(
+            rule_check(tapped_hole(block_with_pad(6.0)), self.RULE, limit="4.0")
+        )
 
     def test_a_tight_counterbore_wall_crowds_the_tap(self):
         # A 10 mm mouth over an M8 thread leaves 1 mm of wall, and the tap's
@@ -275,10 +281,27 @@ class TestThreadWallThickness(unittest.TestCase):
         self.assertAlmostEqual(findings[0].value, 1.32, places=2)
 
     def test_a_hole_hard_against_a_wall_is_an_error(self):
-        # A millimetre and a half of wall before tapping, and less than one
-        # after: it will split when the fastener is pulled up.
-        findings = rule_check(tapped_hole(block(x0=-5.0), x=-0.1), self.RULE)
+        # Fourteen tenths of wall before tapping, and seven after: it will
+        # split when the fastener is pulled up.
+        findings = rule_check(tapped_hole(block(x0=-4.8)), self.RULE)
         self.assertEqual(severities(findings), [Severity.ERROR])
+
+    def test_a_thin_walled_bar_is_measured_against_the_outside(self):
+        # A round bar has no flat wall to measure to, so the wall has to come
+        # from the outside of the part. A 6.8 mm tapping hole up a 10 mm bar
+        # leaves 1.6 mm of it, and less than a millimetre after tapping.
+        bar = BRepPrimAPI_MakeCylinder(
+            gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), 5.0, 30.0
+        ).Shape()
+        findings = rule_check(tapped_hole(bar), self.RULE)
+        self.assertEqual(severities(findings), [Severity.WARNING])
+        self.assertAlmostEqual(findings[0].value, 0.92, places=2)
+
+    def test_a_thick_walled_bar_is_clean(self):
+        bar = BRepPrimAPI_MakeCylinder(
+            gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), 7.0, 30.0
+        ).Shape()
+        self.assertEqual(rule_check(tapped_hole(bar), self.RULE), [])
 
     def test_the_thresholds_are_configurable(self):
         shape = tapped_hole(block(x0=-6.0), x=-0.6)

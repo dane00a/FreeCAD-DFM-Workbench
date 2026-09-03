@@ -26,6 +26,7 @@ from OCP.gp import gp_Ax1, gp_Vec
 
 from .aag import AagNode, AttributedAdjacencyGraph, SurfaceType
 from .config import RuleThresholds
+from ..utils.geometry import FaceIndex
 from .features import FeatureType
 
 
@@ -298,7 +299,16 @@ def detect_sheet_metal(
         + areas.get(SurfaceType.CONE, 0.0)
         + areas.get(SurfaceType.EXTRUDED, 0.0)
     )
-    if developable / total < _SHEET_DEVELOPABLE_MIN:
+    sculpted = total - developable
+    share = developable / total
+
+    # The cheap ceiling first. Counting every sculpted face as formed is the
+    # most generous answer the expensive test below could give; if even that
+    # misses the gate the part is genuinely freeform and leaves here having
+    # cost nothing.
+    if share < _SHEET_DEVELOPABLE_MIN and (
+        sculpted <= 0.0 or (developable + sculpted) / total < _SHEET_DEVELOPABLE_MIN
+    ):
         return None
     if areas.get(SurfaceType.CYLINDER, 0.0) <= 0.0:
         return None  # no bends and no holes: nothing was formed here
@@ -312,6 +322,17 @@ def detect_sheet_metal(
         return None
 
     if not _has_concentric_bend(graph, gauge):
+        return None
+
+    if share >= _SHEET_DEVELOPABLE_MIN:
+        return gauge
+
+    # A uniform-gauge shell with a real bend whose shortfall against the area
+    # gate is sculpture. A drawn louver or a swept hood is formed sheet
+    # however its surface is modelled, so ask the material which of those
+    # faces are one skin of a gauge-thick pair, and count only those.
+    skin = freeform_skin_area(graph, shape, gauge)
+    if (developable + skin) / total < _SHEET_DEVELOPABLE_MIN:
         return None
     return gauge
 
@@ -754,3 +775,70 @@ def _distance_to_box(box, point) -> float:
     dy = max(ymin - point.Y(), 0.0, point.Y() - ymax)
     dz = max(zmin - point.Z(), 0.0, point.Z() - zmax)
     return math.sqrt(dx * dx + dy * dy + dz * dz)
+
+
+def freeform_skin_area(
+    graph: AttributedAdjacencyGraph, shape, gauge: float
+) -> float:
+    """Area of the sculpted faces that are one skin of a constant-gauge pair.
+
+    A drawn louver or a swept hood is a formed sheet feature, but its surface
+    is a spline and so counts against the developable area gate -- which
+    would throw out exactly the parts most obviously made on a press.
+
+    The question is asked of the material rather than of the surface type: a
+    formed face has metal for one gauge behind it and air past that, because
+    that is what forming does. A machined face has solid stock behind it as
+    far as the probe goes.
+    """
+    from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+    from OCP.TopAbs import TopAbs_IN
+
+    from .aag_builder import _face_sample_point
+
+    if shape is None or gauge <= 0.0:
+        return 0.0
+
+    face_index = FaceIndex(shape)
+    classifier = BRepClass3d_SolidClassifier(shape)
+    tolerance = 1e-6
+    total = 0.0
+
+    for node in graph.nodes:
+        # Extruded walls already count as developable, so counting them again
+        # would let a part clear the gate on area it does not have.
+        if node.surface_type not in (
+            SurfaceType.BSPLINE,
+            SurfaceType.REVOLVED,
+            SurfaceType.OTHER,
+        ):
+            continue
+        try:
+            face = face_index.face_at(node.face_id)
+        except Exception:
+            continue
+        sample = _face_sample_point(face)
+        if sample is None:
+            continue
+        point, normal = sample
+        if node.is_reversed:
+            normal.Reverse()
+
+        inward = gp_Vec(normal).Multiplied(-1.0)
+        near = point.Translated(inward.Multiplied(0.5 * gauge))
+        far = point.Translated(inward.Multiplied(1.5 * gauge))
+
+        try:
+            classifier.Perform(near, tolerance)
+            near_inside = classifier.State() == TopAbs_IN
+            classifier.Perform(far, tolerance)
+            far_inside = classifier.State() == TopAbs_IN
+        except Exception:
+            continue
+
+        # Metal at half a gauge, air at one and a half: a skin exactly one
+        # gauge thick, which is what forming leaves and machining does not.
+        if near_inside and not far_inside:
+            total += node.area
+
+    return total

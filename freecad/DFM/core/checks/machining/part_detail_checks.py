@@ -60,12 +60,24 @@ _SIZE_EXEMPT = frozenset(
 )
 
 # Features whose own rules already speak for the corners inside them.
+#
+# The slit family and V-grooves belong here even though their corners really
+# are square: those corners are the *shape of the process* -- a broach
+# profile, a saw kerf, a dressing wheel -- and the rule that reports the
+# process speaks for them. Without this a part with forty-eight broached
+# dovetails reports ninety-six square corners, every one of them correct and
+# every one of them useless.
 _OWNS_ITS_CORNERS = frozenset(
     {
         FeatureType.POCKET,
         FeatureType.SLOT,
+        FeatureType.CHANNEL,
+        FeatureType.THROUGH_CAVITY,
         FeatureType.UNDERCUT,
         FeatureType.SPHERICAL_POCKET,
+        FeatureType.FLEXURE_SLIT,
+        FeatureType.BROACHED_SLOT,
+        FeatureType.V_GROOVE,
         FeatureType.STEP,
         FeatureType.RIB,
         FeatureType.BOSS,
@@ -73,6 +85,7 @@ _OWNS_ITS_CORNERS = frozenset(
         FeatureType.THREAD_RELIEF_GROOVE,
         FeatureType.O_RING_GLAND,
         FeatureType.RETAINING_RING_GROOVE,
+        FeatureType.EXTERNAL_THREAD,
         FeatureType.MARKING_TEXT,
     }
     | BORE_TYPES
@@ -84,10 +97,13 @@ _POCKET_LIKE = frozenset(
     {
         FeatureType.POCKET,
         FeatureType.SLOT,
+        FeatureType.CHANNEL,
+        FeatureType.THROUGH_CAVITY,
         FeatureType.UNDERCUT,
         FeatureType.SPHERICAL_POCKET,
         FeatureType.FLEXURE_SLIT,
         FeatureType.BROACHED_SLOT,
+        FeatureType.V_GROOVE,
     }
 )
 

@@ -503,7 +503,9 @@ class HoleIntersectsCavityCheck(MachiningCheck):
             return []
 
         breaching = self._blind_breaches(context, holes)
-        breaching += self._through_breaches(context, holes, set(breaching))
+        breaching += self._through_breaches(
+            context, holes, {hole.instance_id for hole in breaching}
+        )
         if not breaching:
             return []
 
@@ -562,7 +564,7 @@ class HoleIntersectsCavityCheck(MachiningCheck):
         self,
         context: MachiningContext,
         holes: list[FeatureInstance],
-        already: set,
+        already: set[str],
     ) -> list[FeatureInstance]:
         """Passages whose every mouth opens inside a cavity.
 
@@ -572,6 +574,12 @@ class HoleIntersectsCavityCheck(MachiningCheck):
         a bolt hole through a pocket floor, a drain, a counterbore stack all
         have at least one ordinary opening and stay silent, which is what
         keeps this from firing on half the holes on the part.
+
+        Reach is narrower than it looks today. The pocket pass will not read
+        a cavity whose floor a bore has pierced, so a passage between two
+        blind pockets leaves neither pocket recognized and nothing here to
+        match against. Passages between cavities the piercing does not
+        unseat -- channels, through cavities -- are found.
         """
         cavity_faces = context.recognition.faces_of_type(*_CAVITY_TYPES)
         if not cavity_faces:
@@ -579,7 +587,7 @@ class HoleIntersectsCavityCheck(MachiningCheck):
 
         found: list[FeatureInstance] = []
         for hole in holes:
-            if hole in already:
+            if hole.instance_id in already:
                 continue
             if hole.type != FeatureType.THROUGH_HOLE and not hole.param("is_through"):
                 continue

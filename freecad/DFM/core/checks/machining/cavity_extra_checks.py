@@ -285,7 +285,7 @@ class BroachedSlotProcessCheck(MachiningCheck):
                 self.finding(
                     rule,
                     severity,
-                    f"re-entrant slot, {width:.2f} mm at the mouth",
+                    f"re-entrant slot, {width:.1f} mm x {depth:.1f} mm",
                     self.render(
                         feedback,
                         severity,
@@ -293,11 +293,13 @@ class BroachedSlotProcessCheck(MachiningCheck):
                         0.0,
                         0.0,
                         "mm",
-                        f"This slot is {width:.2f} mm at the mouth and "
+                        f"This slot is about {width:.1f} mm across and "
                         f"{depth:.1f} mm deep, and its walls lean out over the "
-                        "opening. Anything that fits through the gap is already "
-                        "past the widest part of the slot, so no end mill coming in "
-                        "from the top can cut the flanks. As drawn it needs "
+                        "opening -- it is wider inside than the gap you would have "
+                        "to come in through. Anything that fits through the mouth "
+                        "is already past the widest part of the slot, so no end "
+                        "mill working from the top can cut the flanks. As drawn it "
+                        "needs "
                         "broaching, wire EDM, or a dovetail cutter fed along the "
                         "length -- and the last of those only works if the slot "
                         "runs out at both ends. If the undercut is not functional, "

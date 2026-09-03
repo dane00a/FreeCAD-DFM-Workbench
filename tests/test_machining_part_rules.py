@@ -11,8 +11,10 @@ are reported by the rule that owns the feature. A sharp-edge finding on a
 plain pocket would be a duplicate, and enough duplicates make the whole
 result panel worthless.
 
-What must survive is the corner nobody else speaks for: the inside angle of
-an L bracket, or where two slots cross.
+What must survive is the corner nobody else speaks for -- the inside angle
+of an L bracket. That makes the rule's count on a part a reading of how
+completely the part was recognized, which is worth knowing when interpreting
+it.
 """
 
 import unittest
@@ -133,10 +135,30 @@ class TestSharpInternalEdge(unittest.TestCase):
         message = rule_check(l_bracket(), self.RULE)[0].message
         self.assertTrue(any(term in message for term in ("radius", "EDM", "relief")))
 
-    def test_crossing_slots_report_their_corners(self):
-        # Where two slots cross, the corners belong to neither slot, so no
-        # cavity rule speaks for them.
-        self.assertTrue(rule_check(crossing_slots(), self.RULE))
+    def test_a_recognized_cavity_speaks_for_its_own_corners(self):
+        # Two crossing slots read as one through-cavity, and the cavity rules
+        # report its corners with the context to say something useful about
+        # them. A per-edge duplicate would only crowd them out.
+        self.assertEqual(rule_check(crossing_slots(), self.RULE), [])
+
+    def test_the_rule_reports_only_what_nothing_else_claims(self):
+        # This is the shape of the rule: it fires on the residue left after
+        # every recognizer has taken what it understands. Its count on a part
+        # is therefore a reading of how well the part was recognized, which
+        # is worth knowing when interpreting it.
+        findings = rule_check(l_bracket(), self.RULE)
+        context = list(
+            MachiningAnalyzer()
+            .execute(
+                l_bracket(),
+                FaceIndex(l_bracket()),
+                EdgeIndex(l_bracket()),
+                prefs={},
+            )
+            .values()
+        )[0]
+        self.assertEqual(context.recognition.features, [])
+        self.assertTrue(findings)
 
     def test_a_pocket_does_not_double_report(self):
         # A pocket's corners are square too, but the corner-radius rule

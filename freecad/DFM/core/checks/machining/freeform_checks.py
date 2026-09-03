@@ -100,11 +100,14 @@ class FreeformInternalRadiusCheck(MachiningCheck):
             return []  # no milling tools configured; nothing to judge against
 
         thresholds = context.config.thresholds
-        required = self.safe_float(rule_config.limit)
-        if required is None:
+        # A configured floor of zero is the absence of one, not a
+        # requirement no radius can fail, so it falls through to the figure
+        # the tool library gives.
+        required = self.safe_float(rule_config.limit) or 0.0
+        if required <= 0.0:
             required = tool_radius * thresholds.freeform_radius_safety
-        info_tier = self.safe_float(rule_config.target)
-        if info_tier is None:
+        info_tier = self.safe_float(rule_config.target) or 0.0
+        if info_tier <= 0.0:
             info_tier = thresholds.freeform_radius_info_tier_mm
 
         tight: list = []
@@ -344,8 +347,9 @@ class TurnedProfileRadiusCheck(MachiningCheck):
         if nose is None or nose <= 0.0:
             return []  # no inserts configured
 
-        required = self.safe_float(rule_config.limit)
-        if required is None:
+        # As above: zero is not a requirement, so the insert nose decides.
+        required = self.safe_float(rule_config.limit) or 0.0
+        if required <= 0.0:
             required = nose * context.config.thresholds.freeform_radius_safety
 
         results: list[CheckResult] = []

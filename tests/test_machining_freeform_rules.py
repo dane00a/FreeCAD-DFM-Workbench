@@ -153,7 +153,9 @@ def sculpted_block(scale: float = 1.0) -> TopoDS_Shape:
         BRepBuilderAPI_MakeEdge(gp_Pnt(far, 0.0, 0.0), gp_Pnt(far, back, 0.0)).Edge(),
         BRepBuilderAPI_MakeEdge(gp_Pnt(far, back, 0.0), gp_Pnt(0.0, back, 0.0)).Edge(),
     )
-    wire.Add(BRepBuilderAPI_MakeEdge(gp_Pnt(0.0, back, 0.0), gp_Pnt(0.0, 0.0, 0.0)).Edge())
+    wire.Add(
+        BRepBuilderAPI_MakeEdge(gp_Pnt(0.0, back, 0.0), gp_Pnt(0.0, 0.0, 0.0)).Edge()
+    )
     face = BRepBuilderAPI_MakeFace(wire.Wire()).Face()
     return BRepPrimAPI_MakePrism(face, gp_Vec(0.0, 0.0, 25.0 * scale)).Shape()
 
@@ -212,8 +214,8 @@ def shallow_dish() -> TopoDS_Shape:
 def dome() -> TopoDS_Shape:
     """The same sphere with the material on the other side of it."""
     ball = BRepPrimAPI_MakeSphere(gp_Ax2(gp_Pnt(50, 40, 50), gp_Dir(0, 0, 1)), 12.0)
-    upper = _cut(ball.Shape(), BRepPrimAPI_MakeBox(gp_Pnt(0, 0, 0), gp_Pnt(100, 80, 50)).Shape())
-    return _fuse(_bowl_block(), upper)
+    lower = BRepPrimAPI_MakeBox(gp_Pnt(0, 0, 0), gp_Pnt(100, 80, 50)).Shape()
+    return _fuse(_bowl_block(), _cut(ball.Shape(), lower))
 
 
 # =============================================================================
@@ -240,21 +242,26 @@ class TestFreeformInternalRadius(unittest.TestCase):
     def test_a_shop_with_big_cutters_cannot_finish_it(self):
         # The same block, judged by a shop whose smallest end mill is 12 mm:
         # that cutter wants 12 mm of concave radius and the part has 10.
-        findings = rule_check(sculpted_block(), self.RULE, config=shop_with(end_mill(12.0)))
+        big_cutters = shop_with(end_mill(12.0))
+        findings = rule_check(sculpted_block(), self.RULE, config=big_cutters)
         self.assertEqual(severities(findings), [Severity.WARNING])
         self.assertIn("chatter", findings[0].message)
 
     def test_the_two_tiers_are_configurable(self):
         # Target is the tier that only costs money, limit the tier that
         # cannot be cut.
-        self.assertEqual(
-            severities(rule_check(sculpted_block(), self.RULE, target="12.0", limit="6.0")),
-            [Severity.INFO],
+        mild = rule_check(sculpted_block(), self.RULE, target="12.0", limit="6.0")
+        self.assertEqual(severities(mild), [Severity.INFO])
+        findings = rule_check(sculpted_block(), self.RULE, target="20.0", limit="12.0")
+        self.assertEqual(severities(findings), [Severity.WARNING])
+
+    def test_a_configured_zero_falls_back_to_the_tool_library(self):
+        # The process files carry a zero here, which is not a radius any
+        # part could fail. The smallest cutter has to decide instead.
+        findings = rule_check(
+            sculpted_block(), self.RULE, limit="0.0", config=shop_with(end_mill(12.0))
         )
-        self.assertEqual(
-            severities(rule_check(sculpted_block(), self.RULE, target="20.0", limit="12.0")),
-            [Severity.WARNING],
-        )
+        self.assertEqual(severities(findings), [Severity.WARNING])
 
     def test_the_whole_part_is_reported_once(self):
         # One decision about tooling, so one finding -- not one per patch.
@@ -263,9 +270,9 @@ class TestFreeformInternalRadius(unittest.TestCase):
         self.assertTrue(findings[0].failing_geometry)
 
     def test_a_shop_with_no_mills_says_nothing(self):
+        lathe_only = shop_with(turning_insert(0.4))
         self.assertEqual(
-            rule_check(sculpted_block(0.2), self.RULE, config=shop_with(turning_insert(0.4))),
-            [],
+            rule_check(sculpted_block(0.2), self.RULE, config=lathe_only), []
         )
 
 
@@ -337,6 +344,12 @@ class TestTurnedProfileRadius(unittest.TestCase):
         self.assertTrue(rule_check(waisted_shaft(), self.RULE, limit="10.0"))
         self.assertEqual(rule_check(waisted_shaft(), self.RULE, limit="2.0"), [])
 
+    def test_a_configured_zero_falls_back_to_the_insert_nose(self):
+        self.assertEqual(rule_check(waisted_shaft(), self.RULE, limit="0.0"), [])
+        big_nose = shop_with(turning_insert(4.0))
+        findings = rule_check(waisted_shaft(), self.RULE, limit="0.0", config=big_nose)
+        self.assertEqual(severities(findings), [Severity.WARNING])
+
     def test_a_shop_with_no_inserts_says_nothing(self):
         self.assertEqual(
             rule_check(waisted_shaft(), self.RULE, config=shop_with(end_mill(1.0))), []
@@ -366,10 +379,9 @@ class TestSphericalPocketUndercut(unittest.TestCase):
         self.assertIn("sinker EDM", findings[0].message)
 
     def test_the_severity_follows_the_rule_configuration(self):
-        self.assertEqual(
-            severities(rule_check(super_hemispherical_bowl(), self.RULE, severity="ERROR")),
-            [Severity.ERROR],
-        )
+        bowl = super_hemispherical_bowl()
+        findings = rule_check(bowl, self.RULE, severity="ERROR")
+        self.assertEqual(severities(findings), [Severity.ERROR])
 
     def test_a_generous_threshold_silences_it(self):
         # Below the threshold the rim is inside machining tolerance and a

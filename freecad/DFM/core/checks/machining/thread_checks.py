@@ -156,10 +156,7 @@ class ThreadRunoutCheck(MachiningCheck):
                 thread_depth = depth
 
             pitch = hole.number("thread_pitch_mm") or 0.0
-            if configured is not None:
-                required = configured
-                basis = "the configured minimum"
-            elif pitch > 0.0:
+            if pitch > 0.0:
                 # The lead is ground as a number of threads, so it scales
                 # with pitch. This is the figure that governs whenever the
                 # thread has been resolved.
@@ -174,6 +171,13 @@ class ThreadRunoutCheck(MachiningCheck):
                     f"{thresholds.thread_runout_min_diameters:g} times the "
                     f"{diameter:.2f} mm bore, the pitch being unknown"
                 )
+            # A configured limit is a floor the shop will not go below,
+            # never a licence to tap closer than the pitch demands: a fine
+            # thread whose lead comes to less than the shop minimum still
+            # has to clear the minimum.
+            if configured is not None and configured > required:
+                required = configured
+                basis = "the shop minimum for any thread"
 
             available = max(0.0, depth - thread_depth)
             if available >= required:
@@ -366,7 +370,8 @@ class ThreadShoulderProximityCheck(MachiningCheck):
         end. A hole open at both ends offers the tap a choice, so both are
         probed and the worse answer is the one that counts.
         """
-        axis = gp_Vec(bore.cyl_cone_axis.Direction())
+        direction = bore.cyl_cone_axis.Direction()
+        axis = gp_Vec(direction)
         cross_section = math.pi * bore.cyl_radius * bore.cyl_radius
 
         floor: Optional[AagNode] = None
@@ -377,9 +382,7 @@ class ThreadShoulderProximityCheck(MachiningCheck):
             if node.surface_type is not SurfaceType.PLANE:
                 continue
             normal = node.outward_normal
-            if normal is None or abs(normal.Dot(bore.cyl_cone_axis.Direction())) < (
-                _ENTRY_AXIS_ALIGNMENT
-            ):
+            if normal is None or abs(normal.Dot(direction)) < _ENTRY_AXIS_ALIGNMENT:
                 continue
             # The floor is about the size of the bore. A large planar member
             # face is the surface the hole was drilled into, not its bottom.
@@ -483,9 +486,10 @@ class ThreadShoulderProximityCheck(MachiningCheck):
             # Cheap lower bound on how close the face can come to the axis,
             # so the solver only ever sees plausible candidates.
             xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
-            centre = gp_Vec(
-                origin, gp_Pnt(0.5 * (xmin + xmax), 0.5 * (ymin + ymax), 0.5 * (zmin + zmax))
+            middle = gp_Pnt(
+                0.5 * (xmin + xmax), 0.5 * (ymin + ymax), 0.5 * (zmin + zmax)
             )
+            centre = gp_Vec(origin, middle)
             radial = centre.Subtracted(up.Multiplied(centre.Dot(up))).Magnitude()
             half_diagonal = 0.5 * math.sqrt(
                 (xmax - xmin) ** 2 + (ymax - ymin) ** 2 + (zmax - zmin) ** 2
@@ -622,6 +626,7 @@ class ThreadWallThicknessCheck(MachiningCheck):
             return None
         axis = bore.cyl_cone_axis.Direction()
         radius = diameter / 2.0
+        cross_section = math.pi * bore.cyl_radius * bore.cyl_radius
         bore_face = context.face_index.face_at(bore.face_id)
 
         nearest: Optional[float] = None
@@ -630,6 +635,12 @@ class ThreadWallThicknessCheck(MachiningCheck):
             key=lambda n: n.face_id,
         ):
             if hole.has_face(node.face_id):
+                continue
+            # A face smaller than the bore's own cross-section is not a wall.
+            # It is a scrap of geometry -- the end cap of a modelled thread
+            # groove is a square millimetre of plane sitting right beside the
+            # bore -- and measuring to one invents a wall out of nothing.
+            if node.area < cross_section:
                 continue
             normal = node.outward_normal
             if normal is None or abs(axis.Dot(normal)) > _CAP_PLANE_ALIGNMENT:

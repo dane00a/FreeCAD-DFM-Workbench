@@ -233,10 +233,10 @@ materials:
         limit: '0.8'
       CUTTER_RADIUS_INFEASIBLE:
         target: N/A
-        limit: '0.0'
+        limit: N/A
       CUTTER_RADIUS_SUBOPTIMAL:
         target: N/A
-        limit: '0.0'
+        limit: N/A
       CHAMFER_NONSTANDARD_ANGLE:
         binary_severity: INFO
       METAL_SEAL_WITNESS:
@@ -249,12 +249,12 @@ materials:
         limit: '3.0'
       FREEFORM_INTERNAL_RADIUS:
         target: N/A
-        limit: '0.0'
+        limit: N/A
       FREEFORM_FINISHING:
-        binary_severity: INFO
+        binary_severity: WARNING
       TURNED_PROFILE_RADIUS:
         target: N/A
-        limit: '0.0'
+        limit: N/A
       SPHERICAL_POCKET_UNDERCUT:
         binary_severity: WARNING
       THREAD_RUNOUT:
@@ -264,8 +264,8 @@ materials:
         target: N/A
         limit: '1.5'
       THREAD_WALL_THICKNESS:
-        target: N/A
-        limit: '1.5'
+        target: '1.5'
+        limit: '0.8'
       THREAD_RELIEF_WIDTH:
         target: N/A
         limit: '1.5'

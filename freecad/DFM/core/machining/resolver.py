@@ -52,6 +52,14 @@ _PRIORITY: dict[str, int] = {
     # end-mills a serial number, so those readings and the rules that would
     # fire on them must not survive.
     FeatureType.MARKING_TEXT: 200,
+    # Formed sheet outranks every machined reading of the same faces. An
+    # emboss reads as a boss over a pocket, a louver as a through cavity, a
+    # notch as a step -- each correct had the part been cut from solid, and
+    # each wrong on a part that came off a press. Without these the sheet
+    # rules can never fire on a real part: the machining readings win every
+    # overlap and the formed feature disappears before any rule sees it.
+    FeatureType.SHEET_FORMED: 160,
+    FeatureType.BEND: 155,
     # The groove family sits above counterbore: a groove's faces are a
     # superset of what the counterbore path emits for the same geometry, so
     # a counterbore mistaken for a groove is wholly contained and dropped.
@@ -78,6 +86,11 @@ _PRIORITY: dict[str, int] = {
     FeatureType.V_GROOVE: 65,
     FeatureType.POCKET: 60,
     FeatureType.SLOT: 50,
+    # A tab and a notch are cuts in the outline of a blank. The step
+    # recognizer reads a notch's shoulder as a terrace, which it is, and
+    # says nothing useful about it.
+    FeatureType.TAB: 45,
+    FeatureType.NOTCH: 45,
     FeatureType.STEP: 40,
 }
 

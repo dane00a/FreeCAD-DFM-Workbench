@@ -317,6 +317,44 @@ class RuleThresholds:
     turn_slender_warn_ratio: float = 4.0  # turned: length along axis / max OD
     turn_slender_error_ratio: float = 8.0
     minimum_feature_size_mm: float = 0.5
+
+    # -- sheet metal ---------------------------------------------------------
+    #
+    # Almost all of these are multiples of the gauge rather than absolute
+    # sizes, because that is how a sheet shop thinks: a bend radius is "one
+    # material thickness", not "1.5 mm". The few that are absolute are
+    # absolute for a physical reason -- a punch breaks below a size whatever
+    # the sheet is, and a countersink has to leave a land.
+    sheet_bend_radius_warn_factor: float = 1.0
+    sheet_bend_radius_error_factor: float = 0.5
+    sheet_min_flange_factor: float = 4.0
+    sheet_hole_bend_clearance_factor: float = 2.5
+    sheet_min_hole_factor: float = 1.0
+    sheet_hole_pitch_factor: float = 2.0
+    sheet_max_countersink_depth_factor: float = 0.6
+    sheet_min_countersink_land_mm: float = 0.3
+    # How far a brake can over-bend before springback and tooling get
+    # awkward, which depends on how heavy the stock is.
+    sheet_max_bend_deg_at_ga11: float = 125.0
+    sheet_max_bend_deg_at_ga14: float = 180.0
+    sheet_min_thickness_mm: float = 0.305
+    sheet_max_thickness_steel_mm: float = 3.175
+    sheet_max_thickness_alu_mm: float = 6.0
+    sheet_min_tab_width_mm: float = 3.2
+    sheet_tab_width_factor: float = 2.0
+    sheet_tab_max_aspect: float = 5.0
+    sheet_min_notch_factor: float = 1.0
+    sheet_notch_max_depth_ratio: float = 10.0
+    sheet_hem_min_return_factor: float = 4.0
+    sheet_emboss_max_depth_factor: float = 3.0
+    # 6.35 mm of hood on 1.897 mm stock: the tallest standard louver die.
+    sheet_louver_max_height_factor: float = 3.3474
+    sheet_formed_min_pitch_factor: float = 2.0
+    sheet_formed_bend_clearance_factor: float = 3.0
+    sheet_dimension_eps_mm: float = 0.02
+    # Below this gauge a diagonal bend is a nuisance rather than a problem.
+    sheet_diagonal_bend_min_thickness_mm: float = 1.897
+    sheet_bend_over_length_eps_mm: float = 0.5
     # How many distinct features before the part is worth pricing as a
     # complicated one. Not a defect at any count: programming time and setup
     # count follow feature count more closely than any single dimension, so a

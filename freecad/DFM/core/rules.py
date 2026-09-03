@@ -802,10 +802,13 @@ class Rulebook(Enum):
         family=RuleFamily.SHEET,
     )
     SHEET_BEND_LONGER_THAN_BODY = RuleType(
-        "Bend Longer Than the Brake",
+        "Diagonal Bend",
         shape=RuleShape.BINARY,
         unit=None,
-        description="Bend line longer than the press brake can take in one hit.",
+        description=(
+            "A bend line running diagonally across the blank, so it is longer "
+            "than the part itself and the brake has to take it at an angle."
+        ),
         family=RuleFamily.SHEET,
     )
     SHEET_THICKNESS_OUT_OF_RANGE = RuleType(

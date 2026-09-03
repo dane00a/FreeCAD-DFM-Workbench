@@ -135,8 +135,8 @@ class SheetBendRadiusCheck(SheetCheck):
                         error_factor,
                         "",
                         f"This bend has an inside radius of {radius:.2f} mm in "
-                        f"{gauge:.2f} mm material, under {factor:.1f} times the "
-                        "gauge. The outside of the fold stretches further than "
+                        f"{gauge:.2f} mm material, under {gauge_phrase(factor)}"
+                        ". The outside of the fold stretches further than "
                         "the material will take and cracks along the bend line, "
                         "and forming it needs a punch ground for the job rather "
                         "than anything on the rack. An inside radius of at least "

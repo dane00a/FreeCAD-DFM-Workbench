@@ -1,0 +1,110 @@
+name: CNC Turning
+category: CNC Machining
+description: 'Subtractive machining on a lathe: the part rotates and the tool traverses,
+    so the geometry is a body of revolution. The part is gripped by its outside diameter
+    in a chuck, which is why the vise workholding rules do not apply here.
+
+    '
+active_rules:
+- PART_ASPECT_RATIO
+- MATERIAL_REMOVAL
+- SEALED_VOID
+- THIN_WALL
+rule_feedback:
+    PART_ASPECT_RATIO:
+        warning_msg: ''
+        error_msg: ''
+    MATERIAL_REMOVAL:
+        warning_msg: ''
+        error_msg: ''
+    SEALED_VOID:
+        warning_msg: ''
+        error_msg: ''
+    THIN_WALL:
+        warning_msg: ''
+        error_msg: ''
+rule_criticality:
+    SEALED_VOID: CRITICAL
+    PART_ASPECT_RATIO: HIGH
+    THIN_WALL: HIGH
+    MATERIAL_REMOVAL: LOW
+# Material names follow FreeCAD's own Machining material cards. The
+# slenderness limits are the turning ones -- length over diameter, where 4:1
+# wants a steady rest and 8:1 is Swiss-style territory -- rather than the
+# bounding-box ratio used for milled parts.
+materials:
+    Default:
+        category: Default
+        is_active: true
+        rule_limits:
+            PART_ASPECT_RATIO:
+                target: '4.0'
+                limit: '8.0'
+            MATERIAL_REMOVAL:
+                target: '75'
+                limit: '90'
+            SEALED_VOID:
+                binary_severity: ERROR
+            THIN_WALL:
+                target: '1.5'
+                limit: '0.8'
+    Aluminum (Soft Wrought Alloy):
+        category: Aluminium
+        is_active: true
+        rule_limits:
+            THIN_WALL:
+                target: '1.2'
+                limit: '0.6'
+    Aluminum (Hard Cast Alloy):
+        category: Aluminium
+        is_active: true
+        rule_limits:
+            THIN_WALL:
+                target: '1.5'
+                limit: '0.8'
+    Mild Steel:
+        category: Steel
+        is_active: true
+        rule_limits:
+            THIN_WALL:
+                target: '1.5'
+                limit: '0.8'
+    Low Alloy Steel:
+        category: Steel
+        is_active: true
+        rule_limits:
+            # Tougher material pushes back harder on an overhanging bar, so a
+            # slender part needs support sooner than in aluminium.
+            PART_ASPECT_RATIO:
+                target: '3.5'
+                limit: '7.0'
+            THIN_WALL:
+                target: '1.8'
+                limit: '1.0'
+    Austenitic Stainless Steel:
+        category: Steel
+        is_active: true
+        rule_limits:
+            PART_ASPECT_RATIO:
+                target: '3.0'
+                limit: '6.0'
+            THIN_WALL:
+                target: '2.0'
+                limit: '1.2'
+    Tool Steel (unhardened):
+        category: Steel
+        is_active: true
+        rule_limits:
+            PART_ASPECT_RATIO:
+                target: '3.0'
+                limit: '6.0'
+            THIN_WALL:
+                target: '2.0'
+                limit: '1.2'
+    Gray Cast Iron:
+        category: Cast Iron
+        is_active: true
+        rule_limits:
+            THIN_WALL:
+                target: '2.5'
+                limit: '1.5'

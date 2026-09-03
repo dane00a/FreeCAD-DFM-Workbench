@@ -1,0 +1,136 @@
+name: CNC Milling
+category: CNC Machining
+description: 'Subtractive machining on a milling centre: the part is cut from solid
+    stock held in a vise or fixture, with the cutter approaching from a limited number
+    of directions. Rules cover workholding, proportion, wall thickness and stock waste.
+
+    '
+active_rules:
+- PART_ASPECT_RATIO
+- MATERIAL_REMOVAL
+- SEALED_VOID
+- THIN_WALL
+- NO_DATUM_FACE
+- NO_PARALLEL_DATUM_PAIR
+- THIN_CLAMPING_DIMENSION
+- SMALL_PART_HOLDING
+rule_feedback:
+    PART_ASPECT_RATIO:
+        warning_msg: ''
+        error_msg: ''
+    MATERIAL_REMOVAL:
+        warning_msg: ''
+        error_msg: ''
+    SEALED_VOID:
+        warning_msg: ''
+        error_msg: ''
+    THIN_WALL:
+        warning_msg: ''
+        error_msg: ''
+    NO_DATUM_FACE:
+        warning_msg: ''
+        error_msg: ''
+    NO_PARALLEL_DATUM_PAIR:
+        warning_msg: ''
+        error_msg: ''
+    THIN_CLAMPING_DIMENSION:
+        warning_msg: ''
+        error_msg: ''
+    SMALL_PART_HOLDING:
+        warning_msg: ''
+        error_msg: ''
+rule_criticality:
+    SEALED_VOID: CRITICAL
+    THIN_WALL: HIGH
+    NO_DATUM_FACE: HIGH
+    NO_PARALLEL_DATUM_PAIR: MEDIUM
+    THIN_CLAMPING_DIMENSION: MEDIUM
+    PART_ASPECT_RATIO: MEDIUM
+    MATERIAL_REMOVAL: LOW
+    SMALL_PART_HOLDING: LOW
+# Material names follow FreeCAD's own Machining material cards, so a material
+# chosen here refers to the same stock the CAM workbench would cut. Only the
+# rules where material genuinely changes the answer are overridden; everything
+# else inherits from Default.
+materials:
+    Default:
+        category: Default
+        is_active: true
+        rule_limits:
+            PART_ASPECT_RATIO:
+                target: '8.0'
+                limit: 'N/A'
+            MATERIAL_REMOVAL:
+                target: '70'
+                limit: '85'
+            SEALED_VOID:
+                binary_severity: ERROR
+            THIN_WALL:
+                target: '1.5'
+                limit: '0.8'
+            NO_DATUM_FACE:
+                binary_severity: WARNING
+            NO_PARALLEL_DATUM_PAIR:
+                binary_severity: WARNING
+            THIN_CLAMPING_DIMENSION:
+                target: 'N/A'
+                limit: '3.0'
+            SMALL_PART_HOLDING:
+                binary_severity: INFO
+    Aluminum (Soft Wrought Alloy):
+        category: Aluminium
+        is_active: true
+        rule_limits:
+            # Cuts cleanly and holds an edge, so thinner sections survive
+            # machining without chatter or tearing.
+            THIN_WALL:
+                target: '1.2'
+                limit: '0.6'
+    Aluminum (Hard Cast Alloy):
+        category: Aluminium
+        is_active: true
+        rule_limits:
+            # High silicon content is abrasive and the casting may carry
+            # porosity, so leave a little more material than wrought.
+            THIN_WALL:
+                target: '1.5'
+                limit: '0.8'
+    Mild Steel:
+        category: Steel
+        is_active: true
+        rule_limits:
+            THIN_WALL:
+                target: '1.5'
+                limit: '0.8'
+    Low Alloy Steel:
+        category: Steel
+        is_active: true
+        rule_limits:
+            THIN_WALL:
+                target: '1.8'
+                limit: '1.0'
+    Austenitic Stainless Steel:
+        category: Steel
+        is_active: true
+        rule_limits:
+            # Work-hardens under a rubbing tool and pushes back hard, so thin
+            # sections deflect into the cutter and glaze rather than cut.
+            THIN_WALL:
+                target: '2.0'
+                limit: '1.2'
+    Tool Steel (unhardened):
+        category: Steel
+        is_active: true
+        rule_limits:
+            THIN_WALL:
+                target: '2.0'
+                limit: '1.2'
+    Gray Cast Iron:
+        category: Cast Iron
+        is_active: true
+        rule_limits:
+            # Brittle: thin sections chip at the cutter exit rather than
+            # deflecting, so the floor is higher than its hardness suggests.
+            THIN_WALL:
+                target: '2.5'
+                limit: '1.5'

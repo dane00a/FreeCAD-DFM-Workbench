@@ -341,3 +341,100 @@ class TestFindingShape(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# =============================================================================
+
+
+class TestCncProcesses(unittest.TestCase):
+    """The shipped CNC process definitions must load and differentiate."""
+
+    @classmethod
+    def setUpClass(cls):
+        from freecad.DFM.core.registries import ProcessRegistry
+
+        cls.registry = ProcessRegistry.get_instance()
+
+    def _process(self, name):
+        process = self.registry.get_process_by_name(name)
+        self.assertIsNotNone(process, f"{name} did not load")
+        return process
+
+    def test_both_cnc_processes_load(self):
+        self.assertIn("CNC Machining", self.registry.get_categories())
+        names = {p.name for p in self.registry.get_processes_for_category("CNC Machining")}
+        self.assertEqual(names, {"CNC Milling", "CNC Turning"})
+
+    def test_every_active_rule_has_a_check(self):
+        for name in ("CNC Milling", "CNC Turning"):
+            for rule in self._process(name).active_rules:
+                with self.subTest(process=name, rule=rule.name):
+                    self.assertIsNotNone(get_check_class(rule))
+
+    def test_every_active_rule_has_default_limits(self):
+        for name in ("CNC Milling", "CNC Turning"):
+            default = self._process(name).materials["Default"]
+            for rule in self._process(name).active_rules:
+                with self.subTest(process=name, rule=rule.name):
+                    self.assertIn(rule, default.rule_limits)
+
+    def test_turning_omits_the_vise_workholding_rules(self):
+        # A turned part is held in a chuck, so offering vise rules would be
+        # noise the user has to switch off by hand.
+        active = set(self._process("CNC Turning").active_rules)
+        self.assertNotIn(Rulebook.NO_PARALLEL_DATUM_PAIR, active)
+        self.assertNotIn(Rulebook.THIN_CLAMPING_DIMENSION, active)
+
+    def test_material_names_match_freecad_machining_cards(self):
+        # Materials are named for FreeCAD's own machining cards so a choice
+        # here refers to the same stock the CAM workbench would cut.
+        expected = {
+            "Aluminum (Soft Wrought Alloy)",
+            "Aluminum (Hard Cast Alloy)",
+            "Mild Steel",
+            "Low Alloy Steel",
+            "Austenitic Stainless Steel",
+            "Tool Steel (unhardened)",
+            "Gray Cast Iron",
+        }
+        for name in ("CNC Milling", "CNC Turning"):
+            with self.subTest(process=name):
+                self.assertTrue(expected.issubset(set(self._process(name).materials)))
+
+    def _limits_for(self, process_name, material, rule):
+        process = self._process(process_name)
+        source = process.materials[material].rule_limits.get(rule)
+        return source or process.materials["Default"].rule_limits[rule]
+
+    def test_material_changes_the_thin_wall_verdict(self):
+        # 1.0mm is acceptable in wrought aluminium and not in stainless.
+        plate = BRepPrimAPI_MakeBox(18.0, 18.0, 1.0).Shape()
+        aluminium = self._limits_for(
+            "CNC Milling", "Aluminum (Soft Wrought Alloy)", Rulebook.THIN_WALL
+        )
+        stainless = self._limits_for(
+            "CNC Milling", "Austenitic Stainless Steel", Rulebook.THIN_WALL
+        )
+        self.assertEqual(
+            severities(check(plate, Rulebook.THIN_WALL, aluminium.target, aluminium.limit)),
+            [Severity.WARNING],
+        )
+        self.assertEqual(
+            severities(check(plate, Rulebook.THIN_WALL, stainless.target, stainless.limit)),
+            [Severity.ERROR],
+        )
+
+    def test_material_changes_the_turning_slenderness_verdict(self):
+        # The same 3.75:1 shaft is fine in aluminium and slender in stainless.
+        shaft = make_shaft(10.0, 75.0)
+        default = self._limits_for("CNC Turning", "Default", Rulebook.PART_ASPECT_RATIO)
+        stainless = self._limits_for(
+            "CNC Turning", "Austenitic Stainless Steel", Rulebook.PART_ASPECT_RATIO
+        )
+        self.assertEqual(
+            check(shaft, Rulebook.PART_ASPECT_RATIO, default.target, default.limit), []
+        )
+        self.assertEqual(
+            severities(check(shaft, Rulebook.PART_ASPECT_RATIO, stainless.target, stainless.limit)),
+            [Severity.WARNING],
+        )

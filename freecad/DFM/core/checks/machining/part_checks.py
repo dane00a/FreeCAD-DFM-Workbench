@@ -48,12 +48,14 @@ class PartAspectRatioCheck(MachiningCheck):
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
         if context.is_turning_family:
-            return self._turned(context, rule, feedback)
+            return self._turned(context, rule_config, rule, feedback)
         return self._milled(context, rule_config, rule, feedback)
 
     # -- turning ------------------------------------------------------------
 
-    def _turned(self, context: MachiningContext, rule, feedback) -> list[CheckResult]:
+    def _turned(
+        self, context: MachiningContext, rule_config, rule, feedback
+    ) -> list[CheckResult]:
         axis = context.part_process.axis_of_revolution
         if axis is None:
             return []
@@ -62,11 +64,18 @@ class PartAspectRatioCheck(MachiningCheck):
         if diameter <= 1e-6 or length <= diameter:
             return []  # a disc is not slender, however wide
 
+        # The material's own limits win when the process defines them: a
+        # stainless bar overhangs less happily than an aluminium one, and that
+        # is exactly the kind of thing a shop tunes per material.
         thresholds = context.config.thresholds
+        target = self.safe_float(rule_config.target)
+        limit = self.safe_float(rule_config.limit)
+        if target is None and limit is None:
+            target = thresholds.turn_slender_warn_ratio
+            limit = thresholds.turn_slender_error_ratio
+
         ratio = length / diameter
-        graded = self.graded(
-            ratio, thresholds.turn_slender_warn_ratio, thresholds.turn_slender_error_ratio, "max"
-        )
+        graded = self.graded(ratio, target, limit, "max")
         if graded is None:
             return []
 
@@ -82,8 +91,8 @@ class PartAspectRatioCheck(MachiningCheck):
             feedback,
             severity,
             ratio,
-            thresholds.turn_slender_warn_ratio,
-            thresholds.turn_slender_error_ratio,
+            target if target is not None else 0.0,
+            limit if limit is not None else 0.0,
             "",
             f"The turned profile is {length:.1f} mm long on a {diameter:.1f} mm "
             f"diameter, a {ratio:.1f}:1 ratio -- {detail}. Expect taper and "

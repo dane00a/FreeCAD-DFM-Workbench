@@ -674,11 +674,14 @@ class Rulebook(Enum):
     # already editable by the shop, rather than being a second project.
     GDT_TOLERANCE_ACHIEVABLE = RuleType(
         "Tolerance Achievable",
-        shape=RuleShape.LIMIT_ONLY,
+        shape=RuleShape.MIN_AND_MAX,
         unit="mm",
-        comparison="min",
-        field_labels=("At least",),
-        description="Tolerance tighter than the process can hold.",
+        field_labels=("Form at least", "Position at least"),
+        description=(
+            "Tolerance tighter than the process can hold. Form and position "
+            "have separate floors: one is set by spindle runout and "
+            "deflection, the other by how well the part can be located."
+        ),
         family=RuleFamily.GDT,
     )
     GDT_DATUM_VALID = RuleType(

@@ -43,11 +43,11 @@ The rule bodies are equivalent; the recognizers disagree about what is on the
 part. Fixing these means changing recognition, which moves several rules at
 once — so measure the whole corpus after each, not just the fixture.
 
-### 1a. `slot_overhang` +18 — the slot recognizer claims more than the reference's
+### 1a. `slot_overhang` +18 — the slot recognizer seeds where the reference's does not
 
-The two rules are the same computation: `length/width > 6` and
-`depth/width >= gate`, same thresholds, same order. Every finding of the
-difference is a feature that exists here and not there.
+The rules are the same computation: `length/width > 6` and `depth/width >=
+gate`, same thresholds, same order. All eighteen findings of difference are
+features that exist here and not there.
 
 | fixture | ours | reference | reference sees |
 |---|---|---|---|
@@ -55,17 +55,32 @@ difference is a feature that exists here and not there.
 | `torture_casting_ribfield` | 1 | 0 | 19 "other", **0 slots** |
 | `machine_base_angle_plate` | 1 | 0 | 1 "other", **0 slots** |
 
-`micro_fluidic_channels` is the one to judge. Sixteen channels, each 1 mm
-wide × 25 mm long × 2.5 mm deep. We call them sixteen slots; the reference
-calls them four pockets. At 25:1 length-to-width with a 1 mm cutter the
-chatter warning is real, so our reading may be the more useful one — but
-sixteen identical findings is the noise the reference avoids by grouping.
+**Traced, and the resolver is not the cause.** Measured on
+`micro_fluidic_channels`:
 
-**Decide first whether these are slots.** If they are, the fix is not this
-rule but reporting one finding per group of identical parallel channels.
+- Our POCKET recognizer finds the 16 channels: faces `[9, 12, 60]` and so
+  on, width 1.0, length 25.0, depth 2.5.
+- Our SLOT recognizer finds the same channels with the same parameters.
+- Our resolver then prefers SLOT, **correctly by the reference's own rule** —
+  `interacting_feature_resolver.cpp` overrides its POCKET > SLOT priority
+  when the two cover the same face set, the slot's length/width is at least
+  2, and its length is at least its depth. Here that is 25:1 and 25 ≥ 2.5.
+  We already implement that override, at the same threshold.
 
-Same fixture also drives `pocket_narrow_opening` −4 (0 vs 4), for the mirror
-reason: the reference has pockets to apply it to and we do not.
+So the difference is entirely that the reference's **slot recognizer never
+seeds on these channels**, and the override therefore never runs. Its seed
+constraints are documented in `slot_recognizer.cpp` around line 25: the floor
+must be small relative to the part, at least two thirds of the floor's edges
+must be concave, and there must be two anti-parallel planar walls.
+
+Two things to establish before changing anything:
+
+1. Which of those three constraints rejects a 1 mm × 25 mm channel floor in
+   the reference. That is the difference to port.
+2. Why the reference reports **4** pockets for 16 channels. Either the part
+   has four channel groups, or its pocket recognizer grows across a connected
+   network where ours stops at each channel. If the latter, that is a second
+   difference and the more consequential one.
 
 ### 1b. `impeller_blade_hub` — three of five done
 

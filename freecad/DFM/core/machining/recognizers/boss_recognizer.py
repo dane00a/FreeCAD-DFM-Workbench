@@ -170,6 +170,15 @@ class BossRecognizer(FeatureRecognizer):
                 node, top
             ):
                 continue
+            # A shaped surface is not the side of a pad. A boss is prismatic
+            # or round -- that is what makes it a boss rather than a form --
+            # and a face carrying real curvature is a surface somebody set
+            # out to make. Absorbed as walls, three impeller blades and the
+            # hub they stand on became one boss, and the blades stopped
+            # existing: no freeform finding, no undercut, no report that the
+            # part cannot be reached from any cardinal direction at all.
+            if node.has_freeform_curvature:
+                continue
             walls.add(face_id)
             if _is_chamfer_cone(node):
                 edge_treatment.add(face_id)

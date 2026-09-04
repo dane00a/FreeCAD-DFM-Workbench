@@ -67,20 +67,41 @@ rule but reporting one finding per group of identical parallel channels.
 Same fixture also drives `pocket_narrow_opening` −4 (0 vs 4), for the mirror
 reason: the reference has pockets to apply it to and we do not.
 
-### 1b. `impeller_blade_hub` — one part, five rules
+### 1b. `impeller_blade_hub` — three of five done
+
+The cause was one miss, as expected. The boss recognizer took the three
+B-spline blades as walls of a boss, so the blades and the hub they stand on
+became a single protrusion and the blades stopped existing. A shaped face is
+not the side of a pad, and the wall test now says so.
+
+Fixed by that: `freeform_finishing` 4→5 (exact), `freeform_internal_radius`
+0→1 (exact), `boss_height_ratio` 7→6 (exact). `sharp_internal_edge` moved
+54→60, toward the reference.
+
+**Still open, and it is a real port rather than a tweak:**
 
 | rule | ours | reference |
 |---|---|---|
 | `tool_access_blocked` | 0 | 3 |
 | `undercut_present` | 0 | 3 |
-| `freeform_internal_radius` | 0 | 1 |
-| `freeform_finishing` | 0 | 1 |
-| `boss_height_ratio` | 1 | 0 |
 
-Five rules pointing at one bladed hub is one cause, not five. Start with what
-each engine recognizes on it. Note we report a boss where they do not and
-miss undercuts they find — consistent with the blades being read as
-protrusions here and as undercut-forming surfaces there.
+Both need UNDERCUT features on the blades, which we do not produce. Our
+undercut recognizer has a planar pass and a cylinder/torus pass, and so does
+the reference's — but the reference has a **third path in its draft
+recognizer** (`draft_recognizer.cpp`, around line 150): for a face with
+reverse draft it samples the overhanging region, takes each sample's surface
+normal, and ray-tests it against all six cardinal directions. When a majority
+of the overhang is unreachable it emits an UNDERCUT with
+`surface_type = "FREEFORM"`.
+
+The majority gate is the load-bearing part and its comment says why: a
+wrapped impeller channel buries 86–100% of its overhang, while a machinable
+exterior fillet is open and only ray-grazes on a few edge samples (33% and
+4–8% on two named fixtures). An earlier normal-coherence proxy could not tell
+them apart and called machinable fillets unmachinable.
+
+`tool_access_blocked` needs nothing of its own once those exist: it fires on
+any feature all of whose faces are undercut.
 
 ### 1c. `torture_casting_ribfield` — `rib_draft_angle` 0 vs 3
 

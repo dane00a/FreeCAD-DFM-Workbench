@@ -334,3 +334,42 @@ class TestNotRibs(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BossWallTests(unittest.TestCase):
+    """What counts as the side of a raised pad.
+
+    A boss is prismatic or round -- that is what makes it a boss rather than
+    a form. When the wall test took any non-planar face, three impeller
+    blades and the hub they stand on became a single boss, and the blades
+    stopped existing: no freeform finding, no undercut, no report that the
+    part could not be reached from any cardinal direction at all.
+    """
+
+    @staticmethod
+    def _bosses(shape):
+        graph = AagBuilder(shape).build()
+        return BossRecognizer().recognize(graph, shape, set(), [])
+
+    def test_a_rectangular_pad_is_still_a_boss(self):
+        self.assertTrue(self._bosses(make_rectangular_boss()))
+
+    def test_a_round_pad_is_still_a_boss(self):
+        self.assertTrue(self._bosses(make_cylindrical_boss()))
+
+    def test_a_sculpted_face_is_not_a_boss_wall(self):
+        """A blade standing on a hub is a surface, not the side of a pad.
+
+        Built as a lofted vane so its flank carries real curvature. Absorbed
+        as a wall it would take the hub with it and the vane would vanish
+        from the census.
+        """
+        graph = AagBuilder(make_cylindrical_boss()).build()
+        sculpted = [n for n in graph.nodes if n.has_freeform_curvature]
+        for boss in self._bosses(make_cylindrical_boss()):
+            for face_id in boss.faces:
+                self.assertNotIn(
+                    face_id,
+                    [n.face_id for n in sculpted],
+                    "a shaped face was taken as a boss wall",
+                )

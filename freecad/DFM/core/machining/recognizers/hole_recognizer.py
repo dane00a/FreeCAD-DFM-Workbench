@@ -193,8 +193,13 @@ class HoleRecognizer(FeatureRecognizer):
 
         if self._try_partial_bore(graph, cylinder, feature):
             return feature
-        self._try_counterbore(graph, cylinder, feature, taken)
-        self._try_countersink(graph, cylinder, feature, caps.cones)
+        # One or the other, never both. A counterbored bolt hole usually has
+        # a cone at its far end too -- the drill point, or a chamfer on the
+        # exit -- and calling both in sequence let the countersink test
+        # overwrite a counterbore that had already been recognized. The seat
+        # is what the hole is for; the cone is how it was finished.
+        if not self._try_counterbore(graph, cylinder, feature, taken):
+            self._try_countersink(graph, cylinder, feature, caps.cones)
         feature.parameters["hole_type"] = feature.type
         return feature
 
@@ -602,6 +607,18 @@ class HoleRecognizer(FeatureRecognizer):
                 # coaxial band with a shoulder at *both* ends is a relief
                 # groove turned into the middle of it, and absorbing that
                 # swallows the groove and misstates the counterbore depth.
+                #
+                # This is where a bolt hole counterbored from both faces of
+                # a flange is lost -- two bores sharing one seat look from
+                # here exactly like one bore with a groove in it. The
+                # reference tells them apart from the drawing, reading the
+                # band as a relief only when the tolerance data says the
+                # bore is tapped. Trying the same test on what a FreeCAD
+                # document declares does not work: on the corpus nothing
+                # declares a thread, so the test always says "seat" and the
+                # relief groove's bore is swallowed and then dropped by the
+                # resolver. Left as it is until there is a discriminator
+                # that does not need the drawing.
                 if self._is_flanked(graph, outer, axis):
                     continue
 

@@ -477,6 +477,11 @@ class HoleMultiPassCheck(MachiningCheck):
         return results
 
 
+# How closely a bore has to follow the part's rotation axis to have been
+# opened on the lathe rather than drilled.
+_LATHE_AXIS_DOT = 0.95
+
+
 @register_check(Rulebook.HOLE_INTERSECTS_CAVITY)
 class HoleIntersectsCavityCheck(MachiningCheck):
     """Bores that open into a milled cavity rather than into air.
@@ -555,10 +560,35 @@ class HoleIntersectsCavityCheck(MachiningCheck):
                 continue
             if self._blend_capped(context, hole):
                 continue
+            if self._bored_on_the_lathe(context, hole):
+                continue
             if self._touches_another_bore(context, hole, holes):
                 continue
             found.append(hole)
         return found
+
+    @staticmethod
+    def _bored_on_the_lathe(context: MachiningContext, hole: FeatureInstance) -> bool:
+        """Whether this bore was made on the axis the part was turned about.
+
+        A bore down the middle of a turned part is opened with a boring bar
+        while the part spins, and it stops wherever the previous turned form
+        left off -- a counterbore, a recess, the back of a flange. Nothing
+        broke into anything: that is the order the operations were done in.
+
+        The concern this rule carries is a drill arriving somewhere it was
+        not expected, and that is a milling concern. A cross-drilled hole on
+        the same part still fires, because it is not on the lathe axis and
+        does meet whatever it meets by surprise.
+        """
+        process = context.part_process
+        if not process.has_axis or not context.is_turning_family:
+            return False
+        axis = HoleWebThicknessCheck._axis_line(context, hole)
+        if axis is None:
+            return False
+        rotation = process.axis_of_revolution
+        return abs(axis.Direction().Dot(rotation.Direction())) > _LATHE_AXIS_DOT
 
     def _through_breaches(
         self,

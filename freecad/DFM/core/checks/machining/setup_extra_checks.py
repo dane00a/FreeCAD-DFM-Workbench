@@ -152,18 +152,62 @@ class SetupCountCheck(MachiningCheck):
         ]
 
     @staticmethod
-    def _approach_directions(context) -> list[gp_Dir]:
-        """The direction the tool comes from, for every feature that needs one."""
-        directions: list[gp_Dir] = []
+    def _approach_directions(context) -> list[tuple[gp_Dir, bool]]:
+        """Where the tool comes from, and whether it could come from the other side.
+
+        Each direction carries whether it is reversible. A through hole is
+        not: it is drilled from whichever end is convenient, and which end is
+        a fixturing decision rather than a fact about the hole. A blind hole
+        is -- there is one end you can drill it from, and no amount of
+        fixturing changes that. So is a cavity, which is reached from the
+        side its floor faces, and so is anything applied onto a face.
+
+        Getting this wrong in the permissive direction is what made a
+        compressor disk with work on both faces read as a single setup.
+        """
+        directions: list[tuple[gp_Dir, bool]] = []
         for feature in context.recognition.features:
             if feature.type not in _COSTS_A_SETUP:
                 continue
+
+            # A cavity is reached from the side its floor points to, and that
+            # side only.
+            floor = feature.direction("floor_normal")
+            if floor is not None:
+                directions.append((floor, True))
+                continue
+
+            # A feature applied onto a face -- engraving, marking -- can only
+            # be approached from the outward side of the face carrying it.
+            host = SetupCountCheck._host_face_normal(context, feature)
+            if host is not None:
+                directions.append((host, True))
+                continue
+
             axis = feature.direction("axis")
             if axis is None:
                 axis = feature.direction("normal")
             if axis is not None:
-                directions.append(axis)
+                # A bore is reversible unless something closes one end.
+                directions.append((axis, bool(feature.param("axis_signed"))))
         return directions
+
+    @staticmethod
+    def _host_face_normal(context, feature):
+        """The outward normal of the face a feature is applied to."""
+        host = feature.parameters.get("host_face")
+        if host is None:
+            return None
+        try:
+            face_id = int(host)
+        except (TypeError, ValueError):
+            return None
+        if not context.graph.has_node(face_id):
+            return None
+        node = context.graph.node(face_id)
+        if node.surface_type is not SurfaceType.PLANE:
+            return None
+        return node.outward_normal
 
 
 @register_check(Rulebook.NO_ORTHOGONAL_DATUM_TRIO)
@@ -298,24 +342,41 @@ class ToolAccessSpecialSetupCheck(MachiningCheck):
 # =============================================================================
 
 
-def _cluster(directions: list[gp_Dir], cluster_deg: float) -> int:
-    """How many distinct approach directions a set of features needs.
+def _cluster(directions: list[tuple[gp_Dir, bool]], cluster_deg: float) -> int:
+    """How many times the part has to be refixtured.
 
-    Greedy: each direction joins the first cluster it is close enough to.
-    Order-dependent in principle, but the graph hands back faces in a fixed
-    order, so the answer is stable for a given part.
+    Greedy: each direction joins the first cluster it can. Order-dependent in
+    principle, but the graph hands back faces in a fixed order, so the answer
+    is stable for a given part.
 
-    Directions are compared without sign. A hole is drilled from one end, and
-    which end is a fixturing decision rather than a property of the hole.
+    What decides whether two directions are one setup is whether either can
+    be reversed. Two features that can each only be reached from one side are
+    the same setup only if that side is the same side -- top and bottom are
+    two. A feature that can be reached from either end joins whichever
+    cluster it is parallel to, in either sense, and once a one-sided feature
+    joins it the cluster is one-sided too, pointing the way that feature
+    needs.
     """
     tolerance = math.cos(math.radians(cluster_deg))
-    representatives: list[gp_Dir] = []
-    for direction in directions:
-        if not any(
-            abs(direction.Dot(existing)) > tolerance for existing in representatives
-        ):
-            representatives.append(direction)
-    return len(representatives)
+    clusters: list[list] = []  # [direction, fixed]
+
+    for direction, fixed in directions:
+        for cluster in clusters:
+            existing, existing_fixed = cluster
+            alignment = direction.Dot(existing)
+            if not (fixed and existing_fixed):
+                alignment = abs(alignment)
+            if alignment > tolerance:
+                if fixed and not existing_fixed:
+                    # The cluster was free to be approached either way and
+                    # is not any more.
+                    if direction.Dot(existing) < 0.0:
+                        existing.Reverse()
+                    cluster[1] = True
+                break
+        else:
+            clusters.append([gp_Dir(direction.XYZ()), fixed])
+    return len(clusters)
 
 
 def _best_cardinal_dot(axis: gp_Dir) -> float:

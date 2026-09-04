@@ -481,3 +481,67 @@ class TestCncProcesses(unittest.TestCase):
             severities(check(shaft, Rulebook.PART_ASPECT_RATIO, stainless.target, stainless.limit)),
             [Severity.WARNING],
         )
+
+
+class TestSetupDirections(unittest.TestCase):
+    """Which way the tool comes, and whether it could come the other way.
+
+    A through hole is drilled from whichever end is convenient; a blind hole
+    has one end and no fixturing changes that. Treating both as reversible
+    made a part with work on its top and its bottom read as a single setup.
+    """
+
+    RULE = Rulebook.SETUP_COUNT_HIGH
+
+    @staticmethod
+    def _plate():
+        return BRepPrimAPI_MakeBox(120.0, 80.0, 40.0).Shape()
+
+    def _drill(self, shape, at, direction, depth=15.0, radius=4.0):
+        from OCP.BRepPrimAPI import BRepPrimAPI_MakeCylinder
+
+        return _cut(
+            shape,
+            BRepPrimAPI_MakeCylinder(
+                gp_Ax2(gp_Pnt(*at), gp_Dir(*direction)), radius, depth
+            ).Shape(),
+        )
+
+    def _setups(self, shape):
+        from freecad.DFM.core.checks.machining.setup_extra_checks import (
+            SetupCountCheck,
+            _cluster,
+        )
+
+        context = list(_analyse(shape).values())[0]
+        directions = SetupCountCheck()._approach_directions(context)
+        if not directions:
+            return 0
+        cluster_deg = context.config.thresholds.tad_angular_cluster_deg
+        return max(1, _cluster(directions, cluster_deg))
+
+    def test_blind_holes_from_one_side_are_one_setup(self):
+        shape = self._plate()
+        shape = self._drill(shape, (30, 40, 40), (0, 0, -1))
+        shape = self._drill(shape, (60, 40, 40), (0, 0, -1))
+        self.assertEqual(self._setups(shape), 1)
+
+    def test_blind_holes_from_opposite_sides_are_two(self):
+        """The part has to be turned over, and that is the whole rule."""
+        shape = self._plate()
+        shape = self._drill(shape, (30, 40, 40), (0, 0, -1))
+        shape = self._drill(shape, (60, 40, 0), (0, 0, 1))
+        self.assertEqual(self._setups(shape), 2)
+
+    def test_a_through_hole_joins_either_side(self):
+        """It can be drilled from whichever end is already facing up."""
+        shape = self._plate()
+        shape = self._drill(shape, (30, 40, 40), (0, 0, -1))
+        shape = self._drill(shape, (60, 40, -5), (0, 0, 1), depth=50.0)
+        self.assertEqual(self._setups(shape), 1)
+
+    def test_blind_holes_at_right_angles_are_two(self):
+        shape = self._plate()
+        shape = self._drill(shape, (30, 40, 40), (0, 0, -1))
+        shape = self._drill(shape, (0, 40, 20), (1, 0, 0))
+        self.assertEqual(self._setups(shape), 2)

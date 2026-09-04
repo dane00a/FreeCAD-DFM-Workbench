@@ -664,9 +664,10 @@ class FeatureComplexityCheck(MachiningCheck):
 
         census = self._census(context)
         count = float(census["total"])
-        if count <= 0.0:
-            return []
-
+        # A part with nothing recognized on it still gets its line. "No
+        # features, one operation" is a true statement and a useful one --
+        # it is a billet somebody saws to length, and an estimator reading a
+        # silent panel cannot tell that from an analysis that failed.
         graded = self.graded(count, target, limit, "max")
         if graded is not None:
             severity, threshold = graded
@@ -695,7 +696,7 @@ class FeatureComplexityCheck(MachiningCheck):
             self.finding(
                 rule,
                 severity,
-                f"{int(count)} features, about {census['operations']} operations",
+                _census_overview(census),
                 self.render(
                     feedback,
                     severity,
@@ -703,9 +704,7 @@ class FeatureComplexityCheck(MachiningCheck):
                     target,
                     limit,
                     "",
-                    f"This part carries {int(count)} recognized features "
-                    f"({census['summary']}), which is roughly "
-                    f"{census['operations']} machining operations. {closing}",
+                    _census_sentence(census) + " " + closing,
                 ),
                 faces=[],
                 value=count,
@@ -772,6 +771,37 @@ class FeatureComplexityCheck(MachiningCheck):
             "operations": operations,
             "summary": ", ".join(spoken) or "no recognized features",
         }
+
+
+def _census_overview(census) -> str:
+    """The census as a row label."""
+    if not census["total"]:
+        return "nothing recognized"
+    return "%d features, about %d operations" % (
+        census["total"],
+        census["operations"],
+    )
+
+
+def _census_sentence(census) -> str:
+    """The census as a sentence a person would say.
+
+    A part with nothing on it is the one worth writing separately. "This part
+    carries 0 recognized features (no recognized features)" is what comes of
+    running an empty tally through a template, and a machinist reading it
+    learns less than from a blank line.
+    """
+    if not census["total"]:
+        return (
+            "Nothing on this part was recognized as a machined feature: no "
+            "holes, no pockets, no slots, no blends. It reads as stock cut "
+            "to size."
+        )
+    return (
+        "This part carries %d recognized features (%s), which is roughly "
+        "%d machining operations."
+        % (census["total"], census["summary"], census["operations"])
+    )
 
 
 def _readable(feature_type: str) -> str:

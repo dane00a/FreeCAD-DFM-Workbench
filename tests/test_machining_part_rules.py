@@ -249,8 +249,18 @@ class TestFeatureComplexity(unittest.TestCase):
         self.assertTrue(findings)
         self.assertEqual(findings[0].severity, Severity.INFO)
 
-    def test_a_part_with_nothing_on_it_says_nothing(self):
-        self.assertEqual(rule_check(block(), self.RULE), [])
+    def test_a_part_with_nothing_on_it_says_so(self):
+        """A blank panel and a failed analysis look the same otherwise.
+
+        Nothing recognized is a finding in its own right -- the part reads as
+        stock cut to size -- and an estimator who sees no line at all cannot
+        tell that from an analysis that fell over.
+        """
+        findings = rule_check(block(), self.RULE)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].severity, Severity.INFO)
+        self.assertIn("stock cut to size", findings[0].message)
+        self.assertNotIn("0 recognized features (no", findings[0].message)
 
 
 class TestMarkingRules(unittest.TestCase):

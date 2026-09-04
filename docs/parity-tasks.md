@@ -11,6 +11,45 @@ first.
 
 **46 rules agree exactly. 29 differ.** Raw totals: 1091 here, 1218 there.
 
+## Status, and a warning about the numbers below
+
+The rule-level figures in this document were measured before the recognition
+work of 2026-09-04 and have not been re-measured since. That work changed
+what the rules are looking at, so treat every count below as an indication of
+where to look rather than as a current reading. Several entries name causes
+that no longer exist.
+
+Recognition itself is now close. Against the reference's own `features.json`
+over the 211-part corpus, total L1 error is 21 and 198 fixtures match exactly,
+from 479 and 99 at the start of that day's work. Fifteen feature types agree
+exactly, including every hole type. What remains, per type and net of sign:
+
+| type | ours | reference | where |
+| --- | --- | --- | --- |
+| `THROUGH_CAVITY` | 29 | 25 | phantom windows on three formed sheet parts and the turbo housing flange |
+| `PATTERN` | 79 | 83 | four fixtures, one group each |
+| `FREEFORM_SURFACE` | 29 | 26 | `sm_emboss_freeform`, `torture_freeform_leviathan` |
+| `GROOVE` | 16 | 14 | `sm_hd_bracket`, `sm_relief_shapes` |
+| `BOSS` | 21 | 22 | three fixtures, one each way |
+| `STEP` | 52 | 54 | `sm_torture_curved_outline` |
+| `POCKET` | 68 | 70 | `sm_formed_shapes`, `torture_freeform_leviathan` |
+| `FILLET` | 42 | 43 | `sm_emboss_gallery` |
+
+The turbo housing case is worth reading first because it is one disagreement
+counted twice: the reference calls faces 1-6 and 10-13 a `BOSS` and we call
+almost the same set a `THROUGH_CAVITY`. Our boss pass declines it, and the
+reason is worth finding before the phantom cavity is chased separately.
+
+A note on re-measuring the rules: the scratch parity harness compares rule
+ids literally, and several of ours are named differently from the reference's
+for the same concern -- `pocket_corner_radius`/`pocket_square_corner`,
+`hole_depth_ratio`/`hole_deep_risk`, `slot_depth_ratio`/`slot_deep_risk`,
+`pocket_depth_ratio`/`pocket_deep_risk`, `boss_height_ratio`/`boss_height_risk`,
+`material_removal`/`material_removal_high`. Its raw output shows those as
+total disagreements when they are the same finding under two names. Anything
+read from it needs that translation applied first, on top of the
+`occurrence_count` summing described below.
+
 ## Reading the numbers
 
 Compare raw against raw. The reference collapses identical findings into one
@@ -44,6 +83,14 @@ part. Fixing these means changing recognition, which moves several rules at
 once — so measure the whole corpus after each, not just the fixture.
 
 ### 1a. `slot_overhang` +18 — the slot recognizer seeds where the reference's does not
+
+**Resolved 2026-09-04.** The pocket pass was retyping long cavities as slots
+and the slot pass stood down wherever the pocket pass had claimed a face, so
+which vocabulary a channel got was decided by running order. Both passes now
+emit their own reading and the resolver arbitrates on the aspect ratio, and
+the floored-slot pass re-selects its floor, rejects a lidded opening and
+measures width across the narrowest facing pair. `SLOT` is exact against the
+reference. The rule count below has not been re-measured.
 
 The rules are the same computation: `length/width > 6` and `depth/width >=
 gate`, same thresholds, same order. All eighteen findings of difference are

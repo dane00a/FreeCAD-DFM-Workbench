@@ -21,7 +21,7 @@ from ...core.base.base_analyzer import BaseAnalyzer
 from ...core.machining.aag_builder import AagBuilder
 from ...core.machining.config import MachiningConfig
 from ...core.machining.context import MachiningContext
-from ...core.machining.features import RecognitionResult
+from ...core.machining.features import FeatureType, RecognitionResult
 from ...core.machining.process_classifier import (
     PartProcessType,
     classify_part_process,
@@ -159,18 +159,18 @@ class MachiningAnalyzer(BaseAnalyzer):
         # The sheet-metal pass runs after the resolver rather than inside it,
         # and appends what it finds.
         #
-        # A fold is two things at once and both are wanted. It is a BEND --
-        # a brake operation, with an angle and a radius and rules of its own
-        # -- and each of its two cylindrical faces is also a FILLET, which is
-        # what the freeform and corner rules read. Run through the resolver
-        # together the bend contains both fillets outright and the resolver,
-        # correctly by its own lights, drops them: one of two readings of the
-        # same faces is meant to survive. Here both readings are true and the
-        # rules want both, so the question never goes to the resolver.
+        # It has to run late: a bend can only be recognized once the final,
+        # feature-veto-refined classification says sheet metal, and that is
+        # not known until resolution is done. Running it after also means a
+        # part the classifier did not call sheet metal can never pick up a
+        # bend, which keeps every milled and turned result untouched.
         #
-        # It also means a part the classifier did not call sheet metal can
-        # never pick up a bend, which keeps every milled and turned result
-        # untouched by this pass.
+        # The cost of running late is that the blend pass has already been
+        # and gone, and it reported both of the bend's skins as fillets --
+        # they are tangent cylinders, which is precisely a fillet. Those
+        # duplicates are cleaned up below rather than prevented, because at
+        # the time the blends were found there was nothing to prevent them
+        # with.
         if part_process.type is PartProcessType.SHEET_METAL:
             for recognizer_class in SHEET_PIPELINE:
                 if check_abort and check_abort():
@@ -191,5 +191,48 @@ class MachiningAnalyzer(BaseAnalyzer):
                 settled.extend(found)
                 for feature in found:
                     claimed.update(feature.faces)
+            _drop_bend_duplicate_fillets(settled)
 
         return settled
+
+
+def _drop_bend_duplicate_fillets(recognition) -> None:
+    """Remove the fillets that are a bend seen a second time.
+
+    A bend has an inner radius face and an outer one a gauge thickness
+    further out, and both are cylinders tangent to the panels they join --
+    which is a fillet's signature exactly. The blend pass runs long before
+    the part is known to be sheet, so it cannot know a bend is coming, and
+    every fold ends up reported three times: once as the bend, twice as the
+    fillets its skins make.
+
+    Matched on face identity and never on radius. A fillet that merely
+    happens to share a radius with a bend, somewhere else on the part, is a
+    real fillet with a real tool behind it.
+
+    A blend that claims a bend skin *and* something else is left whole. The
+    blend pass merges same-radius faces, so such a feature still describes
+    real non-bend geometry, and its radius was measured from whichever
+    member has the most area -- possibly that one. Trimming its face list
+    would leave a feature whose numbers describe geometry it no longer
+    claims. A duplicate left standing is the safer error.
+
+    Sheet metal only. On a milled part a fillet carries rules of its own,
+    and this never runs there.
+    """
+    bend_faces: set[int] = set()
+    for feature in recognition.features:
+        if feature.type == FeatureType.BEND:
+            bend_faces.update(feature.faces)
+    if not bend_faces:
+        return
+
+    recognition.features = [
+        feature
+        for feature in recognition.features
+        if not (
+            feature.type == FeatureType.FILLET
+            and feature.faces
+            and all(face_id in bend_faces for face_id in feature.faces)
+        )
+    ]

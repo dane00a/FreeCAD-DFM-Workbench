@@ -144,9 +144,18 @@ def block_with_pad(offset: float) -> TopoDS_Shape:
 
 
 def counterbored_tapped_hole(outer_diameter: float) -> TopoDS_Shape:
-    """A tapped hole with a coaxial mouth opened over it."""
+    """A tapped hole with a coaxial spot face opened over it.
+
+    The seat is a millimetre deep past the block face, which puts its
+    shoulder among the first turns of the thread rather than above them. Cut
+    deeper than the thread's lead, the seat sits on a plain length of bore
+    and the recognizer -- correctly, and as the reference engine does -- reads
+    that as a counterbore in its own right with the tapped length below it as
+    a second feature. Both readings describe the part; this one is the shape
+    the rule under test is about, a head seat bearing straight onto thread.
+    """
     mouth = BRepPrimAPI_MakeCylinder(
-        gp_Ax2(gp_Pnt(0, 0, -1), gp_Dir(0, 0, 1)), outer_diameter / 2.0, 4.0
+        gp_Ax2(gp_Pnt(0, 0, -1), gp_Dir(0, 0, 1)), outer_diameter / 2.0, 2.0
     ).Shape()
     return _cut(tapped_hole(block()), mouth)
 

@@ -70,6 +70,11 @@ _BLEND_BAND_MAX_WRAP = 0.35
 
 # A would-be bore covering less than this much of a circle laterally is an
 # open saddle -- a bearing seat milled open-side-up, not a drilled hole.
+#: How close to the end of the part a face has to be to count as the outside
+#: of it. A few millimetres covers a shoulder set slightly in from the face
+#: without letting an internal step pass for an external one.
+_PART_EXTREME_TOL_MM = 2.0
+
 _PARTIAL_BORE_LATERAL_MAX = 1.7
 
 #: How alike two cylinders must be to belong to one coaxial system: the same
@@ -132,6 +137,7 @@ class HoleRecognizer(FeatureRecognizer):
                 taken.update(feature.faces)
 
         merged = self._merge_split_bores(graph, found)
+        self._absorb_orphan_fragments(graph, merged)
         # After the merge, because a modelled thread splits the bore it is cut
         # in: each fragment alone is not the hole, and the thread belongs to
         # the whole of it.
@@ -174,7 +180,14 @@ class HoleRecognizer(FeatureRecognizer):
         # depth. Rules about tapping and flat bottoms make no sense on it.
         terminates_in_cavity = not is_through and not floors and not caps.cones
 
-        faces = [cylinder.face_id] + floors + openings + caps.cones + caps.bridges
+        # The opening is not part of the hole. It is the face the hole was
+        # drilled into -- a face the size of the part, usually, shared with
+        # every other hole on that side -- and listing it makes the feature
+        # claim the whole wall: the viewport highlights it, and the resolver
+        # cannot see a bore sitting inside the groove that interrupts it,
+        # because the groove does not claim the wall too. Only the hole's own
+        # ends belong to it.
+        faces = [cylinder.face_id] + floors + caps.cones + caps.bridges
         parameters = {
             "diameter_mm": round(cylinder.cyl_radius * 2.0, 6),
             "depth_mm": round(self._depth(cylinder, graph, caps.bridges), 6),
@@ -206,7 +219,7 @@ class HoleRecognizer(FeatureRecognizer):
         # exit -- and calling both in sequence let the countersink test
         # overwrite a counterbore that had already been recognized. The seat
         # is what the hole is for; the cone is how it was finished.
-        if not self._try_counterbore(graph, cylinder, feature, taken):
+        if not self._try_counterbore(graph, cylinder, feature):
             self._try_countersink(graph, cylinder, feature, caps.cones)
         feature.parameters["hole_type"] = feature.type
         return feature
@@ -409,11 +422,6 @@ class HoleRecognizer(FeatureRecognizer):
                     node.plane_normal is not None
                     and abs(node.plane_normal.Dot(axis_dir)) > _CAP_AXIS_ALIGNMENT
                     and node.face_id not in caps.planar
-                    # The shoulder of a relief groove turned into the bore
-                    # wall is square to the axis like a cap, but it neither
-                    # opens the hole nor bottoms it. Counting it makes the
-                    # bore look terminated where it carries straight on.
-                    and not self._is_groove_shoulder(graph, node, cylinder)
                 ):
                     caps.planar.append(node.face_id)
             elif node.surface_type is SurfaceType.CONE:
@@ -635,11 +643,32 @@ class HoleRecognizer(FeatureRecognizer):
         graph: AttributedAdjacencyGraph,
         cylinder: AagNode,
         feature: FeatureInstance,
-        taken: set[int],
     ) -> bool:
-        """A larger coaxial bore stacked on top of this one, with a shoulder."""
+        """A larger coaxial bore stacked on top of this one, with a shoulder.
+
+        A bore can carry a seat at each end. A through bolt gets a socket-head
+        counterbore on one face and a nut seat on the other, and the two are
+        one hole to drill and two to spot-face. The far seat is absorbed into
+        the same feature rather than left to the main loop, which would see a
+        wide short cylinder closed by a shoulder and call it a flat-bottomed
+        blind hole -- and then a rule would ask why a flat-bottomed hole was
+        drilled instead of milled, about a spot face.
+
+        No attempt is made to tell a counterbore from a thread-relief groove
+        on topology alone. They are the same shape: a wider coaxial band with
+        a shoulder. What separates them is what the band is for, which is on
+        the drawing and not in the solid, and the reference reads it from the
+        tolerance data. Guessing from the shoulders instead -- a band with a
+        step at each end is a groove -- costs more than it earns: it throws
+        away every bolt hole counterbored from both faces of a flange, which
+        has exactly that signature and is not a groove at all.
+        """
         axis = cylinder.cyl_cone_axis
         axis_dir = axis.Direction()
+        cross = cross_section_area(cylinder)
+
+        found = False
+        first_shoulder: Optional[int] = None
 
         for shoulder, _ in neighbours(graph, cylinder.face_id):
             if (
@@ -648,105 +677,240 @@ class HoleRecognizer(FeatureRecognizer):
                 or abs(shoulder.plane_normal.Dot(axis_dir)) < _CAP_AXIS_ALIGNMENT
             ):
                 continue
+            if found and shoulder.face_id == first_shoulder:
+                continue  # this end already absorbed
 
             for outer, _ in neighbours(graph, shoulder.face_id):
                 if (
                     outer.face_id == cylinder.face_id
+                    or outer.face_id in feature.faces
                     or outer.surface_type is not SurfaceType.CYLINDER
                     or not outer.is_internal
                     or outer.cyl_cone_axis is None
-                    or outer.face_id in taken
-                    or outer.cyl_radius <= cylinder.cyl_radius + 1e-6
+                    or outer.cyl_radius <= cylinder.cyl_radius + 1e-4
                     or not axes_are_coaxial(outer.cyl_cone_axis, axis)
                 ):
                     continue
 
-                # A counterbore opens out at an end of the bore. A wider
-                # coaxial band with a shoulder at *both* ends is a relief
-                # groove turned into the middle of it, and absorbing that
-                # swallows the groove and misstates the counterbore depth.
-                #
-                # This is where a bolt hole counterbored from both faces of
-                # a flange is lost -- two bores sharing one seat look from
-                # here exactly like one bore with a groove in it. The
-                # reference tells them apart from the drawing, reading the
-                # band as a relief only when the tolerance data says the
-                # bore is tapped. Trying the same test on what a FreeCAD
-                # document declares does not work: on the corpus nothing
-                # declares a thread, so the test always says "seat" and the
-                # relief groove's bore is swallowed and then dropped by the
-                # resolver. Left as it is until there is a discriminator
-                # that does not need the drawing.
-                if self._is_flanked(graph, outer, axis):
-                    continue
+                if found:
+                    # The far seat. Absorbing it claims its cylinder, which
+                    # is the whole point.
+                    feature.parameters["outer2_diameter_mm"] = round(
+                        outer.cyl_radius * 2.0, 6
+                    )
+                    feature.parameters["counterbore2_depth_mm"] = round(
+                        cylinder_length(outer), 6
+                    )
+                    feature.parameters["counterbore_double_ended"] = True
+                    feature.faces = sorted(
+                        set(feature.faces) | {shoulder.face_id, outer.face_id}
+                    )
+                    # Seats at both ends usually mean the bore runs through:
+                    # each one is entered from its own face. Only say so when
+                    # the far seat actually opens onto a face, because an
+                    # undercut relief at the closed end of a blind bore has
+                    # the same topology and terminates on an internal floor.
+                    if self._opens_onto_a_face(
+                        graph, outer, shoulder.face_id, axis_dir, cross
+                    ):
+                        feature.parameters["is_through"] = True
+                        feature.parameters["flat_bottom"] = False
+                    return True
 
                 feature.type = FeatureType.COUNTERBORE
-                feature.faces = sorted(set(feature.faces + [shoulder.face_id, outer.face_id]))
-                feature.parameters["outer_diameter_mm"] = round(outer.cyl_radius * 2.0, 6)
+                feature.parameters["outer_diameter_mm"] = round(
+                    outer.cyl_radius * 2.0, 6
+                )
                 feature.parameters["counterbore_depth_mm"] = round(
                     cylinder_length(outer), 6
                 )
-                return True
-        return False
+                feature.faces = sorted(
+                    set(feature.faces) | {shoulder.face_id, outer.face_id}
+                )
 
-    @staticmethod
-    def _is_groove_shoulder(
-        graph: AttributedAdjacencyGraph, plane: AagNode, cylinder: AagNode
-    ) -> bool:
-        """Whether a planar neighbour is the wall of a groove, not a cap.
+                # The bore was called blind because the annular shoulder was
+                # its floor. With the outer cylinder merged on top of that
+                # shoulder the shoulder is no longer an end, so ask again:
+                # the bore is through if its far end opens onto a face.
+                if self._opens_onto_a_face(
+                    graph, cylinder, shoulder.face_id, axis_dir, cross
+                ):
+                    feature.parameters["is_through"] = True
 
-        A groove shoulder steps out to a wider coaxial band that has another
-        shoulder at its far end. A counterbore seat looks identical from this
-        side, and is told apart by exactly that: its wider band opens to air
-        rather than stepping back down.
+                if not feature.param("axis_signed"):
+                    self._sign_counterbore(
+                        graph, feature, cylinder, outer, shoulder.face_id
+                    )
+
+                found = True
+                first_shoulder = shoulder.face_id
+                break
+
+        return found
+
+    def _sign_counterbore(
+        self,
+        graph: AttributedAdjacencyGraph,
+        feature: FeatureInstance,
+        inner: AagNode,
+        outer: AagNode,
+        shoulder_id: int,
+    ) -> None:
+        """Point the axis the way the tool came in.
+
+        A through bore is left unsigned on the grounds that it can be drilled
+        from either end. A counterbore cannot: the seat is spot-faced from
+        whichever face it opens onto, and that end is a fact about the part
+        rather than a fixturing choice. Usually it is the outer -- that is
+        what a counterbore is -- but an undercut relief turned into the far
+        end of a blind bore has exactly the same topology with the wide band
+        buried inside, and there the tool comes in through the inner.
+
+        Which of the two is settled by walking the bore stack out from each
+        end and seeing whether it reaches the outside of the part. Saying so
+        matters twice over: two counterbores machined into opposite faces of
+        one block stay two setups instead of collapsing into one, and two
+        bores in line with a relief band between them stay two bores instead
+        of being merged into a single long hole.
         """
-        axis = cylinder.cyl_cone_axis
+        axis = inner.cyl_cone_axis
         if axis is None:
+            return
+        axis_dir = axis.Direction()
+        limits = self._axial_extremes(graph, axis_dir)
+
+        inner_outside = self._reaches_the_outside(
+            graph, inner, shoulder_id, axis_dir, limits
+        )
+        outer_outside = self._reaches_the_outside(
+            graph, outer, shoulder_id, axis_dir, limits
+        )
+        if not inner_outside and not outer_outside:
+            return  # buried at both ends: nothing to point at
+
+        offset = _axial_midpoint(outer, axis_dir) - _axial_midpoint(inner, axis_dir)
+        if abs(offset) <= 1e-6:
+            return
+        # Toward the outer when the seat is the way in, toward the inner when
+        # the wide band is a relief buried at the far end.
+        toward = offset if outer_outside else -offset
+        signed = gp_Dir(axis_dir.XYZ())
+        if toward < 0.0:
+            signed.Reverse()
+        feature.parameters["axis"] = (
+            round(signed.X(), 6),
+            round(signed.Y(), 6),
+            round(signed.Z(), 6),
+        )
+        feature.parameters["axis_signed"] = True
+
+    @staticmethod
+    def _axial_extremes(
+        graph: AttributedAdjacencyGraph, axis_dir
+    ) -> tuple[float, float]:
+        """How far the part reaches along an axis, either way."""
+        low, high = math.inf, -math.inf
+        for node in graph.nodes:
+            if node.bbox.IsVoid():
+                continue
+            xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
+            for x in (xmin, xmax):
+                for y in (ymin, ymax):
+                    for z in (zmin, zmax):
+                        along = (
+                            x * axis_dir.X() + y * axis_dir.Y() + z * axis_dir.Z()
+                        )
+                        low = min(low, along)
+                        high = max(high, along)
+        return (low, high)
+
+    @staticmethod
+    def _reaches_the_outside(
+        graph: AttributedAdjacencyGraph,
+        start: AagNode,
+        shoulder_id: int,
+        axis_dir,
+        limits: tuple[float, float],
+    ) -> bool:
+        """Whether a tool sized for this bore could get to it from outside.
+
+        Walks the stack of coaxial bores and shoulders out from one end,
+        without crossing back over the shoulder that separates the two ends,
+        and asks whether it comes out on a face at the end of the part. Only
+        bores at least as wide as the one it started from are passable: a
+        tool that fits this bore cannot come in through a narrower one.
+
+        A gland groove splitting a counterbore into two bands, or an internal
+        shoulder part way along, is a stepping stone rather than an answer --
+        only where the walk stops does the question get asked.
+        """
+        low, high = limits
+        if low is math.inf:
             return False
-        for band, _ in neighbours(graph, plane.face_id):
-            if band.face_id == cylinder.face_id:
-                continue
-            if band.surface_type is not SurfaceType.CYLINDER:
-                continue
-            if band.cyl_cone_axis is None or not band.is_internal:
-                continue
-            if band.cyl_radius <= cylinder.cyl_radius + 1e-6:
-                continue
-            if not axes_are_coaxial(band.cyl_cone_axis, axis):
-                continue
-            if HoleRecognizer._is_flanked(graph, band, axis):
-                return True
+        minimum_radius = start.cyl_radius
+        seen = {start.face_id}
+        stack = [start.face_id]
+
+        while stack:
+            for node, _ in neighbours(graph, stack.pop()):
+                if node.face_id == shoulder_id or node.face_id in seen:
+                    continue
+                if node.surface_type is SurfaceType.PLANE:
+                    if node.plane_normal is None:
+                        continue
+                    if abs(node.plane_normal.Dot(axis_dir)) < _CAP_AXIS_ALIGNMENT:
+                        continue
+                    along = (
+                        node.centroid.X() * axis_dir.X()
+                        + node.centroid.Y() * axis_dir.Y()
+                        + node.centroid.Z() * axis_dir.Z()
+                    )
+                    if (
+                        abs(along - low) < _PART_EXTREME_TOL_MM
+                        or abs(along - high) < _PART_EXTREME_TOL_MM
+                    ):
+                        return True
+                    seen.add(node.face_id)
+                    stack.append(node.face_id)
+                elif node.surface_type is SurfaceType.CYLINDER:
+                    if node.cyl_cone_axis is None:
+                        continue
+                    if abs(node.cyl_cone_axis.Direction().Dot(axis_dir)) < 0.98:
+                        continue
+                    if node.cyl_radius + 1e-4 < minimum_radius:
+                        continue
+                    seen.add(node.face_id)
+                    stack.append(node.face_id)
         return False
 
     @staticmethod
-    def _is_flanked(
-        graph: AttributedAdjacencyGraph, band: AagNode, axis
+    def _opens_onto_a_face(
+        graph: AttributedAdjacencyGraph,
+        bore: AagNode,
+        skip_face: int,
+        axis_dir,
+        cross_section: float,
     ) -> bool:
-        """Whether a wider band has a shoulder stepping down at both ends.
+        """Whether a bore's other end comes out somewhere.
 
-        That is the signature of a groove rather than a counterbore: a
-        counterbore has material on one side and open air on the other.
+        Somewhere means a plane square to the axis and broad enough to be a
+        face of the part rather than another shoulder inside it. Three times
+        the bore's own cross-section is the reference's line, and it is drawn
+        low deliberately: a hub annulus is not much wider than the bore
+        through it and is still the outside of the part.
         """
-        steps = 0
-        for shoulder, _ in neighbours(graph, band.face_id):
-            if shoulder.surface_type is not SurfaceType.PLANE:
+        for node, _ in neighbours(graph, bore.face_id):
+            if node.face_id == skip_face:
                 continue
-            normal = shoulder.outward_normal
-            if normal is None or abs(normal.Dot(axis.Direction())) < _CAP_AXIS_ALIGNMENT:
+            if node.surface_type is not SurfaceType.PLANE:
                 continue
-            for beyond, _ in neighbours(graph, shoulder.face_id):
-                if beyond.face_id == band.face_id:
-                    continue
-                if beyond.surface_type is not SurfaceType.CYLINDER:
-                    continue
-                if beyond.cyl_cone_axis is None or not beyond.is_internal:
-                    continue
-                if beyond.cyl_radius >= band.cyl_radius - 1e-6:
-                    continue
-                if axes_are_coaxial(beyond.cyl_cone_axis, axis):
-                    steps += 1
-                    break
-        return steps >= 2
+            if node.plane_normal is None:
+                continue
+            if abs(node.plane_normal.Dot(axis_dir)) < _CAP_AXIS_ALIGNMENT:
+                continue
+            if node.area >= cross_section * 3.0:
+                return True
+        return False
 
     def _try_countersink(
         self,
@@ -806,6 +970,59 @@ class HoleRecognizer(FeatureRecognizer):
         return False
 
     # -- post pass ----------------------------------------------------------
+
+    @staticmethod
+    def _absorb_orphan_fragments(
+        graph: AttributedAdjacencyGraph, features: list[FeatureInstance]
+    ) -> bool:
+        """Give a bore back the pieces of itself that nothing claimed.
+
+        A cylinder needs a cap at one end to be read as a hole at all, and a
+        middle fragment has none: a bore crossed by another bore has a piece
+        with curved surfaces at both ends, and a modelled thread turns the
+        bore it is cut in into a stack of flank cylinders with nothing planar
+        anywhere near them. Those pieces are unmistakably part of a hole that
+        was already found -- same radius, same axis line -- but no pass emits
+        them, so they end up belonging to nothing.
+
+        Nothing is created here and no classification changes; the fragments
+        simply join the feature they are part of, which is what makes the
+        viewport highlight the whole hole rather than its two ends, and what
+        lets the thread pass see a thread that had been left in no man's
+        land.
+        """
+        claimed = {face_id for feature in features for face_id in feature.faces}
+        absorbed = False
+
+        for feature in features:
+            axis = _first_cylinder_axis(graph, feature)
+            if axis is None:
+                continue
+            radius = (feature.number("diameter_mm") or 0.0) / 2.0
+            if radius <= 0.0:
+                continue
+            direction = axis.Direction()
+            origin = axis.Location()
+
+            for node in graph.nodes:
+                if node.surface_type is not SurfaceType.CYLINDER:
+                    continue
+                if node.face_id in claimed or not node.is_internal:
+                    continue
+                if node.cyl_cone_axis is None:
+                    continue
+                if abs(node.cyl_radius - radius) > 1e-3:
+                    continue
+                if abs(node.cyl_cone_axis.Direction().Dot(direction)) < 0.99:
+                    continue
+                offset = gp_Vec(origin, node.cyl_cone_axis.Location())
+                if offset.Crossed(gp_Vec(direction)).Magnitude() > 0.01:
+                    continue
+                feature.faces = sorted(set(feature.faces) | {node.face_id})
+                claimed.add(node.face_id)
+                absorbed = True
+
+        return absorbed
 
     def _merge_split_bores(
         self, graph: AttributedAdjacencyGraph, features: list[FeatureInstance]
@@ -943,8 +1160,8 @@ class HoleRecognizer(FeatureRecognizer):
             return False
 
         direction = axis_a.Direction()
-        span_a = _bbox_axial_range(graph, a, direction)
-        span_b = _bbox_axial_range(graph, b, direction)
+        span_a = _bbox_axial_range(graph, a, direction, radius_a)
+        span_b = _bbox_axial_range(graph, b, direction, radius_a)
         if span_a is None or span_b is None:
             return True
         gap = max(0.0, span_a[0] - span_b[1], span_b[0] - span_a[1])
@@ -958,14 +1175,38 @@ class HoleRecognizer(FeatureRecognizer):
         return gap <= shortest
 
 
+def _axial_midpoint(node: AagNode, axis_dir) -> float:
+    """Where a face sits along an axis, by the middle of its bounding box."""
+    if node.bbox.IsVoid():
+        return 0.0
+    xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
+    return (
+        (xmin + xmax) * 0.5 * axis_dir.X()
+        + (ymin + ymax) * 0.5 * axis_dir.Y()
+        + (zmin + zmax) * 0.5 * axis_dir.Z()
+    )
+
+
 def _bbox_axial_range(
-    graph: AttributedAdjacencyGraph, feature: FeatureInstance, direction: gp_Dir
+    graph: AttributedAdjacencyGraph,
+    feature: FeatureInstance,
+    direction: gp_Dir,
+    radius: float = 0.0,
 ) -> Optional[tuple[float, float]]:
-    """Extent of a feature's cylindrical faces projected onto a direction."""
+    """How far a bore runs along its axis.
+
+    Only the faces at the bore's own diameter count. A counterbore's seat is
+    a wider band sitting on top of the bore rather than part of its run, and
+    including it says the bore reaches places it does not -- two bolt holes
+    drilled into opposite faces of a flange and sharing one seat between them
+    would read as overlapping, and then as one hole.
+    """
     low, high = math.inf, -math.inf
     for face_id in feature.faces:
         node = graph.node(face_id)
         if node.surface_type is not SurfaceType.CYLINDER or node.bbox.IsVoid():
+            continue
+        if radius > 0.0 and abs(node.cyl_radius - radius) > 1e-3:
             continue
         xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
         for x in (xmin, xmax):

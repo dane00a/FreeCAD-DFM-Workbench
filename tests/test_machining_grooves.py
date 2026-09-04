@@ -196,12 +196,23 @@ class TestInternalGrooves(unittest.TestCase):
         self.assertEqual(len(found), 1)
         self.assertTrue(found[0].param("is_internal"))
 
-    def test_the_bore_is_still_recognised(self):
+    def test_the_groove_carries_the_bore_it_is_cut_in(self):
         # Grooves and holes overlap deliberately: the groove is part of the
         # bore's geometry as well as a feature in its own right, so skipping
         # faces the hole recognizer claimed would lose every internal groove.
+        #
+        # Which of the two survives is the resolver's call, and the groove
+        # family deliberately outranks the bore family: a groove owns its
+        # band, both shoulders and the bore either side of it, which is a
+        # superset of what the bore recognizer sees, so the bore is contained
+        # and drops out. Here that is the whole part -- there is nothing to
+        # the bore but the groove and its two stubs -- so the groove is left
+        # holding all five faces. On a real part the bore reaches an end of
+        # its own past the groove and both features survive.
         context = list(analyse(make_internal_groove()).values())[0]
-        self.assertTrue(context.recognition.of_type(FeatureType.THROUGH_HOLE))
+        grooves = context.recognition.of_type(FeatureType.GROOVE)
+        self.assertEqual(len(grooves), 1)
+        self.assertEqual(len(grooves[0].faces), 5)
 
 
 class TestFaceGlands(unittest.TestCase):

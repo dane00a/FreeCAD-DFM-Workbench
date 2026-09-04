@@ -181,6 +181,12 @@ class MachiningAnalyzer(BaseAnalyzer):
         # the time the blends were found there was nothing to prevent them
         # with.
         if part_process.type is PartProcessType.SHEET_METAL:
+            # Each sheet pass is told only what the sheet passes before it
+            # claimed, not what the machining passes did. They are looking
+            # at the same faces on purpose: the whole point of this stage is
+            # to say what the press did to metal the milling vocabulary has
+            # already described some other way.
+            sheet_claimed: set[int] = set()
             for recognizer_class in SHEET_PIPELINE:
                 if check_abort and check_abort():
                     break
@@ -190,7 +196,7 @@ class MachiningAnalyzer(BaseAnalyzer):
                 recognizer.thread_evidence = evidence
                 try:
                     found = recognizer.recognize(
-                        graph, shape, claimed, settled.features
+                        graph, shape, sheet_claimed, settled.features
                     )
                 except Exception as exc:
                     App.Console.PrintWarning(
@@ -199,8 +205,10 @@ class MachiningAnalyzer(BaseAnalyzer):
                     continue
                 settled.extend(found)
                 for feature in found:
-                    claimed.update(feature.faces)
+                    if feature.type in _CLAIMS_AGAINST_FORMING:
+                        sheet_claimed.update(feature.faces)
             _drop_bend_duplicate_fillets(settled)
+            _supersede_formed_reads(settled, graph)
 
         return settled
 
@@ -389,3 +397,67 @@ def _drop_undercut_dominated_pockets(features) -> None:
 
     if doomed:
         features[:] = [f for i, f in enumerate(features) if i not in doomed]
+
+
+#: What a later sheet pass must not tread on. A bend's faces are not
+#: available to the outline pass, and neither a bend's nor a punched
+#: outline's are available to the forming pass -- a hem lip read as a formed
+#: hood is the failure this prevents.
+_CLAIMS_AGAINST_FORMING = (FeatureType.BEND, FeatureType.TAB, FeatureType.NOTCH)
+
+#: The machining vocabulary a formed feature speaks over. An emboss pressed
+#: into a panel is a raised dome on one side and the same dome hollow on the
+#: other, so the milling passes see a boss and a pocket and are each right
+#: about the shape and wrong about the part: nobody milled either of them,
+#: and the rules that would fire -- corner radii, depth ratios, floor finish
+#: -- are about a cutter that was never there.
+_SUPERSEDED_BY_FORMING = (
+    FeatureType.BOSS,
+    FeatureType.POCKET,
+    FeatureType.SPHERICAL_POCKET,
+    FeatureType.BLIND_HOLE,
+    FeatureType.SLOT,
+    FeatureType.STEP,
+    FeatureType.GROOVE,
+    FeatureType.O_RING_GLAND,
+    FeatureType.RETAINING_RING_GROOVE,
+)
+
+#: The outline vocabulary, which loses on adjacency rather than on the faces
+#: themselves.
+_OUTLINE_READS = (FeatureType.TAB, FeatureType.NOTCH)
+
+
+def _supersede_formed_reads(recognition, graph) -> None:
+    """Drop the milled reading of anything the press formed.
+
+    A louver, an emboss, a lance: each is one operation on one piece of
+    metal, and each shows the machining passes something they know how to
+    name. The formed feature is the true account, so the others go.
+
+    Punched tabs and notches go on adjacency rather than on the faces
+    themselves. A louver's shear opening touches the hood without being part
+    of it, and read on its own that opening is a notch in the outline -- but
+    it is the louver's own opening, made by the same hit of the same tool,
+    and nobody punched it separately.
+    """
+    formed_faces: set[int] = set()
+    for feature in recognition.features:
+        if feature.type == FeatureType.SHEET_FORMED:
+            formed_faces.update(feature.faces)
+    if not formed_faces:
+        return
+
+    adjacent = set(formed_faces)
+    for face_id in formed_faces:
+        if graph.has_node(face_id):
+            adjacent.update(graph.neighbors_of(face_id))
+
+    def superseded(feature) -> bool:
+        if feature.type in _OUTLINE_READS:
+            return any(face_id in adjacent for face_id in feature.faces)
+        if feature.type in _SUPERSEDED_BY_FORMING:
+            return any(face_id in formed_faces for face_id in feature.faces)
+        return False
+
+    recognition.features = [f for f in recognition.features if not superseded(f)]

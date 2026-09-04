@@ -22,6 +22,8 @@ from freecad.DFM.core.analyzers.machining_analyzer import MachiningAnalyzer
 from freecad.DFM.core.machining import AagBuilder
 from freecad.DFM.core.machining.features import FeatureType
 from freecad.DFM.core.machining.recognizers import (
+    HoleRecognizer,
+    PatternRecognizer,
     BossRecognizer,
     RibRecognizer,
     StepRecognizer,
@@ -373,3 +375,102 @@ class BossWallTests(unittest.TestCase):
                     [n.face_id for n in sculpted],
                     "a shaped face was taken as a boss wall",
                 )
+
+
+class PatternTests(unittest.TestCase):
+    """Repeated features grouped into the one operation that makes them.
+
+    Twelve holes on a bolt circle are twelve holes and one drilling cycle.
+    Nothing is consumed by the grouping -- the holes stay individually
+    reportable -- but a part that prices twelve of everything reads as
+    twelve times the work.
+    """
+
+    @staticmethod
+    def _patterns(shape):
+        graph = AagBuilder(shape).build()
+        prior = []
+        for recognizer in (HoleRecognizer(),):
+            prior.extend(recognizer.recognize(graph, shape, set(), prior))
+        return PatternRecognizer().recognize(graph, shape, set(), prior), prior
+
+    @staticmethod
+    def _drill(shape, at, radius=3.0, depth=40.0):
+        return _cut(
+            shape,
+            BRepPrimAPI_MakeCylinder(
+                gp_Ax2(gp_Pnt(at[0], at[1], -5.0), gp_Dir(0, 0, 1)), radius, depth
+            ).Shape(),
+        )
+
+    def _bolt_circle(self, count=6, radius=30.0):
+        import math
+
+        shape = _box((0.0, 0.0, 0.0), (100.0, 100.0, 20.0))
+        for i in range(count):
+            angle = 2.0 * math.pi * i / count
+            shape = self._drill(
+                shape, (50.0 + radius * math.cos(angle), 50.0 + radius * math.sin(angle))
+            )
+        return shape
+
+    def test_a_bolt_circle_is_one_pattern(self):
+        patterns, holes = self._patterns(self._bolt_circle())
+        self.assertEqual(len(holes), 6)
+        self.assertEqual(len(patterns), 1)
+        self.assertEqual(patterns[0].param("pattern_type"), "bolt_circle")
+        self.assertEqual(patterns[0].param("count"), 6)
+
+    def test_it_names_every_hole_it_covers(self):
+        patterns, holes = self._patterns(self._bolt_circle())
+        children = set(patterns[0].param("child_ids"))
+        self.assertEqual(children, {h.instance_id for h in holes})
+
+    def test_and_measures_the_pitch_circle(self):
+        patterns, _ = self._patterns(self._bolt_circle(radius=30.0))
+        self.assertAlmostEqual(patterns[0].number("pcd_mm"), 60.0, places=1)
+
+    def test_a_row_of_holes_is_a_linear_array(self):
+        shape = _box((0.0, 0.0, 0.0), (150.0, 60.0, 20.0))
+        for x in (30.0, 60.0, 90.0, 120.0):
+            shape = self._drill(shape, (x, 30.0))
+        patterns, _ = self._patterns(shape)
+        self.assertEqual(len(patterns), 1)
+        self.assertEqual(patterns[0].param("pattern_type"), "linear")
+        self.assertAlmostEqual(patterns[0].number("spacing_mm"), 30.0, places=1)
+
+    def test_a_rectangular_field_is_a_grid(self):
+        shape = _box((0.0, 0.0, 0.0), (140.0, 140.0, 20.0))
+        for x in (35.0, 70.0, 105.0):
+            for y in (35.0, 70.0, 105.0):
+                shape = self._drill(shape, (x, y))
+        patterns, holes = self._patterns(shape)
+        self.assertEqual(len(holes), 9)
+        self.assertEqual(len(patterns), 1)
+        self.assertEqual(patterns[0].param("pattern_type"), "grid")
+        self.assertEqual(patterns[0].param("rows"), 3)
+        self.assertEqual(patterns[0].param("cols"), 3)
+
+    def test_two_holes_are_not_a_pattern(self):
+        """Two of something is a coincidence; three is an intent."""
+        shape = _box((0.0, 0.0, 0.0), (100.0, 60.0, 20.0))
+        for x in (30.0, 70.0):
+            shape = self._drill(shape, (x, 30.0))
+        patterns, _ = self._patterns(shape)
+        self.assertEqual(patterns, [])
+
+    def test_different_diameters_are_different_patterns(self):
+        """Two bolt families on one flange are two setups, not one."""
+        shape = _box((0.0, 0.0, 0.0), (150.0, 150.0, 20.0))
+        for x in (30.0, 60.0, 90.0, 120.0):
+            shape = self._drill(shape, (x, 40.0), radius=3.0)
+        for x in (30.0, 60.0, 90.0, 120.0):
+            shape = self._drill(shape, (x, 110.0), radius=6.0)
+        patterns, holes = self._patterns(shape)
+        self.assertEqual(len(holes), 8)
+        self.assertEqual(len(patterns), 2)
+        self.assertEqual({p.param("count") for p in patterns}, {4})
+
+    def test_a_plain_block_has_no_pattern(self):
+        patterns, _ = self._patterns(block())
+        self.assertEqual(patterns, [])

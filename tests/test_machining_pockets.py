@@ -124,14 +124,20 @@ class TestPocketRecognition(unittest.TestCase):
     def test_long_narrow_cavity_is_a_channel_not_a_pocket(self):
         # Milling a channel is a different job from clearing a pocket -- one
         # pass along its length against a spiral clear-out -- so a cavity
-        # much longer than it is wide is reported as a slot even though its
-        # floor is fully enclosed.
+        # much longer than it is wide comes out a slot even though its floor
+        # is fully enclosed and this pass had every reason to call it a
+        # pocket. This pass does call it a pocket, and says so plainly; the
+        # slot pass calls the same faces a slot, and the resolver prefers the
+        # slot on the aspect ratio. Neither pass decides alone.
         found = pockets_in(make_deep_narrow_cavity())
         self.assertEqual(len(found), 1)
-        self.assertEqual(found[0].type, FeatureType.SLOT)
-        self.assertAlmostEqual(found[0].number("width_mm"), 10.0, places=3)
-        self.assertAlmostEqual(found[0].number("length_mm"), 40.0, places=3)
-        self.assertAlmostEqual(found[0].number("depth_mm"), 30.0, places=3)
+        self.assertEqual(found[0].type, FeatureType.POCKET)
+
+        settled = slots_in(make_deep_narrow_cavity())
+        self.assertEqual(len(settled), 1)
+        self.assertAlmostEqual(settled[0].number("width_mm"), 10.0, places=3)
+        self.assertAlmostEqual(settled[0].number("length_mm"), 40.0, places=3)
+        self.assertAlmostEqual(settled[0].number("depth_mm"), 30.0, places=3)
 
     def test_a_squarer_cavity_stays_a_pocket(self):
         # 50 x 70 is not elongated enough to be a channel.
@@ -188,15 +194,23 @@ if __name__ == "__main__":
 
 
 from freecad.DFM.core.machining.recognizers import SlotRecognizer
+from freecad.DFM.core.machining.resolver import resolve
 
 
 def slots_in(shape: TopoDS_Shape):
-    """Cavities the pocket recognizer declined, plus channels it reclassified."""
+    """The channels left standing once the resolver has settled the part.
+
+    Both passes see the same cavity and both have something to say about it,
+    which is by design: a channel is a pocket to the one and a slot to the
+    other, and which reading survives is decided on the aspect ratio rather
+    than on which recognizer happened to run first. So this asks the whole
+    analysis rather than a single pass -- reading the slot pass alone would
+    report a channel on every square pocket on the part.
+    """
     graph = AagBuilder(shape, FaceIndex(shape)).build()
-    pockets = PocketRecognizer().recognize(graph, shape)
-    claimed = {face for feature in pockets for face in feature.faces}
-    from_pockets = [f for f in pockets if f.type == FeatureType.SLOT]
-    return from_pockets + SlotRecognizer().recognize(graph, shape, claimed)
+    found = PocketRecognizer().recognize(graph, shape)
+    found += SlotRecognizer().recognize(graph, shape)
+    return resolve(found, graph).of_type(FeatureType.SLOT)
 
 
 class TestSlotRecognition(unittest.TestCase):

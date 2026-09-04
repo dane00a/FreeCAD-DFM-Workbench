@@ -161,11 +161,16 @@ def make_bore_into_bowl() -> TopoDS_Shape:
 def make_linked_tunnels(bore: bool = True) -> TopoDS_Shape:
     """Two channels through the block, optionally joined by a cross passage.
 
+    Channels, not tunnels: each is milled down from the top face and runs out
+    of the part at both ends. A box cut through the middle of the block with
+    material left above it would be a rectangular hole rather than anything a
+    cutter reaches, and nothing would call it a cavity.
+
     With the passage, neither of its mouths reaches the outside of the part:
     both open onto a channel wall.
     """
-    shape = _cut(block(), _cavity((20, -1, 15), (40, 81, 25)))
-    shape = _cut(shape, _cavity((60, -1, 15), (80, 81, 25)))
+    shape = _cut(block(), _cavity((20, -1, 15), (40, 81, 41)))
+    shape = _cut(shape, _cavity((60, -1, 15), (80, 81, 41)))
     if bore:
         shape = _cut(shape, _cylinder(39, 40, 20, 1, 0, 0, 3.0, 22.0))
     return shape

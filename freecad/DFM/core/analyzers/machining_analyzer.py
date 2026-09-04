@@ -15,9 +15,11 @@ from typing import Any, Callable, Optional
 
 import FreeCAD as App  # type: ignore
 
+from OCP.gp import gp_Vec
 from OCP.TopoDS import TopoDS_Shape
 
 from ...core.base.base_analyzer import BaseAnalyzer
+from ...core.machining.aag import SurfaceType
 from ...core.machining.aag_builder import AagBuilder
 from ...core.machining.config import MachiningConfig
 from ...core.machining.context import MachiningContext
@@ -154,6 +156,13 @@ class MachiningAnalyzer(BaseAnalyzer):
             for feature in found:
                 claimed.update(feature.faces)
 
+        # Two corrections before the resolver sees any of it. Both are
+        # about what the pocket pass could not have known: it runs early,
+        # one cavity at a time, and some of what it says only reads wrong
+        # once the rest of the part has been recognized.
+        _merge_port_interrupted_pockets(result.features, graph)
+        _drop_undercut_dominated_pockets(result.features)
+
         settled = resolve(result.features, graph)
 
         # The sheet-metal pass runs after the resolver rather than inside it,
@@ -236,3 +245,147 @@ def _drop_bend_duplicate_fillets(recognition) -> None:
             and all(face_id in bend_faces for face_id in feature.faces)
         )
     ]
+
+def _merge_port_interrupted_pockets(features, graph) -> None:
+    """Rejoin one channel that drilled ports broke into pockets.
+
+    A manifold's channel with feed holes down through its floor arrives here
+    as one pocket per stretch between holes: the pocket pass stops at each
+    port because a cylinder is not a wall it can grow through. Sixteen
+    fragments where a machinist sees four channels, each of them then
+    reported on separately -- sixteen narrow-opening warnings about one
+    cutter path.
+
+    Two fragments belong together when a port pierces both of them, their
+    floors face the same way, and those floors are the same floor rather
+    than two at different heights that a long hole happens to pass through.
+    """
+    class _Pocket:
+        __slots__ = ("index", "normal", "centroid", "ports")
+
+    grouped: list[_Pocket] = []
+    for index, feature in enumerate(features):
+        if feature.type != FeatureType.POCKET or not feature.faces:
+            continue
+        floor_id = feature.faces[0]  # the pocket pass puts its floor first
+        if not graph.has_node(floor_id):
+            continue
+        floor = graph.node(floor_id)
+        if floor.surface_type is not SurfaceType.PLANE:
+            continue
+        normal = floor.outward_normal
+        if normal is None:
+            continue
+
+        ports = []
+        for edge in graph.edges_of(floor_id):
+            node = graph.node(edge.other_face(floor_id))
+            if node.surface_type is not SurfaceType.CYLINDER:
+                continue
+            if node.cyl_cone_axis is None:
+                continue
+            if abs(node.cyl_cone_axis.Direction().Dot(normal)) > 0.95:
+                ports.append(node.face_id)
+        if not ports:
+            continue
+
+        entry = _Pocket()
+        entry.index = index
+        entry.normal = normal
+        entry.centroid = floor.centroid
+        entry.ports = ports
+        grouped.append(entry)
+
+    if len(grouped) < 2:
+        return
+
+    parent = list(range(len(grouped)))
+
+    def root(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    by_port: dict[int, list[int]] = {}
+    for position, entry in enumerate(grouped):
+        for port in entry.ports:
+            by_port.setdefault(port, []).append(position)
+
+    for sharing in by_port.values():
+        if len(sharing) < 2:
+            continue
+        first = grouped[sharing[0]]
+        for other in sharing[1:]:
+            second = grouped[other]
+            if first.normal.Dot(second.normal) < 0.95:
+                continue
+            offset = gp_Vec(first.centroid, second.centroid)
+            if abs(offset.Dot(gp_Vec(first.normal))) > 0.1:
+                continue  # two floors at different heights, one long hole
+            a, b = root(sharing[0]), root(other)
+            if a != b:
+                parent[a] = b
+
+    families: dict[int, list[int]] = {}
+    for position in range(len(grouped)):
+        families.setdefault(root(position), []).append(position)
+
+    absorbed: set[int] = set()
+    for family in families.values():
+        if len(family) < 2:
+            continue
+        family.sort(key=lambda position: grouped[position].index)
+        keeper = features[grouped[family[0]].index]
+        faces = list(keeper.faces)
+        seen = set(faces)
+        for position in family[1:]:
+            index = grouped[position].index
+            for face_id in features[index].faces:
+                if face_id not in seen:
+                    seen.add(face_id)
+                    faces.append(face_id)
+            absorbed.add(index)
+        keeper.faces = faces
+
+    if absorbed:
+        features[:] = [f for i, f in enumerate(features) if i not in absorbed]
+
+
+def _drop_undercut_dominated_pockets(features) -> None:
+    """Let the undercut have the cavities that are nothing but undercut.
+
+    The pocket pass runs before anything has asked what a tool could reach,
+    so a mirror seat or a dovetail bottom is recognized as a cavity like any
+    other. Once the undercut pass has claimed the same faces, every rule
+    that fires on a pocket fires alongside the one finding that actually
+    matters -- that a three-axis cutter cannot get in there.
+
+    Only where the cavity is essentially all undercut, and only where its
+    floor is tilted. A cavity whose floor is square to an axis and yet
+    unreachable everywhere is a sealed void, which is one error about the
+    whole cavity rather than six about its walls, and dropping the pocket
+    would trade the one for the six.
+    """
+    undercut_faces: set[int] = set()
+    for feature in features:
+        if feature.type == FeatureType.UNDERCUT:
+            undercut_faces.update(feature.faces)
+    if not undercut_faces:
+        return
+
+    doomed: set[int] = set()
+    for index, feature in enumerate(features):
+        if feature.type != FeatureType.POCKET or not feature.faces:
+            continue
+        inside = sum(1 for face_id in feature.faces if face_id in undercut_faces)
+        if inside <= len(feature.faces) * 0.8:
+            continue
+        normal = feature.parameters.get("floor_normal")
+        if isinstance(normal, (list, tuple)) and len(normal) == 3:
+            if max(abs(float(v)) for v in normal) > 0.95:
+                continue  # square to an axis: a sealed void, not an undercut
+        doomed.add(index)
+
+    if doomed:
+        features[:] = [f for i, f in enumerate(features) if i not in doomed]

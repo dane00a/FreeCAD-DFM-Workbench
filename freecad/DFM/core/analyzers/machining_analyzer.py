@@ -25,6 +25,7 @@ from ...core.machining.config import MachiningConfig
 from ...core.machining.context import MachiningContext
 from ...core.machining.features import FeatureType, RecognitionResult
 from ...core.machining.process_classifier import (
+    PartProcessResult,
     PartProcessType,
     classify_part_process,
     refine_part_process_with_features,
@@ -81,21 +82,8 @@ class MachiningAnalyzer(BaseAnalyzer):
         # test, or a caller with no document -- gets empty evidence and the
         # helix search on its own, exactly as before.
         evidence = thread_evidence_for(kwargs.get("target_object"))
-        recognition = self._recognize(
+        recognition, part_process = self._recognize(
             graph, shape, part_process, check_abort, evidence
-        )
-
-        # The classification ran before recognition because the recognizers
-        # need its verdict, so it decided on shape alone. Two of its answers
-        # can only be checked once the features exist: a turned part with a
-        # slot in it is a mill-turn part, and a shell that looked like sheet
-        # is really milled if it holds anything cut into solid stock.
-        part_process = refine_part_process_with_features(
-            part_process,
-            recognition.features,
-            graph,
-            shape,
-            declared_blank=self.config.blank_form,
         )
 
         context = MachiningContext(
@@ -115,7 +103,7 @@ class MachiningAnalyzer(BaseAnalyzer):
         part_process,
         check_abort,
         evidence: Optional[ThreadEvidence] = None,
-    ) -> RecognitionResult:
+    ) -> tuple[RecognitionResult, PartProcessResult]:
         """Run the recognizers in order, each told what the others claimed.
 
         The order is load-bearing: a later recognizer is given the faces
@@ -165,6 +153,24 @@ class MachiningAnalyzer(BaseAnalyzer):
 
         settled = resolve(result.features, graph)
 
+        # The classification ran before recognition because the recognizers
+        # need its verdict, so it decided on shape alone. Two of its answers
+        # can only be checked once the features exist: a turned part with a
+        # slot in it is a mill-turn part, and a shell that looked like sheet
+        # is really milled if it holds anything cut into solid stock.
+        #
+        # It has to be settled here rather than after this method returns,
+        # because the sheet stage below turns on the answer. Asking the
+        # first, shape-only verdict instead put punched notches and formed
+        # louvers on parts the refinement then went on to call milled.
+        part_process = refine_part_process_with_features(
+            part_process,
+            settled.features,
+            graph,
+            shape,
+            declared_blank=self.config.blank_form,
+        )
+
         # The sheet-metal pass runs after the resolver rather than inside it,
         # and appends what it finds.
         #
@@ -210,7 +216,7 @@ class MachiningAnalyzer(BaseAnalyzer):
             _drop_bend_duplicate_fillets(settled)
             _supersede_formed_reads(settled, graph)
 
-        return settled
+        return settled, part_process
 
 
 def _drop_bend_duplicate_fillets(recognition) -> None:

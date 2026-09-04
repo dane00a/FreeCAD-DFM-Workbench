@@ -330,8 +330,20 @@ class SlotRecognizer(FeatureRecognizer):
                 normal_b = second.outward_normal
                 if normal_a is None or normal_b is None:
                     continue
-                if normal_a.Dot(normal_b) < _FACING_WALLS_MAX_DOT:
-                    return (first, second)
+                if normal_a.Dot(normal_b) >= _FACING_WALLS_MAX_DOT:
+                    continue
+                # Facing, not back to back. A rib's two sides are
+                # anti-parallel exactly as a channel's are, and the
+                # difference is which of the material and the air lies
+                # between them: the walls of a channel look into it, so the
+                # step from one to the other runs the way the first one
+                # faces.
+                across = gp_Vec(first.centroid, second.centroid).Dot(
+                    gp_Vec(normal_a)
+                )
+                if across <= 0.0:
+                    continue
+                return (first, second)
         return None
 
     @staticmethod

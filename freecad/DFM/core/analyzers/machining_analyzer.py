@@ -23,10 +23,11 @@ from ...core.machining.config import MachiningConfig
 from ...core.machining.context import MachiningContext
 from ...core.machining.features import RecognitionResult
 from ...core.machining.process_classifier import (
+    PartProcessType,
     classify_part_process,
     refine_part_process_with_features,
 )
-from ...core.machining.recognizers import RECOGNIZER_PIPELINE
+from ...core.machining.recognizers import RECOGNIZER_PIPELINE, SHEET_PIPELINE
 from ...core.machining.resolver import resolve
 from ...core.machining.thread_sources import ThreadEvidence, thread_evidence_for
 from ...core.registries import register_analyzer
@@ -153,4 +154,42 @@ class MachiningAnalyzer(BaseAnalyzer):
             for feature in found:
                 claimed.update(feature.faces)
 
-        return resolve(result.features, graph)
+        settled = resolve(result.features, graph)
+
+        # The sheet-metal pass runs after the resolver rather than inside it,
+        # and appends what it finds.
+        #
+        # A fold is two things at once and both are wanted. It is a BEND --
+        # a brake operation, with an angle and a radius and rules of its own
+        # -- and each of its two cylindrical faces is also a FILLET, which is
+        # what the freeform and corner rules read. Run through the resolver
+        # together the bend contains both fillets outright and the resolver,
+        # correctly by its own lights, drops them: one of two readings of the
+        # same faces is meant to survive. Here both readings are true and the
+        # rules want both, so the question never goes to the resolver.
+        #
+        # It also means a part the classifier did not call sheet metal can
+        # never pick up a bend, which keeps every milled and turned result
+        # untouched by this pass.
+        if part_process.type is PartProcessType.SHEET_METAL:
+            for recognizer_class in SHEET_PIPELINE:
+                if check_abort and check_abort():
+                    break
+                recognizer = recognizer_class()
+                recognizer.config = self.config
+                recognizer.part_process = part_process
+                recognizer.thread_evidence = evidence
+                try:
+                    found = recognizer.recognize(
+                        graph, shape, claimed, settled.features
+                    )
+                except Exception as exc:
+                    App.Console.PrintWarning(
+                        f"DFM: {recognizer.name} failed on this shape: {exc}\n"
+                    )
+                    continue
+                settled.extend(found)
+                for feature in found:
+                    claimed.update(feature.faces)
+
+        return settled

@@ -65,13 +65,6 @@ RECOGNIZER_PIPELINE: list[type[FeatureRecognizer]] = [
     UndercutRecognizer,
     DraftRecognizer,
     TurnedProfileRecognizer,
-    # The formed-sheet group. Gated on the classification, so it costs
-    # nothing on a machined part. Bends come first: they claim the fold
-    # cylinders before the hood pass can mistake one for a swept crest, and
-    # before the outline pass can read a hem as a connecting strip.
-    BendRecognizer,
-    SheetOutlineRecognizer,
-    SheetFormedRecognizer,
     # Late, so it can overrule the per-stroke claims the cavity and
     # protrusion passes made on engraved characters.
     MarkingRecognizer,
@@ -79,7 +72,28 @@ RECOGNIZER_PIPELINE: list[type[FeatureRecognizer]] = [
     PatternRecognizer,
 ]
 
+#: The formed-sheet group, which runs after the machining pipeline has been
+#: resolved rather than as part of it.
+#:
+#: A fold is a BEND and its two cylinders are each also a FILLET, and both
+#: readings are wanted -- the bend rules read one, the corner and freeform
+#: rules read the other. Put through the resolver together, the bend contains
+#: the fillets and the resolver drops them, which is the right answer to the
+#: question it was asked and the wrong answer here.
+#:
+#: Running after also means a part the classifier did not call sheet metal
+#: cannot pick up a bend, so every milled and turned result is untouched by
+#: this pass. Bends come first within the group: they claim the fold
+#: cylinders before the hood pass can mistake one for a swept crest, and
+#: before the outline pass can read a hem as a connecting strip.
+SHEET_PIPELINE: list[type[FeatureRecognizer]] = [
+    BendRecognizer,
+    SheetOutlineRecognizer,
+    SheetFormedRecognizer,
+]
+
 __all__ = [
+    "SHEET_PIPELINE",
     "BendRecognizer",
     "BlendRecognizer",
     "BossRecognizer",

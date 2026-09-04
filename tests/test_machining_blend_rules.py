@@ -31,6 +31,7 @@ from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Shape
 
 from freecad.DFM.core.analyzers.machining_analyzer import MachiningAnalyzer
 from freecad.DFM.core.machining.config import MachiningConfig, ToolEntry
+from freecad.DFM.core.machining.features import FeatureType
 from freecad.DFM.core.models import Severity
 from freecad.DFM.core.processes.process import RuleFeedback, RuleLimit
 from freecad.DFM.core.registries import get_check_class
@@ -286,23 +287,43 @@ class TestCutterRadiusInfeasible(unittest.TestCase):
         self.assertEqual(rule_check(shape, self.RULE), [])
         self.assertEqual(len(rule_check(shape, self.RULE, limit="1.5")), 1)
 
-    def test_one_finding_carries_every_corner_it_covers(self):
+    def test_one_finding_carries_the_whole_cavity(self):
         """A pocket has four corners and one corner radius.
 
-        The designer chose it once and will change it once, so saying it four
-        times is four readings of the same decision -- and on a plate of
-        pockets it is the difference between a page and a line. Every corner
-        still has to be named, or selecting the finding lights one wall of
-        four and the machinist goes looking for the others.
+        The designer chose it once and will change it once, so it is read
+        off the pocket -- which is where the recognizer records it and where
+        a machinist would look for it -- rather than off each blend in turn.
+        The finding names the cavity's faces, corners included, so selecting
+        it lights the pocket rather than one wall of four.
         """
-        findings = rule_check(make_pocket_with_corner_radius(0.4), self.RULE)
+        shape = make_pocket_with_corner_radius(0.4)
+        findings = rule_check(shape, self.RULE)
         self.assertEqual(len(findings), 1)
-        faces = {index for _, index in findings[0].failing_geometry}
-        self.assertEqual(len(faces), 4)
 
-    def test_the_finding_says_how_many_corners_it_speaks_for(self):
-        message = rule_check(make_pocket_with_corner_radius(0.4), self.RULE)[0].message
-        self.assertIn("4 corners", message)
+        context = list(
+            MachiningAnalyzer()
+            .execute(shape, FaceIndex(shape), EdgeIndex(shape), prefs={})
+            .values()
+        )[0]
+        pocket = context.recognition.of_type(FeatureType.POCKET)[0]
+        named = {index for _, index in findings[0].failing_geometry}
+        self.assertEqual(named, set(pocket.faces))
+        self.assertGreater(len(named), 4, "the walls and floor are named too")
+
+    def test_the_pocket_owns_the_corners_it_turns(self):
+        """Otherwise each corner is a fillet in its own right.
+
+        Four standalone blends on a rectangular pocket is the same corner
+        radius reported four more times, and it is what happened before the
+        pocket absorbed them.
+        """
+        shape = make_pocket_with_corner_radius(0.4)
+        context = list(
+            MachiningAnalyzer()
+            .execute(shape, FaceIndex(shape), EdgeIndex(shape), prefs={})
+            .values()
+        )[0]
+        self.assertEqual(context.recognition.of_type(FeatureType.FILLET), [])
 
 
 class TestCutterRadiusSuboptimal(unittest.TestCase):

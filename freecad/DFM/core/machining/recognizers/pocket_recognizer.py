@@ -50,6 +50,10 @@ _MAX_WALL_AREA_SHARE = 0.15
 # against the search running away through an unusual graph.
 _MAX_POCKET_AREA_SHARE = 0.70
 
+#: How closely a corner fillet's axis must stand off each wall it blends.
+#: A real fillet is tangent to both; a bore pierced at the corner is not.
+_CORNER_TANGENCY_TOL_MM = 0.05
+
 # Tori bigger than this are passage surfaces, not wall fillets.
 _MAX_BLEND_TORUS_MINOR_R = 8.0
 
@@ -327,7 +331,11 @@ class PocketRecognizer(FeatureRecognizer):
             if face_id != floor.face_id
             and graph.node(face_id).surface_type is SurfaceType.PLANE
         ]
-        corner_radius = self._corner_radius(graph, faces, floor_normal)
+        corner_radius, corner_faces = self._corner_fillets(graph, faces, floor_normal)
+        # The corners belong to the cavity they turn. Measured and then left
+        # out, each one is emitted as a fillet in its own right and the
+        # pocket's single corner radius is reported four more times.
+        faces = sorted(set(faces) | corner_faces)
 
         parameters = {
             "floor_normal": (
@@ -443,41 +451,77 @@ class PocketRecognizer(FeatureRecognizer):
                 axes.append(normal)
         return len(axes) < 2
 
-    @staticmethod
-    def _corner_radius(
-        graph: AttributedAdjacencyGraph, faces: list[int], floor_normal: gp_Dir
-    ) -> float:
-        """Smallest corner fillet radius in the cavity, or zero if sharp.
+    def _corner_fillets(
+        self, graph: AttributedAdjacencyGraph, faces, floor_normal
+    ) -> tuple[float, set[int]]:
+        """The corner fillets of the cavity: their smallest radius, and them.
 
-        Looks one hop past the cavity's own faces as well as through them. A
-        corner fillet meets the walls it blends tangentially, and the cavity
-        grows over concave edges, so the fillets are never absorbed into the
-        pocket -- which would have this report every generously radiused
-        pocket in the world as square-cornered.
+        A corner radius stands parallel to the floor normal and runs
+        tangentially into the two walls it blends. A fillet along the floor
+        is a different thing, cut by the bull nose that cleared the pocket,
+        and it does not cap the cutter diameter.
 
-        A corner radius stands parallel to the floor normal. A fillet along
-        the floor is a different thing entirely, cut by the bull nose that
-        cleared the pocket, and it does not limit the cutter diameter.
+        The growth walks concave edges and never absorbs a cylinder, so the
+        corners are always one hop outside the cavity when we get here.
+        They are returned as well as measured, because they belong to the
+        pocket: left out, each corner is emitted as a FILLET of its own, and
+        a rectangular pocket reports its one corner radius four more times.
+
+        Tangency is the test that keeps a hole out. A bore pierced at the
+        corner of a pocket has two perpendicular wall neighbours exactly as
+        a fillet does, and is told apart by where its axis sits -- a real
+        fillet's axis stands its own radius away from each wall it meets,
+        and a hole overlapping the corner does not.
         """
         collected = set(faces)
-        candidates = set(collected)
-        for face_id in faces:
-            for edge in graph.edges_of(face_id):
-                candidates.add(edge.other_face(face_id))
+        walls = [
+            graph.node(face_id)
+            for face_id in faces
+            if graph.has_node(face_id)
+            and graph.node(face_id).surface_type is SurfaceType.PLANE
+            and graph.node(face_id).outward_normal is not None
+            and abs(graph.node(face_id).outward_normal.Dot(floor_normal)) <= 0.5
+        ]
 
-        radii = []
-        for face_id in sorted(candidates):
-            if not graph.has_node(face_id):
+        radii: list[float] = []
+        corners: set[int] = set()
+        seen: set[int] = set()
+        for wall in walls:
+            for edge in graph.edges_of(wall.face_id):
+                face_id = edge.other_face(wall.face_id)
+                if face_id in seen or face_id in collected:
+                    continue
+                seen.add(face_id)
+                if not graph.has_node(face_id):
+                    continue
+                node = graph.node(face_id)
+                if node.surface_type is not SurfaceType.CYLINDER:
+                    continue
+                if node.cyl_cone_axis is None or not node.is_internal:
+                    continue
+                if abs(node.cyl_cone_axis.Direction().Dot(floor_normal)) < 0.95:
+                    continue
+                if self._tangent_to_two_walls(node, walls):
+                    radii.append(node.cyl_radius)
+                    corners.add(face_id)
+        return (min(radii) if radii else 0.0), corners
+
+    @staticmethod
+    def _tangent_to_two_walls(cylinder: AagNode, walls) -> bool:
+        """Whether a cylinder stands its own radius off two of these walls."""
+        axis = cylinder.cyl_cone_axis.Location()
+        touching = 0
+        for wall in walls:
+            normal = wall.outward_normal
+            if normal is None:
                 continue
-            node = graph.node(face_id)
-            if node.surface_type is not SurfaceType.CYLINDER:
-                continue
-            if node.cyl_cone_axis is None or not node.is_internal:
-                continue
-            if abs(node.cyl_cone_axis.Direction().Dot(floor_normal)) < 0.95:
-                continue
-            radii.append(node.cyl_radius)
-        return min(radii) if radii else 0.0
+            offset = gp_Vec(wall.centroid, axis)
+            distance = abs(offset.Dot(gp_Vec(normal)))
+            if abs(distance - cylinder.cyl_radius) <= _CORNER_TANGENCY_TOL_MM:
+                touching += 1
+                if touching >= 2:
+                    return True
+        return False
 
 
 class _PartEnvelope:

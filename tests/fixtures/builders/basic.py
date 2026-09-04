@@ -100,8 +100,13 @@ def build_deep_hole() -> TopoDS_Shape:
 
 @fixture("nonstandard_hole")
 def build_nonstandard_hole() -> TopoDS_Shape:
-    """7.3 mm across: no drill in any index is that size."""
-    return cut(plate(), cylinder(25, 25, -1, 3.65, 27.0))
+    """7.27 mm across: no drill in any index is that size.
+
+    Not 7.3, which is a stock metric drill. The size has to sit between the
+    9/32" (7.144) and 19/64" (7.541) fractional drills and off the 0.1 mm
+    metric increments, or the part stops being the thing it is named for.
+    """
+    return cut(plate(), cylinder(25, 25, -1, 3.635, 27.0))
 
 
 # -- arrays and patterns -----------------------------------------------------

@@ -1068,7 +1068,7 @@
   "volume_mm3": 98125.0
  },
  "nonstandard_hole": {
-  "area_mm2": 10489.6329,
+  "area_mm2": 10487.9633,
   "bbox_mm": [
    50.0,
    50.0,
@@ -1077,7 +1077,7 @@
   "edge_count": 15,
   "face_count": 7,
   "solid_count": 1,
-  "volume_mm3": 61453.653
+  "volume_mm3": 61462.236
  },
  "off_cardinal_viz_block": {
   "area_mm2": 64265.9562,

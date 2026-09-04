@@ -1102,8 +1102,20 @@ class HoleRecognizer(FeatureRecognizer):
                         }
                     )
 
-            if len(fragments) > 1:
-                self._describe_interrupted_bore(graph, feature, fragments)
+            # Asked of anything with more than one cylinder to its name,
+            # not only of what this pass just joined together. A counterbore
+            # has two cylinders from the start -- the bore and its seat --
+            # and the first pass called it blind because the annular
+            # shoulder stood at one end of the bore. Seen as a whole, that
+            # shoulder is wide enough to be a face the tool came in through,
+            # and the bore carries on past it and out the other side.
+            cylinders = sum(
+                1
+                for face_id in feature.faces
+                if graph.node(face_id).surface_type is SurfaceType.CYLINDER
+            )
+            if cylinders > 1:
+                self._describe_interrupted_bore(graph, feature, [feature])
             merged.append(feature)
         return merged
 
@@ -1205,7 +1217,12 @@ class HoleRecognizer(FeatureRecognizer):
         ]
         if not cylinders:
             return False
-        cross = cross_section_area(cylinders[0])
+        # Measured against the bore rather than against whatever the widest
+        # cylinder here happens to be. On a counterbore the seat's annular
+        # shoulder is small next to the seat and wide next to the bore, and
+        # it is the bore the tool came down: the shoulder is a face it
+        # entered through, not a floor it stopped on.
+        cross = cross_section_area(min(cylinders, key=lambda n: n.cyl_radius))
 
         openings: set[int] = set()
         for cylinder in cylinders:

@@ -179,8 +179,19 @@ class TestGrooveRefusals(unittest.TestCase):
         self.assertEqual(grooves_in(make_bore_between_counterbores()), [])
 
     def test_the_hole_survives(self):
+        # It comes out a through hole rather than a counterbore, and both
+        # readings are of the same geometry: the seat is recorded on it
+        # either way. Counterbored from both ends, the bore's shoulders are
+        # each wide enough to be a face the tool came in through, so once
+        # the whole stack is considered together the hole plainly runs from
+        # one side of the block to the other -- which is the more useful
+        # thing to know about it than that one end has a seat.
         context = list(analyse(make_bore_between_counterbores()).values())[0]
-        self.assertTrue(context.recognition.of_type(FeatureType.COUNTERBORE))
+        bores = context.recognition.of_type(
+            FeatureType.THROUGH_HOLE, FeatureType.COUNTERBORE
+        )
+        self.assertEqual(len(bores), 1)
+        self.assertAlmostEqual(bores[0].number("outer_diameter_mm"), 24.0, places=3)
 
     def test_a_counterbore_alone_is_not_a_groove(self):
         drilled = _cut(block(), _cyl(40, 40, -1, 6.0, 62.0))

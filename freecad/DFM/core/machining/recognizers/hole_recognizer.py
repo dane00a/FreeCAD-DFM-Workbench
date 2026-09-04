@@ -72,6 +72,14 @@ _BLEND_BAND_MAX_WRAP = 0.35
 # open saddle -- a bearing seat milled open-side-up, not a drilled hole.
 _PARTIAL_BORE_LATERAL_MAX = 1.7
 
+#: How alike two cylinders must be to belong to one coaxial system: the same
+#: radius to a micron, axes parallel and within half a millimetre of each
+#: other. Fragments of one bore separated by a slit or a crossing pocket have
+#: to be gathered back together before the circle can be measured.
+_COAXIAL_RADIUS_TOL_MM = 1.0e-3
+_COAXIAL_PARALLEL_MIN_DOT = 0.99
+_COAXIAL_OFFSET_TOL_MM = 0.5
+
 # Countersinks wider than this are funnels or chamfers, not screw seats.
 _COUNTERSINK_MAX_RIM_DIAMETER = 30.0
 
@@ -545,24 +553,74 @@ class HoleRecognizer(FeatureRecognizer):
     ) -> bool:
         """A half-open cylindrical seat rather than a drillable bore.
 
-        A bearing saddle or line-bore cradle is machined open-side-up, so the
-        rules that assume a drill going down a closed hole -- depth ratio,
-        flat bottom, edge distance -- do not apply to it.
+        A bearing saddle, a handlebar cradle, a clamp jaw: half its
+        circumference does not exist. It is machined open-side-up with an end
+        mill or bored with the cap bolted on, so the rules that assume a drill
+        going down a closed hole -- depth ratio, flat bottom, edge distance --
+        have nothing to say about it.
+
+        What separates a saddle from a bore is how much circle there is, and
+        the honest way to measure that is the bounding box of the whole
+        coaxial system rather than the arc of any one face. A real bore's
+        cylinders union to a full circle, 2r across whichever way you measure;
+        a saddle spans 2r one way and about r the other. Measuring the seed
+        face alone gets a clamp bore split by a pinch slit wrong: each
+        fragment is well under half a circle, but together they close, and
+        that is a bore.
+
+        The missing circumference has to open onto free space, not into
+        another bore. Two parallel cylinders that intersect meet along
+        generatrix lines, so a drilled hole grazed away by a crossing hole
+        also unions "partial" -- but its straight boundary edges run against
+        the crossing bore's curved wall, where a true saddle's run out onto
+        the flats it was machined from.
         """
-        if feature.parameters.get("is_through"):
+        radius = cylinder.cyl_radius
+        if radius <= 0.0 or cylinder.cyl_cone_axis is None:
             return False
-        if cylinder_wrap(cylinder) * 2.0 * math.pi >= _PARTIAL_BORE_LATERAL_MAX:
+        axis = cylinder.cyl_cone_axis.Direction()
+        origin = cylinder.cyl_cone_axis.Location()
+
+        low = [None, None, None]
+        high = [None, None, None]
+        for node in graph.nodes:
+            if node.surface_type is not SurfaceType.CYLINDER:
+                continue
+            if not node.is_reversed:
+                continue
+            if node.cyl_cone_axis is None:
+                continue
+            if abs(node.cyl_radius - radius) > _COAXIAL_RADIUS_TOL_MM:
+                continue
+            if abs(node.cyl_cone_axis.Direction().Dot(axis)) < _COAXIAL_PARALLEL_MIN_DOT:
+                continue
+            offset = gp_Vec(origin, node.cyl_cone_axis.Location())
+            if offset.Crossed(gp_Vec(axis)).Magnitude() > _COAXIAL_OFFSET_TOL_MM:
+                continue
+            if node.bbox.IsVoid():
+                continue
+            bounds = node.bbox.Get()
+            for i in range(3):
+                if low[i] is None or bounds[i] < low[i]:
+                    low[i] = bounds[i]
+                if high[i] is None or bounds[i + 3] > high[i]:
+                    high[i] = bounds[i + 3]
+        if low[0] is None:
             return False
 
-        # An open saddle is bounded along its length by flats, not by more
-        # cylinder: that open side is what a drill could never produce.
-        laterals = [
-            node
-            for node, edge in neighbours(graph, cylinder.face_id)
-            if edge.edge_curve_type == "line"
-        ]
-        if not laterals or any(n.surface_type is not SurfaceType.PLANE for n in laterals):
+        spans = [high[i] - low[i] for i in range(3)]
+        components = (abs(axis.X()), abs(axis.Y()), abs(axis.Z()))
+        along = components.index(max(components))
+        across = min(spans[i] for i in range(3) if i != along)
+        if across >= _PARTIAL_BORE_LATERAL_MAX * radius:
             return False
+
+        # The straight edges bounding the open side have to land on flats.
+        for node, edge in neighbours(graph, cylinder.face_id):
+            if edge.edge_curve_type != "line":
+                continue
+            if node.surface_type is not SurfaceType.PLANE:
+                return False
 
         feature.type = FeatureType.PARTIAL_BORE
         feature.parameters["hole_type"] = FeatureType.PARTIAL_BORE

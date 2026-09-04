@@ -921,44 +921,37 @@ class HoleRecognizer(FeatureRecognizer):
     ) -> bool:
         """A coaxial cone that widens away from the bore: a screw seat.
 
-        A cone that narrows is a drill point at the bottom, not a
-        countersink, and a very wide one is a funnel rather than a seat for a
-        screw head.
+        A cone that narrows is the drill point at the bottom, not a
+        countersink, and one that widens past any fastener head is a funnel
+        or a chamber taper.
         """
         axis = cylinder.cyl_cone_axis
-        axis_dir = axis.Direction()
-        origin = axis.Location()
-        bore_centre = axial_coordinate(cylinder.centroid, origin, axis_dir)
+        eligible, is_through_bore = self._countersink_eligible(graph, cylinder)
+        if not eligible:
+            return False
 
         for cone_id in cone_ids:
             cone = graph.node(cone_id)
             if cone.cone_r0 <= 0.0 and cone.cone_r1 <= 0.0:
                 continue
+            if cone.cyl_cone_axis is None:
+                continue
+            if abs(axis.Direction().Dot(cone.cyl_cone_axis.Direction())) < 0.98:
+                continue
+            if not _widens_away_from(cone, cylinder.centroid):
+                continue
 
             wide_radius = max(cone.cone_r0, cone.cone_r1)
-            narrow_radius = min(cone.cone_r0, cone.cone_r1)
-            # A drill point runs down to nothing; a countersink stays at
-            # least as wide as the bore it opens.
-            if narrow_radius < cylinder.cyl_radius * 0.5:
-                continue
-            if wide_radius <= cylinder.cyl_radius * 1.05:
-                continue
             if wide_radius * 2.0 > _COUNTERSINK_MAX_RIM_DIAMETER:
-                continue
-
-            # The wide end has to face away from the bore, or it is a
-            # transition into something deeper rather than an entry.
-            wide_at = (
-                axial_coordinate(cone.cone_p0, origin, axis_dir)
-                if cone.cone_r0 >= cone.cone_r1
-                else axial_coordinate(cone.cone_p1, origin, axis_dir)
-            )
-            narrow_at = (
-                axial_coordinate(cone.cone_p1, origin, axis_dir)
-                if cone.cone_r0 >= cone.cone_r1
-                else axial_coordinate(cone.cone_p0, origin, axis_dir)
-            )
-            if (wide_at - narrow_at) * (narrow_at - bore_centre) < 0.0:
+                # Too wide for any fastener head, so not a seat -- but the
+                # cone is still this bore's far opening. A big chamfered
+                # bore stays a plain hole and gains an honest answer about
+                # running through.
+                if is_through_bore and not feature.param("flat_bottom"):
+                    feature.type = FeatureType.THROUGH_HOLE
+                    feature.parameters["is_through"] = True
+                    feature.parameters["flat_bottom"] = False
+                    feature.parameters.pop("terminates_in_cavity", None)
                 continue
 
             feature.type = FeatureType.COUNTERSINK
@@ -966,8 +959,56 @@ class HoleRecognizer(FeatureRecognizer):
                 2.0 * abs(math.degrees(cone.cone_semi_angle)), 4
             )
             feature.parameters["rim_diameter_mm"] = round(wide_radius * 2.0, 6)
+            if is_through_bore:
+                # The first pass saw one planar opening and called the bore
+                # blind, because the cone stands where the other opening
+                # would be. It is the other opening.
+                feature.parameters["is_through"] = True
+                feature.parameters.pop("terminates_in_cavity", None)
             return True
         return False
+
+    @staticmethod
+    def _countersink_eligible(
+        graph: AttributedAdjacencyGraph, cylinder: AagNode
+    ) -> tuple[bool, bool]:
+        """Whether this bore has an end for a countersink to be the other of.
+
+        A cone on a bore means one of two things, and which it is depends on
+        the rest of the bore rather than on the cone. If the bore already
+        bottoms out on a floor, the cone at its mouth is a seat. If the bore
+        runs through -- two openings, either of them planar or the widening
+        cone itself -- the cone is the far one, and again a seat. A bore with
+        neither has nothing at its far end but the cone, and a cone alone at
+        the end of a bore is where the drill stopped.
+
+        Returns whether to look at all, and whether the bore runs through.
+        """
+        axis_dir = cylinder.cyl_cone_axis.Direction()
+        cross = cross_section_area(cylinder)
+        has_floor = False
+        large_openings = 0
+
+        for node, _ in neighbours(graph, cylinder.face_id):
+            if node.surface_type is SurfaceType.PLANE:
+                if node.plane_normal is None:
+                    continue
+                if abs(node.plane_normal.Dot(axis_dir)) < 0.7:
+                    continue
+                if node.area < cross * 3.0:
+                    has_floor = True
+                else:
+                    large_openings += 1
+            elif node.surface_type is SurfaceType.CONE:
+                if node.cyl_cone_axis is None:
+                    continue
+                if abs(axis_dir.Dot(node.cyl_cone_axis.Direction())) < 0.95:
+                    continue
+                if _widens_away_from(node, cylinder.centroid):
+                    large_openings += 1
+
+        is_through_bore = large_openings >= 2
+        return (has_floor or is_through_bore, is_through_bore)
 
     # -- post pass ----------------------------------------------------------
 
@@ -1075,9 +1116,12 @@ class HoleRecognizer(FeatureRecognizer):
         """Describe a bore that a crossing cavity broke into pieces.
 
         Several coaxial fragments of one diameter are one hole with something
-        cut across it. It necessarily reaches the outside at both ends -- the
-        pieces have to start and finish somewhere -- so it is a through hole
-        even though each fragment on its own looked blind.
+        cut across it. Whether it runs through is asked again of the pieces
+        together: a fragment that looked blind because a cavity cut across it
+        is not blind, but a bore genuinely stopped by a floor at one end is
+        still stopped by it, and only ends that open onto a face of the part
+        count. Two of those and no floor anywhere along the run, and the hole
+        goes through.
 
         How it is drilled depends on the gap. A drill crosses a narrow void
         and carries on in one pass; a wide one leaves nothing to guide it, so
@@ -1117,6 +1161,21 @@ class HoleRecognizer(FeatureRecognizer):
         ]
         total = merged_spans[-1][1] - merged_spans[0][0]
 
+        if not self._runs_through(graph, feature, direction):
+            # The pieces are one bore that stops somewhere. It is not the
+            # cavity between them that stops it -- there is a floor or a
+            # drill point at one end -- so the flag saying it runs out into
+            # nothing is wrong, and the depth is the whole run rather than
+            # the fragment this feature was seeded from.
+            feature.parameters["depth_mm"] = round(total, 6)
+            feature.parameters["max_contiguous_depth_mm"] = round(contiguous, 6)
+            feature.parameters["max_void_mm"] = (
+                round(max(voids), 6) if voids else 0.0
+            )
+            feature.parameters["fragment_count"] = len(merged_spans)
+            feature.parameters.pop("terminates_in_cavity", None)
+            return
+
         feature.type = FeatureType.THROUGH_HOLE
         feature.parameters["is_through"] = True
         feature.parameters["depth_mm"] = round(total, 6)
@@ -1125,6 +1184,47 @@ class HoleRecognizer(FeatureRecognizer):
         feature.parameters["fragment_count"] = len(merged_spans)
         feature.parameters.pop("terminates_in_cavity", None)
         feature.parameters["flat_bottom"] = False
+
+    @staticmethod
+    def _runs_through(
+        graph: AttributedAdjacencyGraph, feature: FeatureInstance, direction: gp_Dir
+    ) -> bool:
+        """Whether a bore in pieces comes out the other side.
+
+        Asked of every piece at once, because the answer is a property of the
+        run and not of any fragment: a piece stopped by a crossing cavity has
+        no end of its own and says nothing either way. What settles it is
+        what the pieces between them touch -- a floor or a drill cone
+        anywhere along the run and the bore stops there; two ends opening
+        onto faces of the part and it does not.
+        """
+        cylinders = [
+            graph.node(face_id)
+            for face_id in feature.faces
+            if graph.node(face_id).surface_type is SurfaceType.CYLINDER
+        ]
+        if not cylinders:
+            return False
+        cross = cross_section_area(cylinders[0])
+
+        openings: set[int] = set()
+        for cylinder in cylinders:
+            for node, _ in neighbours(graph, cylinder.face_id):
+                if node.surface_type is SurfaceType.PLANE:
+                    if node.plane_normal is None:
+                        continue
+                    if abs(node.plane_normal.Dot(direction)) <= 0.7:
+                        continue
+                    if node.area >= cross * 3.0:
+                        openings.add(node.face_id)
+                    else:
+                        return False  # a floor: the bore stops here
+                elif node.surface_type is SurfaceType.CONE:
+                    if node.cyl_cone_axis is None:
+                        continue
+                    if abs(node.cyl_cone_axis.Direction().Dot(direction)) > 0.95:
+                        return False  # a drill point
+        return len(openings) >= 2
 
     @staticmethod
     def _same_bore(
@@ -1173,6 +1273,25 @@ class HoleRecognizer(FeatureRecognizer):
 
         shortest = min(span_a[1] - span_a[0], span_b[1] - span_b[0])
         return gap <= shortest
+
+
+def _widens_away_from(cone: AagNode, origin) -> bool:
+    """Whether a cone opens out as it recedes from a point.
+
+    Which way a cone tapers is what separates a fastener seat from the mark
+    a drill leaves: a countersink's wide rim is the end further from the
+    bore, a drill point's is the end nearer it.
+    """
+    if cone.cone_p0 is None or cone.cone_p1 is None:
+        return False
+    if cone.cone_r0 >= cone.cone_r1:
+        wide, narrow = cone.cone_p0, cone.cone_p1
+    else:
+        wide, narrow = cone.cone_p1, cone.cone_p0
+    outward = gp_Vec(origin, cone.centroid)
+    if outward.Magnitude() < 1e-9:
+        return False
+    return gp_Vec(narrow, wide).Dot(outward) > 0.0
 
 
 def _axial_midpoint(node: AagNode, axis_dir) -> float:

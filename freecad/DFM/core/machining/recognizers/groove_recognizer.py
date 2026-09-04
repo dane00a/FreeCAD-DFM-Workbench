@@ -136,7 +136,16 @@ class GrooveRecognizer(FeatureRecognizer):
 
         shoulders: list[AagNode] = []
         flanks: list[AagNode] = []
+        # By face and not by edge. A groove needs a shoulder at each end, and
+        # a shoulder that happens to meet the groove along two edges -- which
+        # is what a seam or a crossing bore leaves -- is still one shoulder.
+        # Counted twice it satisfied the pair on its own, and a bore simply
+        # stepping down to a smaller bore was reported as a groove.
+        seen: set[int] = set()
         for shoulder, _ in neighbours(graph, groove.face_id):
+            if shoulder.face_id in seen:
+                continue
+            seen.add(shoulder.face_id)
             if shoulder.surface_type is not SurfaceType.PLANE:
                 continue
             normal = shoulder.outward_normal
@@ -169,7 +178,15 @@ class GrooveRecognizer(FeatureRecognizer):
             return None
 
         width = cylinder_length(groove)
-        depth = abs(flanks[0].cyl_radius - groove.cyl_radius)
+        # Averaged over both flanks, not read off whichever one came first.
+        # A groove between two lands of different diameter -- a relief where
+        # a bore steps down, which is most of them on a spindle cap -- is as
+        # deep as the mean of what it was cut into, and taking one side of it
+        # can put the answer half a millimetre out. That is the difference
+        # between an O-ring gland and a plain groove.
+        depth = abs(
+            sum(f.cyl_radius for f in flanks) / len(flanks) - groove.cyl_radius
+        )
         if width <= 1e-6 or depth <= 1e-6:
             return None
 

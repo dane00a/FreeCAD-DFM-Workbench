@@ -155,8 +155,14 @@ class SlotNonstandardWidthCheck(MachiningCheck):
             return []
 
         results: list[CheckResult] = []
+        # A channel is left over rather than cut to a width, so there is no
+        # width for a cutter to have matched: the ribs either side of it were
+        # placed where the design wanted them, and the gap is whatever they
+        # left. Asking a designer to move two ribs so the space between them
+        # lands on an end mill size is not the advice this rule exists to
+        # give.
         for slot in context.recognition.of_type(
-            FeatureType.SLOT, FeatureType.CHANNEL, FeatureType.THROUGH_CAVITY
+            FeatureType.SLOT, FeatureType.THROUGH_CAVITY
         ):
             width = slot.number("width_mm") or 0.0
             if width <= 0.0:

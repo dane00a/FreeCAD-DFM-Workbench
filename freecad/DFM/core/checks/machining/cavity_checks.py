@@ -223,6 +223,11 @@ class PocketNarrowOpeningCheck(MachiningCheck):
         return results
 
 
+#: How much a cavity's profile may vary before its narrowest point stops
+#: standing for the whole of it.
+_VARYING_PROFILE_RATIO = 1.5
+
+
 @register_check(Rulebook.SLOT_DEPTH_RATIO)
 class SlotDepthRatioCheck(MachiningCheck):
     """A deep slot is cut by a tool no wider than the slot.
@@ -241,10 +246,29 @@ class SlotDepthRatioCheck(MachiningCheck):
             limit = context.config.thresholds.slot_deep_warn_ratio
 
         results: list[CheckResult] = []
-        for slot in context.recognition.of_type(FeatureType.SLOT, FeatureType.CHANNEL):
+        # A channel between two ribs and a window cut clean through are both
+        # this rule's business, because what it is about is reaching down a
+        # narrow gap: the chips have nowhere to go and the tool is out at
+        # length whichever way the gap came to be there.
+        for slot in context.recognition.of_type(
+            FeatureType.SLOT, FeatureType.CHANNEL, FeatureType.THROUGH_CAVITY
+        ):
             width = slot.number("width_mm") or 0.0
             depth = slot.number("depth_mm") or 0.0
             if width <= 1e-6 or depth <= 1e-6:
+                continue
+
+            # Depth over width only means anything where the width is the
+            # width all the way along. A stepped cavity reports the narrowest
+            # part of its profile, and dividing the full depth by that says a
+            # window mostly twenty millimetres across is a four-millimetre
+            # slot thirty deep -- the narrow part is not what is thirty deep.
+            # A slot carries neither of these, so nothing changes for one.
+            narrowest = slot.number("min_width_mm") or 0.0
+            widest = slot.number("max_width_mm") or 0.0
+            if slot.param("has_step_transitions"):
+                continue
+            if narrowest > 0.0 and widest > narrowest * _VARYING_PROFILE_RATIO:
                 continue
 
             ratio = depth / width
@@ -298,7 +322,12 @@ class SlotOverhangCheck(MachiningCheck):
         severity = self.severity_from_rule_config(rule_config)
         results: list[CheckResult] = []
 
-        for slot in context.recognition.of_type(FeatureType.SLOT, FeatureType.CHANNEL):
+        # Slots only. A channel is the gap two ribs leave between them, and
+        # nothing was dragged down its length at full stickout to make it --
+        # the ribs were what got machined, from outside, with the cutter
+        # supported on one flank. The chatter this rule is about needs a
+        # cutter engaged on both.
+        for slot in context.recognition.of_type(FeatureType.SLOT):
             width = slot.number("width_mm") or 0.0
             length = slot.number("length_mm") or 0.0
             depth = slot.number("depth_mm") or 0.0

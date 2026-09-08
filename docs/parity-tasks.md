@@ -9,20 +9,38 @@ Where this workbench still disagrees with the reference engine over the
 211-part corpus, what causes each disagreement, and which fixture to open
 first.
 
-**46 rules agree exactly. 29 differ.** Raw totals: 1091 here, 1218 there.
+**65 of 75 rules agree exactly.** Totals over the 211-part corpus, in
+occurrences rather than published rows: 1124 here, 1218 there, L1 126.
 
-## Status, and a warning about the numbers below
+Ninety-three of that 126 is `sharp_internal_edge`, which is parked
+deliberately (§5). The live tail is **33 findings across nine rules**.
 
-The rule-level figures in this document were measured before the recognition
-work of 2026-09-04 and have not been re-measured since. That work changed
-what the rules are looking at, so treat every count below as an indication of
-where to look rather than as a current reading. Several entries name causes
-that no longer exist.
+## Status
 
-Recognition itself is now close. Against the reference's own `features.json`
-over the 211-part corpus, total L1 error is 21 and 198 fixtures match exactly,
-from 479 and 99 at the start of that day's work. Fifteen feature types agree
-exactly, including every hole type. What remains, per type and net of sign:
+Measured 2026-09-08, against the reference at `26e76d14`.
+
+| rule | ours | reference | delta |
+| --- | --- | --- | --- |
+| `sharp_internal_edge` | 54 | 147 | −93 (parked, §5) |
+| `hole_edge_distance` | 26 | 33 | −7 |
+| `setup_count_high` | 42 | 48 | −6 |
+| `undercut_present` | 29 | 23 | +6 |
+| `pocket_square_corner` | 89 | 84 | +5 |
+| `thin_wall` | 102 | 99 | +3 |
+| `hole_flat_bottom` | 74 | 76 | −2 |
+| `hole_deep_risk` | 79 | 81 | −2 |
+| `small_part_holding` | 2 | 1 | +1 |
+| `cutter_radius_suboptimal` | 3 | 2 | +1 |
+
+Two of these are concentrated enough to be worth naming. `undercut_present`
++6 is entirely the `tool_access_blocked` fixture, where we report six and the
+reference none. `hole_edge_distance` −7 is mostly `cf_knife_edge_flange` (2 of
+6) and `hydraulic_actuator_end_cap` (0 of 4).
+
+Recognition is closer still. Against the reference's `features.json`, total
+L1 error is 21 and 198 of 211 fixtures match exactly, from 479 and 99 before
+the 2026-09-04 work. Fifteen feature types agree exactly, including every
+hole type. What is left:
 
 | type | ours | reference | where |
 | --- | --- | --- | --- |
@@ -40,26 +58,49 @@ counted twice: the reference calls faces 1-6 and 10-13 a `BOSS` and we call
 almost the same set a `THROUGH_CAVITY`. Our boss pass declines it, and the
 reason is worth finding before the phantom cavity is chased separately.
 
-A note on re-measuring the rules: the scratch parity harness compares rule
-ids literally, and several of ours are named differently from the reference's
-for the same concern -- `pocket_corner_radius`/`pocket_square_corner`,
-`hole_depth_ratio`/`hole_deep_risk`, `slot_depth_ratio`/`slot_deep_risk`,
-`pocket_depth_ratio`/`pocket_deep_risk`, `boss_height_ratio`/`boss_height_risk`,
-`material_removal`/`material_removal_high`. Its raw output shows those as
-total disagreements when they are the same finding under two names. Anything
-read from it needs that translation applied first, on top of the
-`occurrence_count` summing described below.
+## Measuring this correctly
 
-## Reading the numbers
+Three things have to be right before a rule comparison means anything, and
+each of them has produced a wrong answer here at least once.
 
-Compare raw against raw. The reference collapses identical findings into one
-row and records only the merged one, so its published counts are what a
-reader sees rather than what its rules found — 448 occurrences across the
-corpus sit behind 135 rows. Every count in this document is raw, recovered by
-summing `details.occurrence_count`.
+**Sum the occurrences, not the rows.** The reference collapses identical
+findings into one published row and records how many it stood for in
+`details.occurrence_count`. Its 846 rows are 1218 occurrences. Counting rows
+made `thin_wall` look like 46 against 40 when it was 46 against 99.
 
-Getting this wrong once cost real time: `thin_wall` looked like 46 against 40
-and was 46 against 99.
+**Translate the six aliased rule ids.** These are the same rule under two
+spellings, and compared literally each shows up as a total disagreement in
+both directions at once — inflating the apparent difference by roughly 300.
+
+| ours | reference |
+| --- | --- |
+| `boss_height_ratio` | `boss_height_risk` |
+| `hole_depth_ratio` | `hole_deep_risk` |
+| `material_removal` | `material_removal_high` |
+| `pocket_corner_radius` | `pocket_square_corner` |
+| `pocket_depth_ratio` | `pocket_deep_risk` |
+| `slot_depth_ratio` | `slot_deep_risk` |
+
+**Pass the same declared inputs.** The reference's batch harness declares
+customer intent for four fixtures, in `fixture_analysis_options` in its
+`main.cpp`. These are declarations, not anything either engine works out from
+the geometry, so running them on defaults asks the two engines different
+questions. It accounted for five findings across three rules.
+
+| fixture | declared |
+| --- | --- |
+| `torture_casting_ribfield` | blank `as_cast` |
+| `as_cast_no_draft` | blank `as_cast` |
+| `torture_freeform_leviathan` | precision mode |
+| `sm_gauge_steel_ceiling` | material family `steel` |
+
+Every other fixture runs on defaults on both sides.
+
+**And run only the machining rules.** Every registered check run against a
+machining context also runs the moulding and printing ones, which expect a
+different context and raise — and a rule that raises reads as a rule that
+found nothing. Take the union of `active_rules` from `cnc_milling.yaml`,
+`cnc_turning.yaml` and `sheet_metal.yaml`.
 
 ## How to work one of these
 
@@ -167,6 +208,14 @@ any feature all of whose faces are undercut.
 
 ### 1c. `torture_casting_ribfield` — `rib_draft_angle` 0 vs 3
 
+**Resolved 2026-09-08, and it was never a rule difference.** The reference's
+batch harness declares this fixture's blank as `as_cast`; ours was running it
+on the default billet, and the rule correctly stands down on a part cut from
+solid. Declaring the same thing makes both engines report three. See
+*Measuring this correctly* above -- `casting_draft_angle` on `as_cast_no_draft`
+and `no_orthogonal_datum_trio` on `torture_freeform_leviathan` were the same
+mistake.
+
 We recognize 4 RIB and 4 BOSS; the reference recognizes 19 "other". Our rib
 recognizer is finding ribs, and the draft rule then says nothing about them.
 Check whether `rib_draft_angle` is reading a parameter our rib recognizer
@@ -180,6 +229,9 @@ Same fixture: `slot_depth_ratio` 1 vs 3, `slot_overhang` 1 vs 0.
 
 ### 2a. `feature_complexity` −7 — silent on a part with nothing on it
 
+**Resolved.** `feature_complexity` and `sheet_feature_complexity` both agree
+exactly as of 2026-09-08.
+
 Every one of the seven is a part where we report 0 and the reference reports
 1: `simple_box`, `small_part`, `thin_sheet`, `sealed_void`,
 `single_datum_dome`, `thin_threshold_3_1mm`, `drafted_fin_channel`.
@@ -192,6 +244,10 @@ about a part somebody is quoting.
 `part_detail_checks.py`.
 
 ### 2b. `setup_count_high` −16 — every approach direction is treated as reversible
+
+**Partly done.** The signed-direction work landed and took this from −16 to
+−6, now spread one apiece over four fixtures rather than concentrated. What is
+left is no longer the reversibility premise.
 
 Eighteen parts differ. Fifteen are 0 vs 1 and three are 1 vs 0, and the cause
 is the same in both directions: our clustering compares approach directions
@@ -231,6 +287,11 @@ reference's `setup_rules.cpp` is the shape to follow.
 
 ### 3a. `thin_wall` −7, spread over 22 parts
 
+**Changed direction.** Now +3 rather than −7: the ported passes and the
+narrowed rib mute overshot slightly. The remaining spread is
+`optical_periscope_housing` (4 of 8) and `electronics_enclosure_billet` (28 of
+31) under, against two fixtures two over.
+
 Closest of the large rules. Both over and under, no single cause. The
 reference has two passes we have not ported, worth 10 occurrences together:
 
@@ -245,6 +306,9 @@ Over-reporting: `heat_exchanger_tube_sheet` 6 vs 3, and eight parts at 1–2 vs
 
 ### 3b. `pocket_corner_radius` −7, over 16 parts
 
+**Changed direction.** Now +5, and eleven against nine of that is
+`optical_periscope_housing` alone.
+
 `optical_periscope_housing` 11 vs 9 and seven parts at 1 vs 0, against
 several at 0 vs 1. Likely the same cavity-recognition scope question as §1.
 
@@ -255,6 +319,9 @@ vs 6 are the biggest single gaps in the first; `robotic_gripper_finger` 7 vs
 9 and `fixture_plate_dowels` 2 vs 4 in the second.
 
 ### 3d. `hole_intersects_cavity` +4
+
+**Resolved.** `hole_intersects_cavity` and `hole_intersecting` both agree
+exactly as of 2026-09-08.
 
 Four parts at 1 vs 0: `precision_spindle_end_cap`, `mtb_handlebar_stem`,
 `hydraulic_actuator_end_cap`, `aerospace_tensioner_pulley`. Plus

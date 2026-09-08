@@ -188,7 +188,7 @@ class ThinWallCheck(MachiningCheck):
         results: list[CheckResult] = []
         reported: set[tuple[int, int]] = set()
         muted = self._muted_faces(context)
-        rib_pairs = self._rib_webs(context)
+        rib_faces = self._rib_faces(context)
 
         # The planar pass, then the bores. Two different shapes of wall and
         # two different measurements, but one rule: what a machinist wants
@@ -215,9 +215,6 @@ class ThinWallCheck(MachiningCheck):
                 continue
             if first.face_id in muted or second.face_id in muted:
                 continue
-            if pair in rib_pairs:
-                continue
-
             if kind is _BORE_WEB:
                 verdict = self._grade_bore_web(thickness, target, limit)
             elif kind is _BORE_WALL:
@@ -225,7 +222,11 @@ class ThinWallCheck(MachiningCheck):
             elif kind is _CONVERGING:
                 verdict = self._grade_converging(thickness, target, limit)
             else:
-                verdict = self._grade(context, first, second, thickness, target, limit)
+                verdict = self._grade(
+                    context, first, second, thickness, target, limit,
+                    in_rib=first.face_id in rib_faces
+                    and second.face_id in rib_faces,
+                )
             if verdict is None:
                 continue
             reported.add(pair)
@@ -276,19 +277,21 @@ class ThinWallCheck(MachiningCheck):
         return muted
 
     @staticmethod
-    def _rib_webs(context) -> set[tuple[int, int]]:
-        """The two web faces of each rib, as a pair.
+    def _rib_faces(context) -> set[int]:
+        """Every face belonging to a recognized rib.
 
-        A rib is thin by definition -- that is what makes it a rib rather
-        than a wall -- so its own two faces are not a finding. Only that pair
-        is muted: a rib standing too close to something else still is.
+        A pair of them is muted on the aspect path only, and there for a
+        reason of its own: being long and thin is what a rib is, and
+        `rib_height_aspect` reports that. It is not muted on the measurement
+        -- a rib thin enough to fail on thickness alone will still deflect
+        away from the cutter, which is a different thing to know and worth
+        saying. A rib standing too close to something that is not a rib is
+        not muted either way.
         """
-        pairs: set[tuple[int, int]] = set()
+        faces: set[int] = set()
         for feature in context.recognition.of_type(FeatureType.RIB):
-            webs = sorted(feature.faces[:2])
-            if len(webs) == 2:
-                pairs.add((webs[0], webs[1]))
-        return pairs
+            faces.update(feature.faces)
+        return faces
 
     @staticmethod
     def _grade_bore_wall(
@@ -374,6 +377,7 @@ class ThinWallCheck(MachiningCheck):
         thickness: float,
         target: float,
         limit: float,
+        in_rib: bool = False,
     ) -> Optional[tuple[Severity, float, str]]:
         thresholds = context.config.thresholds
 
@@ -398,6 +402,14 @@ class ThinWallCheck(MachiningCheck):
 
         # The broad-and-thin path. Both the span and the thickness have to
         # qualify, or every large flat face on a normal part would fire.
+        #
+        # A rib is excluded here and only here. Being long and thin is what a
+        # rib is for, and `rib_height_aspect` says so already -- but a rib
+        # thin enough to fail on the measurement alone is still a wall that
+        # will deflect away from the cutter, and the ribfield's 1.2 mm webs
+        # are exactly that. Muting the pair outright lost all three of them.
+        if in_rib:
+            return None
         if thickness > thresholds.thin_wall_aspect_max_thickness_mm:
             return None
 

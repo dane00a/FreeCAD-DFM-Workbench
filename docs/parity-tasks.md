@@ -9,33 +9,31 @@ Where this workbench still disagrees with the reference engine over the
 211-part corpus, what causes each disagreement, and which fixture to open
 first.
 
-**65 of 75 rules agree exactly.** Totals over the 211-part corpus, in
-occurrences rather than published rows: 1124 here, 1218 there, L1 126.
+**66 of 75 rules agree exactly.** Totals over the 211-part corpus, in
+occurrences rather than published rows: 1126 here, 1218 there, L1 114.
 
-Ninety-three of that 126 is `sharp_internal_edge`, which is parked
-deliberately (§5). The live tail is **33 findings across nine rules**.
+Ninety-three of that 114 is `sharp_internal_edge`, which is parked
+deliberately (§5). The live tail is **21 findings across eight rules**.
 
 ## Status
 
 Measured 2026-09-08, against the reference at `26e76d14`.
 
-| rule | ours | reference | delta |
-| --- | --- | --- | --- |
-| `sharp_internal_edge` | 54 | 147 | −93 (parked, §5) |
-| `hole_edge_distance` | 26 | 33 | −7 |
-| `setup_count_high` | 42 | 48 | −6 |
-| `undercut_present` | 29 | 23 | +6 |
-| `pocket_square_corner` | 89 | 84 | +5 |
-| `thin_wall` | 102 | 99 | +3 |
-| `hole_flat_bottom` | 74 | 76 | −2 |
-| `hole_deep_risk` | 79 | 81 | −2 |
-| `small_part_holding` | 2 | 1 | +1 |
-| `cutter_radius_suboptimal` | 3 | 2 | +1 |
+| rule | ours | reference | delta | where |
+| --- | --- | --- | --- | --- |
+| `sharp_internal_edge` | 54 | 147 | −93 | parked, §5 |
+| `setup_count_high` | 42 | 48 | −6 | one apiece over four fixtures |
+| `pocket_square_corner` | 89 | 84 | +5 | `optical_periscope_housing` 11 of 9 |
+| `thin_wall` | 102 | 99 | +3 | `optical_periscope_housing` 4 of 8, `electronics_enclosure_billet` 28 of 31 |
+| `hole_deep_risk` | 79 | 81 | −2 | `torture_hole_labyrinth`, `hole_countersink_angle` |
+| `hole_flat_bottom` | 74 | 76 | −2 | `countersink`, `off_cardinal_viz_block` |
+| `hole_edge_distance` | 34 | 33 | +1 | `euro_lock_cylinder` 0 of 2, two fixtures one over |
+| `small_part_holding` | 2 | 1 | +1 | `small_part` |
+| `cutter_radius_suboptimal` | 3 | 2 | +1 | `wr90_waveguide_flange` |
 
-Two of these are concentrated enough to be worth naming. `undercut_present`
-+6 is entirely the `tool_access_blocked` fixture, where we report six and the
-reference none. `hole_edge_distance` −7 is mostly `cf_knife_edge_flange` (2 of
-6) and `hydraulic_actuator_end_cap` (0 of 4).
+The periscope housing is the one part worth opening first: it carries the
+largest share of both remaining spreads, over on square corners and under on
+thin walls at once.
 
 Recognition is closer still. Against the reference's `features.json`, total
 L1 error is 21 and 198 of 211 fixtures match exactly, from 479 and 99 before

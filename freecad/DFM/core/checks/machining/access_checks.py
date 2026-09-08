@@ -52,8 +52,18 @@ class UndercutPresentCheck(MachiningCheck):
 
         severity = self.severity_from_rule_config(rule_config)
         results: list[CheckResult] = []
+        sealed = _sealed_cavity_faces(context)
 
         for undercut in context.recognition.of_type(FeatureType.UNDERCUT):
+            # A cavity every face of which is unreachable, and which nothing
+            # reachable adjoins, is a sealed void -- and `sealed_void` says
+            # so once, as an error, about the cavity. Saying it again per
+            # wall puts six warnings on top of that one error and none of
+            # them adds anything: there is no wall here to reach separately,
+            # there is a void with no way in.
+            if any(face_id in sealed for face_id in undercut.faces):
+                continue
+
             surface = str(undercut.param("surface_type", "PLANAR"))
             if surface == "CYLINDER":
                 remedy = (
@@ -148,3 +158,43 @@ class ToolAccessBlockedCheck(MachiningCheck):
                 )
             )
         return results
+
+
+def _sealed_cavity_faces(context) -> set[int]:
+    """Faces belonging to a cavity that is sealed shut.
+
+    Sealed means two things together, and the second is what keeps this
+    narrow. Every face of the cavity has to be unreachable -- but that alone
+    also describes a small open recess whose walls each happen to be blocked
+    from every cardinal direction, a mirror seat cut at forty-five degrees
+    being the case in point, and those are genuinely worth a warning apiece.
+    So the cavity also has to have nothing reachable next to it: every face
+    it touches is either part of it or unreachable too. That is a void with
+    no way in, which is one thing to report rather than six.
+    """
+    unreachable: set[int] = set()
+    for feature in context.recognition.of_type(FeatureType.UNDERCUT):
+        unreachable.update(feature.faces)
+    if not unreachable:
+        return set()
+
+    sealed: set[int] = set()
+    for cavity in context.recognition.features:
+        if cavity.type in (FeatureType.UNDERCUT, FeatureType.PATTERN):
+            continue
+        if not cavity.faces:
+            continue
+        if any(face_id not in unreachable for face_id in cavity.faces):
+            continue
+        members = set(cavity.faces)
+        for face_id in cavity.faces:
+            for neighbour in context.graph.neighbors_of(face_id):
+                if neighbour in members or neighbour in unreachable:
+                    continue
+                break
+            else:
+                continue
+            break
+        else:
+            sealed.update(cavity.faces)
+    return sealed

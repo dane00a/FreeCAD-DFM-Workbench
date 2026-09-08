@@ -16,6 +16,7 @@ from __future__ import annotations
 import math
 from typing import Optional
 
+from OCP.Bnd import Bnd_Box
 from OCP.gp import gp_Dir, gp_Pnt, gp_Vec
 
 from ...machining.context import MachiningContext
@@ -242,6 +243,18 @@ class HoleFlatBottomCheck(MachiningCheck):
         return results
 
 
+#: What counts as the outside of a round part, for a hole measured against
+#: it. Small radii are stubs and blends rather than a barrel, and a barrel
+#: has to be meaningfully bigger than the bore inside it -- a sliver of the
+#: bore's own wall with an inverted orientation flag would otherwise read as
+#: a containment of the same size and give a wall of nothing.
+_MIN_CONTAINMENT_RADIUS_MM = 5.0
+_MIN_CONTAINMENT_GAP_MM = 0.5
+
+#: How closely a barrel has to run with the bore to be the wall it breaks out
+#: through.
+_AXIS_PARALLEL_MIN_DOT = 0.95
+
 @register_check(Rulebook.HOLE_EDGE_DISTANCE)
 class HoleEdgeDistanceCheck(MachiningCheck):
     """Material left between a hole and the outside of the part.
@@ -341,6 +354,117 @@ class HoleEdgeDistanceCheck(MachiningCheck):
             for face_coordinate in (lows[index], highs[index]):
                 gap = abs(position[index] - face_coordinate) - reach
                 best = gap if best is None else min(best, gap)
+
+        # That box is built from the part's flat faces, and a round part has
+        # none facing outward -- so a bolt circle set close to the rim of a
+        # flange or an end cap is invisible to it. The wall that matters
+        # there is to the outside diameter, and that is a cylinder.
+        against_od = HoleEdgeDistanceCheck._wall_to_containing_od(
+            context, hole, axis, centre, radius
+        )
+        if against_od is not None:
+            best = against_od if best is None else min(best, against_od)
+        return best
+
+    @staticmethod
+    def _wall_to_containing_od(
+        context: MachiningContext,
+        hole: FeatureInstance,
+        axis: gp_Dir,
+        centre: gp_Pnt,
+        radius: float,
+    ) -> Optional[float]:
+        """The thinnest wall from this bore out to a barrel it sits inside.
+
+        A cylinder with its material on the inside is the outside of the
+        part. For one running the same way as the bore, the wall between them
+        is the barrel's radius, less how far the bore's axis sits off the
+        barrel's, less the bore's own radius.
+
+        Four things have to hold before that arithmetic means anything, and
+        each of them has a part behind it. The barrel has to be bigger than
+        the bore, or a sliver of the bore's own wall with its orientation
+        flag inverted reads as a barrel of the same size and the wall comes
+        out nought. The bore has to be inside it, or the subtraction is
+        measuring across open air. The two have to overlap along the axis, or
+        a tapped hole at one end of an end cap gets paired with a relief
+        groove sixteen millimetres away at the other. And the barrel's
+        surface has to actually exist where the bore approaches it: an
+        external corner radius is a quarter of a cylinder facing away from
+        the part, and read as a barrel it puts every corner screw a
+        millimetre from the edge.
+        """
+        # The bore's own wall, for its extent along the axis. A bore that
+        # stops well short of the barrel it sits beside never breaks out into
+        # it, however close the two are in section: a tapped hole at one end
+        # of an end cap and a relief groove at the other are sixteen
+        # millimetres apart and have nothing to say about each other.
+        wall_face = None
+        for face_id in hole.faces:
+            node = context.graph.node(face_id)
+            if node.surface_type is SurfaceType.CYLINDER and node.is_internal:
+                if wall_face is None or node.cyl_radius < wall_face.cyl_radius:
+                    wall_face = node
+        if wall_face is None:
+            return None
+
+        best: Optional[float] = None
+        own = set(hole.faces)
+
+        for node in context.graph.nodes:
+            if node.surface_type is not SurfaceType.CYLINDER:
+                continue
+            if node.face_id in own or node.cyl_cone_axis is None:
+                continue
+            # Material inside the surface: the outside of the part, not a bore.
+            if node.is_reversed:
+                continue
+            if node.cyl_radius < _MIN_CONTAINMENT_RADIUS_MM:
+                continue
+            if node.cyl_radius < radius + _MIN_CONTAINMENT_GAP_MM:
+                continue
+
+            direction = node.cyl_cone_axis.Direction()
+            if abs(direction.Dot(axis)) < _AXIS_PARALLEL_MIN_DOT:
+                continue
+
+            origin = node.cyl_cone_axis.Location()
+            offset = gp_Vec(origin, centre)
+            axis_offset = offset.Crossed(gp_Vec(direction)).Magnitude()
+            if axis_offset > node.cyl_radius + radius:
+                continue  # the bore is outside this barrel altogether
+
+            span = _axial_extent(node, origin, direction)
+            bore_span = _axial_extent(wall_face, origin, direction)
+            if span is None or bore_span is None:
+                continue
+            if bore_span[1] < span[0] or bore_span[0] > span[1]:
+                continue  # they do not meet anywhere along the axis
+
+            if axis_offset > 1e-6:
+                radial = gp_Vec(offset.XYZ())
+                axial = gp_Vec(direction.XYZ())
+                axial.Multiply(radial.Dot(gp_Vec(direction)))
+                radial.Subtract(axial)
+                length = radial.Magnitude()
+                if length > 1e-6:
+                    radial.Divide(length)
+                    middle = 0.5 * (
+                        max(bore_span[0], span[0]) + min(bore_span[1], span[1])
+                    )
+                    on_surface = gp_Pnt(
+                        origin.X() + middle * direction.X() + node.cyl_radius * radial.X(),
+                        origin.Y() + middle * direction.Y() + node.cyl_radius * radial.Y(),
+                        origin.Z() + middle * direction.Z() + node.cyl_radius * radial.Z(),
+                    )
+                    box = Bnd_Box()
+                    box.Add(node.bbox)
+                    box.Enlarge(1.0)
+                    if box.IsOut(on_surface):
+                        continue  # a corner radius, not a barrel
+
+            wall = node.cyl_radius - axis_offset - radius
+            best = wall if best is None else min(best, wall)
         return best
 
 
@@ -695,3 +819,18 @@ class HoleIntersectingCheck(MachiningCheck):
         if box_a is None or box_b is None:
             return True
         return not box_a.IsOut(box_b)
+
+
+def _axial_extent(node, origin, direction) -> "Optional[tuple[float, float]]":
+    """How far a face reaches along a direction, from a point on it."""
+    if node.bbox.IsVoid():
+        return None
+    xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
+    low, high = math.inf, -math.inf
+    for x in (xmin, xmax):
+        for y in (ymin, ymax):
+            for z in (zmin, zmax):
+                along = gp_Vec(origin, gp_Pnt(x, y, z)).Dot(gp_Vec(direction))
+                low = min(low, along)
+                high = max(high, along)
+    return (low, high)

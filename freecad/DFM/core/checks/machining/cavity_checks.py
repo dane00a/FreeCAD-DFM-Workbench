@@ -112,11 +112,23 @@ class PocketCornerRadiusCheck(MachiningCheck):
         # same way -- and while it was left out, nothing spoke for those
         # corners at all: the sharp-edge rule stood down because the cavity
         # was a recognized feature, and this rule never looked at it.
+        unreachable: set[int] = set()
+        for feature in context.recognition.of_type(FeatureType.UNDERCUT):
+            unreachable.update(feature.faces)
+
         for cavity in context.recognition.of_type(
             FeatureType.POCKET, FeatureType.SLOT, FeatureType.THROUGH_CAVITY
         ):
             # A slot open at its end has no inside corner there to speak of.
             if cavity.param("is_open") and cavity.type == FeatureType.SLOT:
+                continue
+            # A cavity every face of which is unreachable is a sealed void,
+            # and the corner radius of a void nothing can get into is not
+            # the finding worth making about it. `sealed_void` says the
+            # thing that matters, once.
+            if cavity.faces and all(
+                face_id in unreachable for face_id in cavity.faces
+            ):
                 continue
             # Absent means the recognizer found no fillet at all, which is a
             # square corner. Present and zero means the same thing measured.

@@ -159,6 +159,10 @@ def _towards(point: gp_Pnt, anchor: gp_Pnt, fraction: float) -> gp_Pnt:
     )
 
 
+#: How squarely a face has to sit across a turned part's axis before the
+#: lathe, rather than a mill, is what made it.
+_TURNED_FACE_MIN_DOT = 0.95
+
 @register_check(Rulebook.THIN_WALL)
 class ThinWallCheck(MachiningCheck):
     """Material left between two opposed faces.
@@ -413,11 +417,146 @@ class ThinWallCheck(MachiningCheck):
         if thickness > thresholds.thin_wall_aspect_max_thickness_mm:
             return None
 
-        span = self._in_plane_span(first, second)
+        span, height = self._in_plane_extents(first, second)
         if span <= 0.0:
             return None
         aspect = span / thickness
         if aspect < thresholds.thin_wall_aspect_warn:
+            return None
+        # And the wall has to be taller than it is thick. A section shorter
+        # than its own thickness is a stubby ridge standing on the base that
+        # supports it -- the side of a shallow groove -- and how far it runs
+        # is beside the point, because it is not going anywhere.
+        if height < thickness:
+            return None
+        # Two faces square to a turned part's own axis are faced on the
+        # lathe, not milled: the tool bears on the whole face at once and
+        # there is no long unsupported pass to chatter. The web between two
+        # such faces is thin or it is not, and the aspect has nothing to add.
+        if _faces_the_lathe(context, first) and _faces_the_lathe(context, second):
+            return None
+
+        return (
+            Severity.WARNING,
+            target,
+            f"This wall is {thickness:.2f} mm thick but {span:.0f} mm across, an "
+            f"aspect ratio of {aspect:.0f}:1. Thin broad sections drum under the "
+            "cutter and relieve residual stress as material comes off, so expect "
+            "chatter marks and bow even though the thickness itself is acceptable.",
+        )
+
+    @staticmethod
+    def _in_plane_extents(first: AagNode, second: AagNode) -> tuple[float, float]:
+        """How far a wall runs, and how tall it stands.
+
+        Two different questions and two different answers, and reading one
+        for the other is what made a 60 mm wall report as 25.
+
+        The length is the longer of the wall's two in-plane dimensions -- the
+        distance the cutter travels alongside it, which is what makes a thin
+        section drum. The height is the shorter, and it is not an aspect at
+        all: it decides whether the section is a wall in the first place.
+
+        Both are taken across the pair, smaller wins, because the wall is
+        only as long as the shorter of the two faces bounding it. The
+        thickness direction is the first face's normal for both, since the
+        two face each other.
+        """
+        normal = first.outward_normal or second.outward_normal
+        if normal is None:
+            return (0.0, 0.0)
+        components = (abs(normal.X()), abs(normal.Y()), abs(normal.Z()))
+        across = components.index(max(components))
+
+        lengths = []
+        heights = []
+        for node in (first, second):
+            in_plane = [d for i, d in enumerate(node.bbox_dims()) if i != across]
+            if not in_plane:
+                return (0.0, 0.0)
+            lengths.append(max(in_plane))
+            heights.append(min(in_plane))
+        return (min(lengths), min(heights))
+
+    @staticmethod
+    def _grade_converging(
+        thickness: float, target: float, limit: float
+    ) -> tuple[Severity, float, str]:
+        """A wedge of material, measured where it is thinnest."""
+        if thickness <= limit:
+            return (
+                Severity.ERROR,
+                limit,
+                f"These two faces close to {thickness:.2f} mm apart at their "
+                f"nearest, under the {limit:.2f} mm floor. The wall between "
+                "them tapers to nothing and will break out as the second face "
+                "is cut.",
+            )
+        return (
+            Severity.WARNING,
+            target,
+            f"These two faces converge to {thickness:.2f} mm apart, below the "
+            f"{target:.2f} mm target. The wall is thinnest where they meet and "
+            "will deflect there first; cut it last and lightly.",
+        )
+
+    # -- grading ------------------------------------------------------------
+
+    def _grade(
+        self,
+        context: MachiningContext,
+        first: AagNode,
+        second: AagNode,
+        thickness: float,
+        target: float,
+        limit: float,
+        in_rib: bool = False,
+    ) -> Optional[tuple[Severity, float, str]]:
+        thresholds = context.config.thresholds
+
+        if thickness <= limit:
+            return (
+                Severity.ERROR,
+                limit,
+                f"Only {thickness:.2f} mm of material is left between these two "
+                f"faces, under the {limit:.2f} mm floor. A wall this thin will "
+                "deflect away from the cutter and is likely to distort or break "
+                "out during machining.",
+            )
+
+        if thickness <= target:
+            return (
+                Severity.WARNING,
+                target,
+                f"The wall between these faces is {thickness:.2f} mm, below the "
+                f"{target:.2f} mm target. Expect deflection and chatter; it will "
+                "need light finishing passes and may not hold flatness.",
+            )
+
+        # The broad-and-thin path. Both the span and the thickness have to
+        # qualify, or every large flat face on a normal part would fire.
+        #
+        # A rib is excluded here and only here. Being long and thin is what a
+        # rib is for, and `rib_height_aspect` says so already -- but a rib
+        # thin enough to fail on the measurement alone is still a wall that
+        # will deflect away from the cutter, and the ribfield's 1.2 mm webs
+        # are exactly that. Muting the pair outright lost all three of them.
+        if in_rib:
+            return None
+        if thickness > thresholds.thin_wall_aspect_max_thickness_mm:
+            return None
+
+        span, height = self._in_plane_extents(first, second)
+        if span <= 0.0:
+            return None
+        aspect = span / thickness
+        if aspect < thresholds.thin_wall_aspect_warn:
+            return None
+        # And the wall has to be taller than it is thick. A section shorter
+        # than its own thickness is a stubby ridge standing on the base that
+        # supports it -- the side of a shallow groove -- and how far it runs
+        # is beside the point, because it is not going anywhere.
+        if height < thickness:
             return None
 
         return (
@@ -1132,3 +1271,14 @@ class ThinWallCheck(MachiningCheck):
             return solver.Value()
         except Exception:
             return None
+
+
+def _faces_the_lathe(context, node: AagNode) -> bool:
+    """Whether a face stands square to the axis the part was turned about."""
+    axis = getattr(context.part_process, "axis_of_revolution", None)
+    if axis is None:
+        return False
+    normal = node.outward_normal
+    if normal is None:
+        return False
+    return abs(normal.Dot(axis.Direction())) > _TURNED_FACE_MIN_DOT

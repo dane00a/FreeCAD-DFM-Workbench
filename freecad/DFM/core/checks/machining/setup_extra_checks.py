@@ -73,6 +73,18 @@ _COSTS_A_SETUP = frozenset(
 )
 
 
+#: A sculpted face whose normals disagree by more than this across it has no
+#: one direction a tool comes from.
+_SCULPTED_MAX_SPREAD_DEG = 45.0
+
+#: Flatter than this and the face machines like a plane, whatever the
+#: classifier called it.
+_SCULPTED_MIN_RADIUS_MM = 500.0
+
+#: Tighter than this, between tangent edges, and it is a blend rather than a
+#: surface anybody set out to cut.
+_BLEND_BAND_MAX_RADIUS_MM = 10.0
+
 @register_check(Rulebook.SETUP_COUNT_HIGH)
 class SetupCountCheck(MachiningCheck):
     """How many times the part has to be refixtured.
@@ -190,7 +202,71 @@ class SetupCountCheck(MachiningCheck):
             if axis is not None:
                 # A bore is reversible unless something closes one end.
                 directions.append((axis, bool(feature.param("axis_signed"))))
+
+        directions.extend(SetupCountCheck._sculpted_approaches(context))
         return directions
+
+    @staticmethod
+    def _sculpted_approaches(context) -> "list[tuple[gp_Dir, bool]]":
+        """The faces a ball-nose has to come down onto, and from where.
+
+        A styled surface is machined along its own normal, so it costs a
+        setup exactly as a pocket floor does -- and nothing else on the part
+        needs to be angled for that to be true. Signed, because the tool
+        comes from the side the material is not on.
+
+        Three kinds of face are excluded, and each of them would otherwise
+        invent setups that nobody works.
+
+        A face whose normals disagree wildly across it has no single
+        approach; that is a wrapped channel wall, and what it needs is
+        recorded as an undercut rather than as a direction.
+
+        A face with no real curvature machines like a plane. A prism recut
+        can leave a pocket's own walls classified as sculpted, and taken at
+        face value the four of them add four lateral setups -- five on a
+        two-setup part.
+
+        And a blend band is made by whatever tool makes the feature it
+        blends. It is recognized by being tight and running between tangent
+        edges, which is what a fillet is.
+        """
+        found: list[tuple[gp_Dir, bool]] = []
+        for node in context.graph.nodes:
+            if not node.has_freeform_curvature:
+                continue
+            if node.concave_neighbor_count == 0:
+                continue
+            if node.freeform_mean_normal is None:
+                continue
+            if node.freeform_normal_spread_deg > _SCULPTED_MAX_SPREAD_DEG:
+                continue
+
+            concave_radius = node.freeform_min_concave_radius_mm
+            convex_curvature = node.freeform_max_convex_curvature
+            curved = (
+                concave_radius > 0.0
+                or convex_curvature > 1.0 / _SCULPTED_MIN_RADIUS_MM
+            )
+            if not curved:
+                continue
+
+            if 0.0 < concave_radius <= _BLEND_BAND_MAX_RADIUS_MM:
+                tangent = sum(
+                    1 for edge in context.graph.edges_of(node.face_id)
+                    if edge.is_tangent
+                )
+                if tangent >= 2:
+                    continue
+            elif (
+                concave_radius <= 0.0
+                and convex_curvature > 1e-9
+                and 1.0 / convex_curvature <= _BLEND_BAND_MAX_RADIUS_MM
+            ):
+                continue
+
+            found.append((node.freeform_mean_normal, True))
+        return found
 
     @staticmethod
     def _host_face_normal(context, feature):

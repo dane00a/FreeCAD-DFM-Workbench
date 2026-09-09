@@ -249,8 +249,8 @@ materials:
         target: '4.0'
         limit: '8.0'
       BOSS_WALL_THICKNESS:
-        target: N/A
-        limit: '3.0'
+        target: '3.0'
+        limit: N/A
       FREEFORM_INTERNAL_RADIUS:
         target: N/A
         limit: N/A
@@ -274,11 +274,11 @@ materials:
         target: N/A
         limit: '1.5'
       HOLE_NONSTANDARD_DIAMETER:
-        binary_severity: INFO
+        binary_severity: WARNING
       HOLE_PARTIAL_ENTRY:
         binary_severity: WARNING
       HOLE_COUNTERSINK_ANGLE:
-        binary_severity: INFO
+        binary_severity: WARNING
       HOLE_MULTI_PASS:
         binary_severity: INFO
       HOLE_INTERSECTS_CAVITY:
@@ -303,7 +303,7 @@ materials:
         target: '2'
         limit: '4'
       TOOL_ACCESS_SPECIAL_SETUP:
-        binary_severity: WARNING
+        binary_severity: INFO
       SURFACE_FINISH_CONFLICT:
         binary_severity: INFO
   Aluminum (Soft Wrought Alloy):

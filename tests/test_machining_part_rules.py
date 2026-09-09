@@ -215,9 +215,12 @@ class TestFeatureComplexity(unittest.TestCase):
         self.assertTrue(findings)
         self.assertEqual(findings[0].severity, Severity.INFO)
 
-    def test_a_busy_part_is_escalated(self):
+    def test_a_busy_part_is_reported_in_stronger_terms(self):
         # Thirty-six drillings: nothing individually wrong, which is the
-        # whole point of the rule.
+        # whole point of the rule -- and why the severity does not move. A
+        # busy part is not a faulty one, so this stays informational however
+        # many features it has and says something different instead. The
+        # reference publishes the same finding as information on every part.
         shape = block()
         for row in range(6):
             for column in range(6):
@@ -229,8 +232,10 @@ class TestFeatureComplexity(unittest.TestCase):
                 shape = _cut(shape, drill)
         findings = rule_check(shape, self.RULE, target="10", limit="60")
         self.assertTrue(findings)
-        self.assertNotEqual(findings[0].severity, Severity.INFO)
+        self.assertEqual(findings[0].severity, Severity.INFO)
         self.assertIn("recognized features", findings[0].message)
+        self.assertIn("Worth asking whether any of it can be simplified",
+                      findings[0].message)
 
     def test_it_estimates_the_operations_not_just_the_features(self):
         """Features are what is on the part; operations are what it costs.

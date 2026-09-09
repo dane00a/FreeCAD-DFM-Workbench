@@ -891,9 +891,13 @@ class TestFeatureComplexity(SheetCase):
         self.assertAlmostEqual(findings[0].value, 3.0, places=3)
         self.assertIn("forming station", findings[0].message)
 
-    def test_a_configured_ceiling_raises_the_tone(self):
+    def test_a_configured_ceiling_changes_the_wording_not_the_severity(self):
+        # An operation estimate is what a quote is built from, not a fault to
+        # be graded: a busy panel is not a worse panel. The configured
+        # ceiling still selects which sentence is said about it.
         findings = check(hemmed_bracket(), self.RULE, target="1.0", limit="2.0")
-        self.assertEqual(severities(findings), [Severity.ERROR])
+        self.assertEqual(severities(findings), [Severity.INFO])
+        self.assertTrue(findings[0].message)
 
 
 class TestSharpFold(SheetCase):

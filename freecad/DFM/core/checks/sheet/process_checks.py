@@ -201,11 +201,15 @@ class SheetFeatureComplexityCheck(SheetCheck):
         # decides whether it is worth raising the tone.
         target = self.safe_float(rule_config.target)
         limit = self.safe_float(rule_config.limit)
+        # Informational whatever the count. An operation estimate is what a
+        # quote is built from, not a fault to be graded: a busy panel is not
+        # a worse panel, and colouring it as one buries the findings that
+        # are. The threshold still selects the wording.
         severity = Severity.INFO
         threshold_value = float(operations)
         graded = self.graded(float(operations), target, limit, "max")
         if graded is not None:
-            severity, threshold_value = graded
+            _, threshold_value = graded
 
         tapping = (
             f" plus {tapped} secondary tapping operation"

@@ -356,8 +356,8 @@ materials:
         target: '4.0'
         limit: '8.0'
       BOSS_WALL_THICKNESS:
-        target: N/A
-        limit: '3.0'
+        target: '3.0'
+        limit: N/A
       BOSS_UNDERCUT:
         binary_severity: WARNING
       RIB_HEIGHT_ASPECT:
@@ -386,11 +386,11 @@ materials:
         target: N/A
         limit: '0.0'
       HOLE_NONSTANDARD_DIAMETER:
-        binary_severity: INFO
+        binary_severity: WARNING
       HOLE_PARTIAL_ENTRY:
         binary_severity: WARNING
       HOLE_COUNTERSINK_ANGLE:
-        binary_severity: INFO
+        binary_severity: WARNING
       HOLE_MULTI_PASS:
         binary_severity: INFO
       HOLE_INTERSECTS_CAVITY:
@@ -398,7 +398,7 @@ materials:
       POCKET_ASPECT_RATIO:
         binary_severity: ERROR
       SLOT_NONSTANDARD_WIDTH:
-        binary_severity: INFO
+        binary_severity: WARNING
       FLEXURE_SLIT_PROCESS:
         binary_severity: INFO
       BROACHED_SLOT_PROCESS:
@@ -425,7 +425,7 @@ materials:
       NO_ORTHOGONAL_DATUM_TRIO:
         binary_severity: WARNING
       TOOL_ACCESS_SPECIAL_SETUP:
-        binary_severity: WARNING
+        binary_severity: INFO
       SURFACE_FINISH_CONFLICT:
         binary_severity: INFO
       SHEET_INTENT_SHARP_CORNERS:

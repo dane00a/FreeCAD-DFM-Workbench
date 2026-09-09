@@ -295,6 +295,13 @@ class ToolAccessSpecialSetupCheck(MachiningCheck):
         if context.config.machine_mode != "3axis":
             return []
 
+        # Taken from the configuration like every other binary rule. It was
+        # pinned to a warning here, which meant the process file could say
+        # what this is worth and be ignored -- and what it is worth is a note:
+        # an angled feature needs a fixture or a fourth axis, which is a
+        # planning fact rather than something wrong with the part.
+        severity = self.severity_from_rule_config(rule_config)
+
         cluster_deg = context.config.thresholds.tad_angular_cluster_deg
         tolerance = math.cos(math.radians(cluster_deg))
 
@@ -310,11 +317,11 @@ class ToolAccessSpecialSetupCheck(MachiningCheck):
             results.append(
                 self.finding(
                     rule,
-                    Severity.WARNING,
+                    severity,
                     f"{tilt:.0f} deg off axis",
                     self.render(
                         feedback,
-                        Severity.WARNING,
+                        severity,
                         tilt,
                         0.0,
                         0.0,

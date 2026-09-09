@@ -668,9 +668,17 @@ class FeatureComplexityCheck(MachiningCheck):
         # features, one operation" is a true statement and a useful one --
         # it is a billet somebody saws to length, and an estimator reading a
         # silent panel cannot tell that from an analysis that failed.
+        # Graded for the wording, never for the severity. This is a pricing
+        # signal and not a defect: nothing here is wrong, and saying ERROR
+        # about a part for being complicated puts a red mark against a
+        # perfectly good component and pushes the real errors down the list.
+        # The reference publishes it as information on every part, and so
+        # does this -- a busy part gets a different sentence, not a different
+        # colour.
         graded = self.graded(count, target, limit, "max")
+        severity = Severity.INFO
         if graded is not None:
-            severity, threshold = graded
+            _, threshold = graded
             closing = (
                 "Nothing here is individually wrong, which is the point: "
                 "programming time and setup count follow the number of "
@@ -684,7 +692,6 @@ class FeatureComplexityCheck(MachiningCheck):
             # estimator wants it whether or not the part is unusual -- a
             # quote is built from how many things have to be cut, and that
             # number is only obvious once somebody has counted it.
-            severity = Severity.INFO
             threshold = target
             closing = (
                 "Not a fault, and not unusual for a part of this size. It is "

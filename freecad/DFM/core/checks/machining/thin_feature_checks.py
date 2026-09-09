@@ -632,8 +632,23 @@ class ThinWallCheck(MachiningCheck):
 
             shoulders = self._bore_shoulders(context, bores)
 
+            touching = {
+                edge.other_face(bore.face_id)
+                for bore in bores
+                for edge in context.graph.edges_of(bore.face_id)
+            }
+
             for plane in planes:
                 if plane.face_id in fragments or plane.face_id in shoulders:
+                    continue
+                # A face the bore breaks into is the face it was drilled
+                # through, and there is no wall between a hole and its own
+                # opening. The angle test below catches that for a hole
+                # drilled square to the face; a hole entering at thirty
+                # degrees is only 0.87 of the way to square and slips past
+                # it, and then the rim it shares with that face measures as
+                # a tenth of a millimetre of material.
+                if plane.face_id in touching:
                     continue
                 normal = plane.outward_normal
                 if normal is None:

@@ -146,24 +146,24 @@ materials:
         target: '1.0'
         limit: '0.5'
       SHEET_FLANGE_SHORT:
-        target: '4.0'
-        limit: '2.5'
+        target: N/A
+        limit: N/A
       SHEET_HOLE_NEAR_BEND:
         target: N/A
-        limit: '2.5'
+        limit: N/A
       SHEET_HOLE_SMALL:
         target: N/A
         limit: '1.0'
       SHEET_HOLE_PITCH:
         target: N/A
-        limit: '2.0'
+        limit: N/A
       SHEET_COUNTERSINK_DEEP:
         binary_severity: WARNING
       SHEET_CLOSED_FLANGE_LOOP:
         binary_severity: WARNING
       SHEET_BEND_ANGLE_EXTREME:
         target: N/A
-        limit: '150.0'
+        limit: N/A
       SHEET_BEND_LONGER_THAN_BODY:
         binary_severity: WARNING
       SHEET_THICKNESS_OUT_OF_RANGE:
@@ -181,7 +181,7 @@ materials:
         limit: '1.0'
       SHEET_HEM_DIMENSIONS:
         target: N/A
-        limit: '4.0'
+        limit: N/A
       SHEET_FORMED_FEATURE:
         binary_severity: INFO
       SHEET_EMBOSS_DEEP:
@@ -189,15 +189,15 @@ materials:
         limit: '3.0'
       SHEET_LOUVER_TALL:
         target: N/A
-        limit: '3.0'
+        limit: N/A
       SHEET_FORMED_PITCH:
         target: N/A
-        limit: '6.0'
+        limit: N/A
       SHEET_SHARP_FOLD:
         binary_severity: WARNING
       SHEET_FORMED_NEAR_BEND:
         target: N/A
-        limit: '6.0'
+        limit: N/A
       SHEET_FEATURE_COMPLEXITY:
         target: '12'
         limit: '25'

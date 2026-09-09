@@ -9,11 +9,14 @@ Where this workbench still disagrees with the reference engine over the
 211-part corpus, what causes each disagreement, and which fixture to open
 first.
 
-**66 of 75 rules agree exactly.** Totals over the 211-part corpus, in
-occurrences rather than published rows: 1126 here, 1218 there, L1 114.
+**56 of 75 rules agree exactly.** Totals over the 211-part corpus, in
+occurrences rather than published rows: 1121 here, 1218 there, L1 131.
+Process classification agrees on all 211 parts, and 157 of them produce an
+identical set of findings.
 
-Ninety-three of that 114 is `sharp_internal_edge`, which is parked
-deliberately (§5). The live tail is **21 findings across eight rules**.
+Ninety-three of that 131 is `sharp_internal_edge`, which is parked
+deliberately (§5), and fourteen more is one settings bug (§0a). The live tail
+is **24 findings across eleven rules**.
 
 ## Status
 
@@ -24,16 +27,79 @@ Measured 2026-09-08, against the reference at `26e76d14`.
 | `sharp_internal_edge` | 54 | 147 | −93 | parked, §5 |
 | `setup_count_high` | 42 | 48 | −6 | one apiece over four fixtures |
 | `pocket_square_corner` | 89 | 84 | +5 | `optical_periscope_housing` 11 of 9 |
+| `sheet_formed_pitch` | 10 | 6 | +4 | §0a |
 | `thin_wall` | 102 | 99 | +3 | `optical_periscope_housing` 4 of 8, `electronics_enclosure_billet` 28 of 31 |
+| `sheet_bend_angle_extreme` | 9 | 7 | +2 | §0a |
+| `sheet_hem_dimensions` | 2 | 4 | −2 | §0a |
+| `sheet_hole_near_bend` | 1 | 3 | −2 | §0a |
+| `sheet_hole_pitch` | 0 | 2 | −2 | §0a |
 | `hole_deep_risk` | 79 | 81 | −2 | `torture_hole_labyrinth`, `hole_countersink_angle` |
 | `hole_flat_bottom` | 74 | 76 | −2 | `countersink`, `off_cardinal_viz_block` |
-| `hole_edge_distance` | 34 | 33 | +1 | `euro_lock_cylinder` 0 of 2, two fixtures one over |
+| `sheet_flange_short` | 0 | 1 | −1 | §0a |
+| `sheet_formed_near_bend` | 3 | 4 | −1 | §0a |
+| `part_aspect_ratio` | 11 | 12 | −1 | one fixture |
+| `material_removal_high` | 9 | 10 | −1 | one fixture |
+| `turned_profile_radius` | 2 | 3 | −1 | one fixture |
+| `hole_edge_distance` | 34 | 33 | +1 | `euro_lock_cylinder` 0 of 2 |
 | `small_part_holding` | 2 | 1 | +1 | `small_part` |
 | `cutter_radius_suboptimal` | 3 | 2 | +1 | `wr90_waveguide_flange` |
 
-The periscope housing is the one part worth opening first: it carries the
-largest share of both remaining spreads, over on square corners and under on
-thin walls at once.
+Four parts carry 82 of the 131, and all four of them are
+`sharp_internal_edge`: `photonic_fiber_v_groove_array` (13 of 53),
+`progressive_die_punch` (4 of 24), `torture_machinists_maze` (26 of 37) and
+`complex_undercut_part_v2` (11 of 22).
+
+Setting those aside, the periscope housing is the part worth opening first:
+it carries the largest share of both remaining spreads, over on square
+corners and under on thin walls at once.
+
+## 0a. The shipped sheet limits override the rules
+
+Seven sheet rules disagree, fourteen findings between them, and none of it is
+rule logic. Every one of those rules computes a gauge-relative answer -- a
+web of 2×t, a flange of 4×t + r, a brake ceiling interpolated between 125° at
+11 gauge and 180° at 14 -- and then lets a configured limit replace it:
+
+```python
+ceiling = self.safe_float(rule_config.limit)
+if ceiling is None:
+    ceiling = max_std_bend_deg(gauge, context)
+```
+
+`sheet_metal.yaml` supplies a figure for each, so the fallback never runs.
+`SHEET_BEND_ANGLE_EXTREME` ships `150.0`, a flat angle standing in for the
+gauge band. `SHEET_FORMED_PITCH` ships `6.0` mm where the rule wants 2×t. The
+others ship the factor's numeral as though it were millimetres — `2.5`,
+`4.0`, `2.0` — which is right only at exactly 1 mm gauge.
+
+Blanking those numeric limits, and keeping the severities, takes the corpus
+from L1 131 to 117 and from 56 rules exact to 63. The fix is in the settings
+file, not in any check: either remove the limits so the gauge-relative
+default stands, or write them as the factors they are.
+
+This was invisible until the comparison started reading the process YAML.
+Measured with every limit left at `N/A`, all seven rules fall back to the
+correct logic and appear to agree — which is what the run of 2026-09-08
+reported, and why its 114 was optimistic.
+
+## 0b. Severity
+
+Thirty-nine findings carry a different severity from the reference's, on
+rules whose counts agree exactly. Four are one-line declarations in the
+process YAML; three are banding inside the rule.
+
+| rule | ours | reference | where |
+| --- | --- | --- | --- |
+| `tool_access_special_setup` | WARNING ×20 | INFO ×20 | `cnc_milling.yaml`, `cnc_turning.yaml` |
+| `slot_nonstandard_width` | INFO ×7 | WARNING ×7 | `cnc_milling.yaml` |
+| `hole_nonstandard_diameter` | INFO ×4 | WARNING ×4 | `cnc_milling.yaml`, `cnc_turning.yaml` |
+| `hole_countersink_angle` | INFO ×2 | WARNING ×2 | `cnc_milling.yaml`, `cnc_turning.yaml` |
+| `boss_wall_thickness` | ERROR ×2 | WARNING ×2 | threshold placement, not a declaration |
+| `feature_complexity` | 1 ERROR + 2 WARNING of 166 | all INFO | banding in the check |
+| `sheet_feature_complexity` | 1 WARNING of 45 | all INFO | banding in the check |
+
+Severity is what colours a finding and orders the report, so this is more
+visible to a reader than several of the count differences above.
 
 Recognition is closer still. Against the reference's `features.json`, total
 L1 error is 21 and 198 of 211 fixtures match exactly, from 479 and 99 before
@@ -94,11 +160,17 @@ questions. It accounted for five findings across three rules.
 
 Every other fixture runs on defaults on both sides.
 
-**And run only the machining rules.** Every registered check run against a
-machining context also runs the moulding and printing ones, which expect a
-different context and raise — and a rule that raises reads as a rule that
-found nothing. Take the union of `active_rules` from `cnc_milling.yaml`,
-`cnc_turning.yaml` and `sheet_metal.yaml`.
+**And run each part under its own process's configuration.** Take
+`active_rules`, `rule_limits` and `rule_feedback` from the YAML of the
+process the classifier chose for that part -- `cnc_milling`, `cnc_turning` or
+`sheet_metal` -- and not from a merge of all three. Three things go wrong
+otherwise. Running every registered check against a machining context also
+runs the moulding and printing ones, which expect a different context and
+raise, and a rule that raises reads as a rule that found nothing. Passing a
+flat severity reports every INFO and every ERROR the reference publishes as a
+disagreement. And passing `N/A` limits lets every rule fall back to its code
+default, which hides §0a completely: measured that way the sheet rules all
+appear to agree.
 
 ## How to work one of these
 

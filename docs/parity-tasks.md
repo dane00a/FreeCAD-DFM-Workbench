@@ -9,51 +9,58 @@ Where this workbench still disagrees with the reference engine over the
 211-part corpus, what causes each disagreement, and which fixture to open
 first.
 
-**56 of 75 rules agree exactly.** Totals over the 211-part corpus, in
-occurrences rather than published rows: 1121 here, 1218 there, L1 131.
-Process classification agrees on all 211 parts, and 157 of them produce an
-identical set of findings.
+**63 of 75 rules agree exactly.** Totals over the 211-part corpus, in
+occurrences rather than published rows: 1122 here, 1218 there, L1 114.
+Process classification agrees on all 211 parts, 177 of them produce an
+identical set of findings, and every severity matches.
 
-Ninety-three of that 131 is `sharp_internal_edge`, which is parked
-deliberately (§5), and fourteen more is one settings bug (§0a). The live tail
-is **24 findings across eleven rules**.
+Ninety-three of that 114 is `sharp_internal_edge`, which is parked
+deliberately (§5). The live tail is **21 findings across ten rules**, none of
+them more than five and most of them one or two on a single fixture.
 
 ## Status
 
-Measured 2026-09-08, against the reference at `26e76d14`.
+Measured 2026-09-09, against the reference at `26e76d14`.
 
 | rule | ours | reference | delta | where |
 | --- | --- | --- | --- | --- |
 | `sharp_internal_edge` | 54 | 147 | −93 | parked, §5 |
-| `setup_count_high` | 42 | 48 | −6 | one apiece over four fixtures |
-| `pocket_square_corner` | 89 | 84 | +5 | `optical_periscope_housing` 11 of 9 |
-| `sheet_formed_pitch` | 10 | 6 | +4 | §0a |
-| `thin_wall` | 102 | 99 | +3 | `optical_periscope_housing` 4 of 8, `electronics_enclosure_billet` 28 of 31 |
-| `sheet_bend_angle_extreme` | 9 | 7 | +2 | §0a |
-| `sheet_hem_dimensions` | 2 | 4 | −2 | §0a |
-| `sheet_hole_near_bend` | 1 | 3 | −2 | §0a |
-| `sheet_hole_pitch` | 0 | 2 | −2 | §0a |
+| `setup_count_high` | 43 | 48 | −5 | one apiece over six fixtures |
+| `thin_wall` | 103 | 99 | +4 | one or two over six fixtures |
+| `pocket_square_corner` | 86 | 84 | +2 | four fixtures, one each way |
 | `hole_deep_risk` | 79 | 81 | −2 | `torture_hole_labyrinth`, `hole_countersink_angle` |
 | `hole_flat_bottom` | 74 | 76 | −2 | `countersink`, `off_cardinal_viz_block` |
-| `sheet_flange_short` | 0 | 1 | −1 | §0a |
-| `sheet_formed_near_bend` | 3 | 4 | −1 | §0a |
-| `part_aspect_ratio` | 11 | 12 | −1 | one fixture |
-| `material_removal_high` | 9 | 10 | −1 | one fixture |
-| `turned_profile_radius` | 2 | 3 | −1 | one fixture |
-| `hole_edge_distance` | 34 | 33 | +1 | `euro_lock_cylinder` 0 of 2 |
-| `small_part_holding` | 2 | 1 | +1 | `small_part` |
+| `hole_edge_distance` | 34 | 33 | +1 | `euro_lock_cylinder` 0 of 2, two fixtures one over |
+| `material_removal_high` | 9 | 10 | −1 | `optics_spider_mount` |
+| `part_aspect_ratio` | 11 | 12 | −1 | `surgical_handpiece_body` |
+| `turned_profile_radius` | 2 | 3 | −1 | `torture_freeform_leviathan` |
 | `cutter_radius_suboptimal` | 3 | 2 | +1 | `wr90_waveguide_flange` |
 
-Four parts carry 82 of the 131, and all four of them are
+Four parts carry 82 of the 114, and all four of them are
 `sharp_internal_edge`: `photonic_fiber_v_groove_array` (13 of 53),
 `progressive_die_punch` (4 of 24), `torture_machinists_maze` (26 of 37) and
 `complex_undercut_part_v2` (11 of 22).
 
-Setting those aside, the periscope housing is the part worth opening first:
-it carries the largest share of both remaining spreads, over on square
-corners and under on thin walls at once.
+What is left after that is genuinely per-fixture: a measurement difference on
+one part, usually on tilted or freeform geometry, with no pattern shared
+between them. `setup_count_high` is the only one still concentrated in a
+single cause -- six parts where the reference counts a second setup and we
+count one -- and is the place to start.
+
+Not every difference is ours to close. On `inertial_sensor_housing` the
+reference reports nothing at all about two Ø2.5 bores running a tenth of a
+millimetre from a face, under `thin_wall`, `hole_edge_distance` or
+`hole_web_thickness`. That silence looks like a gap in the reference rather
+than a standard to meet.
 
 ## 0a. The shipped sheet limits override the rules
+
+**Fixed 2026-09-09.** The limits are blanked, so each rule answers from
+the gauge as the reference does, and all seven are exact. The
+factor-style rules keep their configured multipliers. Recorded here
+because the shape of the mistake is worth remembering: a settings file
+can silently disable a correct rule, and a comparison run at the code
+defaults will not show it.
 
 Seven sheet rules disagree, fourteen findings between them, and none of it is
 rule logic. Every one of those rules computes a gauge-relative answer -- a
@@ -83,6 +90,14 @@ correct logic and appear to agree — which is what the run of 2026-09-08
 reported, and why its 114 was optimistic.
 
 ## 0b. Severity
+
+**Fixed 2026-09-09.** Every severity now matches. Four were declarations
+in the process files, one was a threshold entered in the error band
+where the check's own default puts it in the warning band, one was a
+severity nailed into a check so the process file could not reach it, and
+the two complexity rules were being graded when they should not be --
+an operation count is a pricing signal, and marking a part ERROR for
+being complicated pushes the real errors below it.
 
 Thirty-nine findings carry a different severity from the reference's, on
 rules whose counts agree exactly. Four are one-line declarations in the

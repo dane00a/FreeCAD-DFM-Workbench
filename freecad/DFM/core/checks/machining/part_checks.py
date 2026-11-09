@@ -32,6 +32,7 @@ from ...models import CheckResult, Severity
 from ...registries import register_check
 from ...rules import Rulebook
 from .base import MachiningCheck
+from ...utils.geometry import face_area
 
 
 # A void smaller than this is modelling noise, not a trapped cavity.
@@ -409,9 +410,7 @@ def _profile_bar_volume(context: MachiningContext, axis) -> float:
         filled = BRepBuilderAPI_MakeFace(plane, outer)
         if not filled.IsDone():
             continue
-        filled_props = GProp_GProps()
-        BRepGProp.SurfaceProperties_s(filled.Face(), filled_props)
-        area = max(area, abs(filled_props.Mass()))
+        area = max(area, abs(face_area(filled.Face())))
     return area * (high - low)
 
 

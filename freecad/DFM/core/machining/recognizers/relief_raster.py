@@ -41,6 +41,7 @@ from OCP.TopoDS import TopoDS
 
 from ..aag import AagNode, SurfaceType
 from .marking.model import add, cross, dot, neg, norm, pnt, scale, sub, unit
+from ...utils.geometry import face_area
 
 #: Same 15 degrees the marking stages use, so "floor" means one thing.
 PARALLEL_DOT = 0.966
@@ -333,11 +334,9 @@ def relief_footprint_metrics(cand: ReliefCandidate, face_index) -> ReliefFootpri
         if f.face_id < 1 or f.face_id > count:
             continue
         face = face_index.face_at(f.face_id)
-        sp = GProp_GProps()
         lp = GProp_GProps()
-        BRepGProp.SurfaceProperties_s(face, sp)
         BRepGProp.LinearProperties_s(face, lp)
-        m.floor_area_mm2 += sp.Mass()
+        m.floor_area_mm2 += face_area(face)
         m.floor_perimeter_mm += lp.Mass()
     if m.floor_perimeter_mm > 1.0e-9:
         m.stroke_w_mm = 2.0 * m.floor_area_mm2 / m.floor_perimeter_mm

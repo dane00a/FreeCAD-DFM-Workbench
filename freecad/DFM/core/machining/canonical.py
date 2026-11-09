@@ -44,7 +44,6 @@ from typing import Optional
 
 from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface
-from OCP.BRepGProp import BRepGProp
 from OCP.BRepLProp import BRepLProp_SLProps
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
@@ -71,7 +70,6 @@ from OCP.GeomAbs import (
 from OCP.GeomAdaptor import GeomAdaptor_Curve, GeomAdaptor_Surface
 from OCP.GeomLib import GeomLib
 from OCP.GeomLProp import GeomLProp_CLProps, GeomLProp_SLProps
-from OCP.GProp import GProp_GProps
 from OCP.Precision import Precision
 from OCP.TColgp import TColgp_Array1OfPnt
 from OCP.TopAbs import TopAbs_OUT
@@ -79,6 +77,7 @@ from OCP.TopLoc import TopLoc_Location
 from OCP.gp import gp, gp_Ax1, gp_Ax3, gp_Dir, gp_Pln, gp_Pnt, gp_Pnt2d, gp_Vec
 
 from .aag import AagNode, SurfaceType
+from ..utils.geometry import face_area
 
 NONE, PLANE, CYLINDER, CONE, SPHERE, TORUS = (
     "NONE", "PLANE", "CYLINDER", "CONE", "SPHERE", "TORUS",
@@ -525,9 +524,7 @@ def recognize_canonical(face, cfg: Optional[CanonicalRecognizerConfig] = None) -
     out = CanonicalFit()
     if face is None or face.IsNull():
         return out
-    gprops = GProp_GProps()
-    BRepGProp.SurfaceProperties_s(face, gprops)
-    out.face_area_mm2 = gprops.Mass()
+    out.face_area_mm2 = face_area(face)
     if out.face_area_mm2 < cfg.min_face_area_mm2:
         return out
 

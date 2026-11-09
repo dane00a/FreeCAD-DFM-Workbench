@@ -118,6 +118,9 @@ def apply_declaration(prefs: dict, obj) -> dict:
         return prefs
     updated = dict(prefs)
     updated["MachiningBlankForm"] = form
+    # Said about this part, so it may also settle what the geometry cannot:
+    # a thin-walled box milled from billet against one folded from sheet.
+    updated["MachiningBlankDeclaredByPart"] = True
     return updated
 
 # ---------------------------------------------------------------------------

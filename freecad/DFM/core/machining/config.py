@@ -642,8 +642,15 @@ class MachiningConfig:
     machine_mode: str = "3axis"
     unit_system: str = "both"
     # Declared, never inferred from geometry: a shop knows what stock it
-    # ordered and no analysis can recover that reliably.
-    blank_form: str = ""
+    # ordered and no analysis can recover that reliably. Billet by default,
+    # as in the reference: most machined parts are cut from solid, and a
+    # billet blank leaves the process detector's verdict as it is.
+    blank_form: str = "billet"
+    # Whether blank_form came from the part itself rather than the shop.
+    # Only a part's own declaration overrules the sheet-metal reading (see
+    # process_classifier._confirm_sheet): the shop buying billet says
+    # nothing about whether this particular part was folded from sheet.
+    blank_declared_by_part: bool = False
     material_family: str = ""
     precision_mode: bool = False
 
@@ -746,9 +753,12 @@ class MachiningConfig:
         if units in UNIT_SYSTEMS:
             config.unit_system = units
 
-        blank = str(prefs.get("MachiningBlankForm", config.blank_form))
+        # An empty stored value is a preference saved before billet was
+        # the default, when empty meant "not declared"; it reads as billet.
+        blank = str(prefs.get("MachiningBlankForm", config.blank_form)) or "billet"
         if blank in BLANK_FORMS:
             config.blank_form = blank
+        config.blank_declared_by_part = bool(prefs.get("MachiningBlankDeclaredByPart", False))
 
         config.material_family = str(prefs.get("MachiningMaterialFamily", ""))
         config.precision_mode = bool(prefs.get("MachiningPrecisionMode", False))

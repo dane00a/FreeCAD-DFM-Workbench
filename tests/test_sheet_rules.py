@@ -968,6 +968,23 @@ class TestThroughTheAnalyzer(SheetCase):
     def test_the_analyzer_classifies_the_bracket_as_sheet(self):
         self.assert_sheet(analysed(bracket()))
 
+    def test_the_shop_s_blank_leaves_the_sheet_reading_alone(self):
+        # Billet is the default and a shop casting its parts still folds
+        # some: a shop-wide blank says nothing about this part, as in the
+        # reference, so the detector's verdict stands.
+        for form in ("billet", "as_cast"):
+            with self.subTest(form=form):
+                self.assert_sheet(analysed(bracket(), {"MachiningBlankForm": form}))
+
+    def test_the_part_s_own_blank_settles_it(self):
+        # Said about this part: a box milled from billet is a uniform-gauge
+        # shell like a folded one, and only the stock ordered tells them apart.
+        context = analysed(
+            bracket(),
+            {"MachiningBlankForm": "billet", "MachiningBlankDeclaredByPart": True},
+        )
+        self.assertEqual(context.process_type, PartProcessType.MILLED)
+
     def test_a_tight_radius_reports_through_the_analyzer(self):
         findings = run(analysed(bracket(inner_radius=1.5)), Rulebook.SHEET_BEND_RADIUS_SMALL)
         self.assertEqual(severities(findings), [Severity.WARNING])

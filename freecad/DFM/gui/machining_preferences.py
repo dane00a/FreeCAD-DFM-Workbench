@@ -70,12 +70,12 @@ _UNIT_SYSTEM_CHOICES = (
 )
 
 _BLANK_FORM_CHOICES = (
-    ("", "Not declared", "Rules that depend on the stock form stay quiet."),
     (
         "billet",
         "Solid billet",
         "Everything is cut away from solid, so the material-removal rule "
-        "measures against the bounding box.",
+        "measures against the bounding box. The usual case, and the "
+        "default.",
     ),
     (
         "as_cast",
@@ -217,7 +217,7 @@ class MachiningPreferences:
         params = dfm_params()
         self._select(self.machine_mode, params.GetString("MachiningMachineMode", "3axis"))
         self._select(self.unit_system, params.GetString("MachiningUnitSystem", "both"))
-        self._select(self.blank_form, params.GetString("MachiningBlankForm", ""))
+        self._select(self.blank_form, params.GetString("MachiningBlankForm", "billet"))
         self.precision_mode.setChecked(params.GetBool("MachiningPrecisionMode", False))
         self.confirm_threads.setChecked(
             params.GetBool("MachiningConfirmInferredThreads", True)

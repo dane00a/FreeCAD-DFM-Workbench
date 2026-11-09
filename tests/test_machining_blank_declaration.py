@@ -80,6 +80,7 @@ class BlankDeclarationTests(unittest.TestCase):
         declare_blank(obj, "billet")
         prefs = apply_declaration({"MachiningBlankForm": "as_cast"}, obj)
         self.assertEqual(prefs["MachiningBlankForm"], "billet")
+        self.assertTrue(prefs["MachiningBlankDeclaredByPart"])
 
     def test_an_undeclared_part_leaves_the_shop_setting_alone(self):
         prefs = {"MachiningBlankForm": "as_cast", "Other": 1}

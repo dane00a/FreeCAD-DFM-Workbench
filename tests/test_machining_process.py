@@ -336,6 +336,14 @@ class TestThresholdOverrides(unittest.TestCase):
         config = MachiningConfig.from_preferences({"MachiningMachineMode": "7axis"})
         self.assertEqual(config.machine_mode, "3axis")
 
+    def test_the_blank_defaults_to_billet(self):
+        self.assertEqual(MachiningConfig().blank_form, "billet")
+        self.assertEqual(MachiningConfig.from_preferences({}).blank_form, "billet")
+        # Saved when empty meant "not declared": reads as the new default.
+        legacy = MachiningConfig.from_preferences({"MachiningBlankForm": ""})
+        self.assertEqual(legacy.blank_form, "billet")
+        self.assertFalse(legacy.blank_declared_by_part)
+
     def test_empty_preferences_give_defaults(self):
         self.assertEqual(MachiningConfig.from_preferences({}).machine_mode, "3axis")
         self.assertEqual(MachiningConfig.from_preferences(None).unit_system, "both")

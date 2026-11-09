@@ -260,8 +260,16 @@ class MachiningAnalyzer(BaseAnalyzer):
             settled.features,
             graph,
             shape,
-            declared_blank=self.config.blank_form,
+            # Only the part's own declaration may overrule the detector.
+            declared_blank=(
+                self.config.blank_form if self.config.blank_declared_by_part else ""
+            ),
         )
+        # A shop-wide blank names the stock and leaves the verdict alone, as
+        # the reference does with its config: billet is the default and
+        # changes nothing, anything else is recorded as the part's blank.
+        if not self.config.blank_declared_by_part and self.config.blank_form not in ("", "billet"):
+            part_process.blank = self.config.blank_form
 
         # The sheet-metal pass runs after the resolver rather than inside it,
         # and appends what it finds.

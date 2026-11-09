@@ -1,0 +1,24 @@
+{
+  "by_category": {
+    "part": 9,
+    "pocket": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "pocket_square_corner": 1,
+    "sharp_internal_edge": 8
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+    "type_THROUGH_CAVITY": 1
+  },
+  "fixture": "sm_lookalike_billet",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 9
+  }
+}

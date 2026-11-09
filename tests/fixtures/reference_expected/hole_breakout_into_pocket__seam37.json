@@ -1,0 +1,27 @@
+{
+  "fixture": "hole_breakout_into_pocket__seam37",
+  "notes": "",
+  "feature_count": 2,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 2
+  },
+  "by_category": {
+    "tool_access": 1,
+    "part": 1,
+    "hole": 1
+  },
+  "by_rule": {
+    "spherical_pocket_undercut": 1,
+    "feature_complexity": 1,
+    "hole_intersects_cavity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BREAKTHROUGH_HOLE": 1,
+    "type_SPHERICAL_POCKET": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

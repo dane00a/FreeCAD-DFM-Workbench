@@ -1,0 +1,25 @@
+{
+  "by_category": {
+    "part": 1,
+    "slot": 1,
+    "thin_feature": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "flexure_slit_process": 1,
+    "thin_wall": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+    "type_FLEXURE_SLIT": 2
+  },
+  "fixture": "flexure_thin_blade",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 2,
+    "warn": 1
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "by_category": {
+    "part": 2,
+    "setup": 1,
+    "thin_feature": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "sharp_internal_edge": 1,
+    "small_part_holding": 1,
+    "thin_wall": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 10,
+  "features": {
+    "type_BLIND_HOLE": 2,
+    "type_V_GROOVE": 8
+  },
+  "fixture": "photonic_fiber_v_groove_array",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 1,
+    "info": 2,
+    "warn": 1
+  }
+}

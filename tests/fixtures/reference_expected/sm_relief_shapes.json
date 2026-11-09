@@ -1,0 +1,26 @@
+{
+  "fixture": "sm_relief_shapes",
+  "notes": "",
+  "feature_count": 3,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 2
+  },
+  "by_category": {
+    "sheet": 3
+  },
+  "by_rule": {
+    "sheet_bend_relief_missing": 1,
+    "sheet_bend_operations": 1,
+    "sheet_feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BEND": 3,
+    "is_hem_false": 3,
+    "bend_family_cylindrical": 3
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "SHEET_METAL"
+}

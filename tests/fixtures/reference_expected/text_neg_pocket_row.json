@@ -1,0 +1,23 @@
+{
+  "fixture": "text_neg_pocket_row",
+  "notes": "",
+  "feature_count": 10,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 1
+  },
+  "by_category": {
+    "part": 2
+  },
+  "by_rule": {
+    "part_aspect_ratio": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_POCKET": 10
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

@@ -1,0 +1,31 @@
+{
+  "fixture": "cf_knife_edge_flange",
+  "notes": "",
+  "feature_count": 10,
+  "severity": {
+    "error": 0,
+    "warn": 2,
+    "info": 4
+  },
+  "by_category": {
+    "hole": 1,
+    "thin_feature": 1,
+    "part": 1,
+    "blend": 3
+  },
+  "by_rule": {
+    "hole_edge_distance": 1,
+    "thin_wall": 1,
+    "feature_complexity": 1,
+    "chamfer_nonstandard_angle": 2,
+    "metal_seal_witness": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 7,
+    "type_CHAMFER": 2,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "TURNED"
+}

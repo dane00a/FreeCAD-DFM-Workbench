@@ -1,0 +1,24 @@
+{
+  "fixture": "sm_fold_u_channel",
+  "notes": "",
+  "feature_count": 2,
+  "severity": {
+    "error": 0,
+    "warn": 0,
+    "info": 1
+  },
+  "by_category": {
+    "sheet": 1
+  },
+  "by_rule": {
+    "sheet_feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BEND": 2,
+    "is_hem_false": 2,
+    "bend_family_cylindrical": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "SHEET_METAL"
+}

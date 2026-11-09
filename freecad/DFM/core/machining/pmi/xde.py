@@ -16,7 +16,7 @@ What the reference does on import, in its order:
    bound through ``ITEM_IDENTIFIED_REPRESENTATION_USAGE`` or a composite
    aspect, datum targets the importer dropped, general drawing notes in
    ``'semantic text'`` properties, and dimension values the importer lost.
-4. Fold those into the parsed result (``part_pipeline.cpp``).
+4. Fold those into the parsed result.
 
 Two differences between the OCCT 7.8 kernel this workbench runs and the 8.0
 kernel the goldens were made on are bridged here, each from the STEP text and

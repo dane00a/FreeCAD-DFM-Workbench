@@ -1,0 +1,25 @@
+{
+  "fixture": "counterbore_stack_plate",
+  "notes": "",
+  "feature_count": 5,
+  "severity": {
+    "error": 0,
+    "warn": 2,
+    "info": 1
+  },
+  "by_category": {
+    "hole": 2,
+    "part": 1
+  },
+  "by_rule": {
+    "hole_edge_distance": 1,
+    "hole_web_thickness": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_COUNTERBORE": 5
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

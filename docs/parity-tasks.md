@@ -469,8 +469,7 @@ around them:
 - "Owned only by a step" counts only the features in the ownership map.
 
 The four that still disagree are all recognition, not the rule. Each was
-checked against the reference engine's own per-face output in
-`cadence-forge/public/models/dfm_tests/<fixture>/features.json`:
+checked against the reference engine's own per-face feature output:
 
 | fixture | ours | ref | cause |
 |---|---|---|---|

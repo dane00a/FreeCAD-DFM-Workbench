@@ -1,0 +1,27 @@
+{
+  "by_category": {
+    "hole": 1,
+    "part": 1,
+    "setup": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_deep_risk": 1,
+    "setup_count_high": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+    "type_BLIND_HOLE": 1,
+    "type_THROUGH_HOLE": 1,
+    "type_TURNED_PROFILE": 1
+  },
+  "fixture": "turned_freeform_handle",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 2,
+    "warn": 1
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "by_category": {
+    "freeform": 1,
+    "part": 1,
+    "pocket": 1,
+    "setup": 1,
+    "thin_feature": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "freeform_finishing": 1,
+    "pocket_square_corner": 1,
+    "setup_count_high": 1,
+    "thin_wall": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+    "type_FREEFORM_SURFACE": 1,
+    "type_POCKET": 1,
+    "type_THROUGH_HOLE": 2
+  },
+  "fixture": "freeform_transition_bracket",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 3,
+    "warn": 2
+  }
+}

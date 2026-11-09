@@ -1,0 +1,26 @@
+{
+  "by_category": {
+    "part": 2,
+    "pocket": 1,
+    "thin_feature": 2
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "material_removal_high": 1,
+    "pocket_square_corner": 1,
+    "thin_wall": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+    "type_POCKET": 1
+  },
+  "fixture": "high_removal",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 4
+  }
+}

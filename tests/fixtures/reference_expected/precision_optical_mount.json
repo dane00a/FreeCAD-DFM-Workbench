@@ -1,0 +1,27 @@
+{
+  "by_category": {
+    "hole": 2,
+    "part": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_deep_risk": 1,
+    "hole_flat_bottom": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 11,
+  "features": {
+    "type_BLIND_HOLE": 4,
+    "type_FILLET": 1,
+    "type_PATTERN": 2,
+    "type_THROUGH_HOLE": 4
+  },
+  "fixture": "precision_optical_mount",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 2
+  }
+}

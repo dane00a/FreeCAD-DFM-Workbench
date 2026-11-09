@@ -1,0 +1,29 @@
+{
+  "by_category": {
+    "hole": 2,
+    "part": 1,
+    "setup": 1,
+    "slot": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "flexure_slit_process": 1,
+    "hole_intersecting": 2,
+    "setup_count_high": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+    "type_BLIND_HOLE": 2,
+    "type_COUNTERBORE": 2,
+    "type_FLEXURE_SLIT": 2
+  },
+  "fixture": "servo_coupling_clamp",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 2,
+    "warn": 3
+  }
+}

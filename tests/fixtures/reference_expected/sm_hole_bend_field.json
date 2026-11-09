@@ -1,0 +1,26 @@
+{
+  "fixture": "sm_hole_bend_field",
+  "notes": "",
+  "feature_count": 3,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 1
+  },
+  "by_category": {
+    "sheet": 2
+  },
+  "by_rule": {
+    "sheet_hole_near_bend": 1,
+    "sheet_feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 2,
+    "type_BEND": 1,
+    "is_hem_false": 1,
+    "bend_family_cylindrical": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "SHEET_METAL"
+}

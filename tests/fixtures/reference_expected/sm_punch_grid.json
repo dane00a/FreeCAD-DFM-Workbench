@@ -1,0 +1,27 @@
+{
+  "fixture": "sm_punch_grid",
+  "notes": "",
+  "feature_count": 7,
+  "severity": {
+    "error": 0,
+    "warn": 2,
+    "info": 1
+  },
+  "by_category": {
+    "sheet": 3
+  },
+  "by_rule": {
+    "sheet_hole_small": 1,
+    "sheet_hole_pitch": 1,
+    "sheet_feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 6,
+    "type_BEND": 1,
+    "is_hem_false": 1,
+    "bend_family_cylindrical": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "SHEET_METAL"
+}

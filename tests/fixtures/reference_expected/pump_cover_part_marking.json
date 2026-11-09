@@ -1,0 +1,31 @@
+{
+  "fixture": "pump_cover_part_marking",
+  "notes": "",
+  "feature_count": 19,
+  "severity": {
+    "error": 0,
+    "warn": 2,
+    "info": 4
+  },
+  "by_category": {
+    "part": 5,
+    "setup": 1
+  },
+  "by_rule": {
+    "part_aspect_ratio": 1,
+    "raised_text_machined_face": 1,
+    "setup_count_high": 1,
+    "feature_complexity": 1,
+    "part_marking": 2
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 5,
+    "type_POCKET": 1,
+    "type_CHAMFER": 10,
+    "type_MARKING_TEXT": 2,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

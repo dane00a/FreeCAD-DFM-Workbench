@@ -1,0 +1,23 @@
+{
+  "by_category": {
+    "part": 1,
+    "slot": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "pocket_square_corner": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+    "type_SLOT": 1
+  },
+  "fixture": "l_slot",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 1
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "by_category": {
+    "part": 1,
+    "setup": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "no_datum_face": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 0,
+  "features": {},
+  "fixture": "small_part",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 1
+  }
+}

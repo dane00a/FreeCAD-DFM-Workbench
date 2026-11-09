@@ -1,0 +1,25 @@
+{
+  "by_category": {
+    "hole": 1,
+    "part": 1,
+    "thin_feature": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_web_thickness": 1,
+    "thin_wall": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+    "type_THROUGH_HOLE": 2
+  },
+  "fixture": "threshold_wall_0_9mm",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 2
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "fixture": "valve_body_mini",
+  "notes": "",
+  "feature_count": 8,
+  "severity": {
+    "error": 0,
+    "warn": 4,
+    "info": 1
+  },
+  "by_category": {
+    "hole": 3,
+    "setup": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "hole_intersecting": 2,
+    "hole_flat_bottom": 1,
+    "setup_count_high": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 4,
+    "type_BREAKTHROUGH_HOLE": 1,
+    "type_THROUGH_HOLE": 2,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

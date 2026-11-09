@@ -1,0 +1,43 @@
+{
+  "fixture": "nist_ctc_02",
+  "notes": "",
+  "feature_count": 180,
+  "severity": {
+    "error": 1,
+    "warn": 1,
+    "info": 2
+  },
+  "by_category": {
+    "setup": 1,
+    "part": 2,
+    "freeform": 1
+  },
+  "by_rule": {
+    "setup_count_high": 1,
+    "material_removal_high": 1,
+    "feature_complexity": 1,
+    "freeform_finishing": 1
+  },
+  "pmi": {
+    "tol_profile_surface": 13,
+    "tol_flatness": 1,
+    "tol_perpendicularity": 3,
+    "tol_position": 4,
+    "tol_profile_line": 1,
+    "dimension_valued": 7,
+    "note": 1,
+    "datum_target": 9,
+    "datum_resolved": 6
+  },
+  "features": {
+    "type_BLIND_HOLE": 74,
+    "type_COUNTERBORE": 10,
+    "type_THROUGH_CAVITY": 1,
+    "type_FILLET": 87,
+    "type_BOSS": 5,
+    "type_GROOVE": 1,
+    "type_FREEFORM_SURFACE": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

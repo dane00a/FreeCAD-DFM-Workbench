@@ -1,0 +1,33 @@
+{
+  "fixture": "mtb_handlebar_stem",
+  "notes": "",
+  "feature_count": 11,
+  "severity": {
+    "error": 0,
+    "warn": 2,
+    "info": 2
+  },
+  "by_category": {
+    "pocket": 1,
+    "setup": 1,
+    "slot": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "pocket_square_corner": 1,
+    "setup_count_high": 1,
+    "flexure_slit_process": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 4,
+    "type_THROUGH_HOLE": 3,
+    "type_PARTIAL_BORE": 1,
+    "type_POCKET": 1,
+    "type_FLEXURE_SLIT": 1,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILL_TURN"
+}

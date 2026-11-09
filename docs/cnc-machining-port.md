@@ -7,8 +7,9 @@ Adding CNC milling and turning DFM to the workbench by porting a validated
 C++/OpenCascade engine to Python.
 
 **Branch:** `feat/cnc-machining`
-**Reference:** `brooklineind-website/apps/geometry-service` — read-only source
-material belonging to a separate project. It is a specification, never a repo
+**Reference:** the reference DFM engine — read-only source material belonging
+to a separate, proprietary project. Its approved results are committed in
+`tests/fixtures/reference_expected/`. It is a specification, never a repo
 to edit.
 
 ---

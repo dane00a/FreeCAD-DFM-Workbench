@@ -1,0 +1,26 @@
+{
+  "by_category": {
+    "hole": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_flat_bottom": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 11,
+  "features": {
+    "type_BLIND_HOLE": 8,
+    "type_CHAMFER": 1,
+    "type_PATTERN": 1,
+    "type_THROUGH_HOLE": 1
+  },
+  "fixture": "radial_bolt_pattern_hub",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 1
+  }
+}

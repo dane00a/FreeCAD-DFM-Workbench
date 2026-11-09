@@ -1,0 +1,24 @@
+{
+  "by_category": {
+    "hole": 2,
+    "part": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_edge_distance": 1,
+    "hole_flat_bottom": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+    "type_BLIND_HOLE": 1
+  },
+  "fixture": "thread_wall_thickness",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 2
+  }
+}

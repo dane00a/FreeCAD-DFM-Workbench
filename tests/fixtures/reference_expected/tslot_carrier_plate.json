@@ -1,0 +1,23 @@
+{
+  "by_category": {
+    "part": 2
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "part_aspect_ratio": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+    "type_STEP": 2,
+    "type_THROUGH_CAVITY": 1
+  },
+  "fixture": "tslot_carrier_plate",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 1
+  }
+}

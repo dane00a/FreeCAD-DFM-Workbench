@@ -1,0 +1,28 @@
+{
+  "by_category": {
+    "hole": 1,
+    "part": 1,
+    "pocket": 2
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_deep_risk": 1,
+    "pocket_narrow_opening": 1,
+    "pocket_square_corner": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 18,
+  "features": {
+    "type_PATTERN": 2,
+    "type_POCKET": 4,
+    "type_THROUGH_HOLE": 12
+  },
+  "fixture": "micro_fluidic_channels",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 3
+  }
+}

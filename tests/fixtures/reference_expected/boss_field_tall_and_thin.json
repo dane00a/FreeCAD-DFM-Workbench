@@ -1,0 +1,25 @@
+{
+  "by_category": {
+    "boss": 2,
+    "part": 2
+  },
+  "by_rule": {
+    "boss_height_risk": 1,
+    "boss_wall_thickness": 1,
+    "feature_complexity": 1,
+    "material_removal_high": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+    "type_BOSS": 2
+  },
+  "fixture": "boss_field_tall_and_thin",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 3
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "fixture": "nist_ctc_04",
+  "notes": "",
+  "feature_count": 181,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 3
+  },
+  "by_category": {
+    "setup": 1,
+    "tool_access": 2,
+    "part": 1
+  },
+  "by_rule": {
+    "setup_count_high": 1,
+    "tool_access_special_setup": 2,
+    "feature_complexity": 1
+  },
+  "pmi": {
+    "tol_position": 3,
+    "tol_profile_surface": 3,
+    "dimension_valued": 9,
+    "datum_resolved": 8
+  },
+  "features": {
+    "type_BLIND_HOLE": 14,
+    "type_THROUGH_HOLE": 32,
+    "type_THREADED_HOLE": 4,
+    "type_COUNTERBORE": 4,
+    "type_FILLET": 62,
+    "type_CHAMFER": 62,
+    "type_PATTERN": 3
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

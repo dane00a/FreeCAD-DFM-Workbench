@@ -1,0 +1,42 @@
+{
+  "fixture": "off_cardinal_viz_block__seam37",
+  "notes": "",
+  "feature_count": 12,
+  "severity": {
+    "error": 1,
+    "warn": 9,
+    "info": 6
+  },
+  "by_category": {
+    "setup": 1,
+    "hole": 3,
+    "tool_access": 9,
+    "part": 2,
+    "boss": 1
+  },
+  "by_rule": {
+    "setup_count_high": 1,
+    "hole_deep_risk": 1,
+    "hole_edge_distance": 1,
+    "hole_flat_bottom": 1,
+    "undercut_present": 3,
+    "sharp_internal_edge": 1,
+    "boss_undercut": 1,
+    "spherical_pocket_undercut": 1,
+    "tool_access_special_setup": 5,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 1,
+    "type_COUNTERSINK": 1,
+    "type_COUNTERBORE": 1,
+    "type_THROUGH_HOLE": 1,
+    "type_FILLET": 1,
+    "type_BOSS": 1,
+    "type_SPHERICAL_POCKET": 2,
+    "type_UNDERCUT": 4
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

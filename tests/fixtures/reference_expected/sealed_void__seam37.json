@@ -1,0 +1,21 @@
+{
+  "fixture": "sealed_void__seam37",
+  "notes": "",
+  "feature_count": 0,
+  "severity": {
+    "error": 1,
+    "warn": 0,
+    "info": 1
+  },
+  "by_category": {
+    "part": 2
+  },
+  "by_rule": {
+    "sealed_void": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {},
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

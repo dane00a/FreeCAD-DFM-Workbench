@@ -1,0 +1,27 @@
+{
+  "fixture": "hole_intersecting__seam37",
+  "notes": "",
+  "feature_count": 2,
+  "severity": {
+    "error": 0,
+    "warn": 2,
+    "info": 2
+  },
+  "by_category": {
+    "hole": 2,
+    "setup": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "hole_deep_risk": 1,
+    "hole_intersecting": 1,
+    "setup_count_high": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

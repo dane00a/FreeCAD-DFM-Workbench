@@ -1,0 +1,32 @@
+{
+  "by_category": {
+    "hole": 2,
+    "part": 1,
+    "pocket": 1,
+    "setup": 1,
+    "tool_access": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_edge_distance": 1,
+    "hole_flat_bottom": 1,
+    "pocket_square_corner": 1,
+    "setup_count_high": 1,
+    "tool_access_special_setup": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+    "type_BLIND_HOLE": 2,
+    "type_POCKET": 1,
+    "type_THROUGH_HOLE": 1
+  },
+  "fixture": "tilted_hole_block",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 1,
+    "info": 2,
+    "warn": 3
+  }
+}

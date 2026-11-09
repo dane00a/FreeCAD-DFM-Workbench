@@ -1,0 +1,24 @@
+{
+  "by_category": {
+    "hole": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_flat_bottom": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+    "type_COUNTERBORE": 1
+  },
+  "fixture": "counterbore",
+  "notes": "Blind counterbore (Ø8 inner × 15mm blind with flat floor + Ø14 × 5mm counterbore step). The flat-bottomed inner bore legitimately fires hole_flat_bottom — a Ø8 × 15mm blind bore with a planar floor can't be made with a standard 118° twist drill.",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 1
+  }
+}

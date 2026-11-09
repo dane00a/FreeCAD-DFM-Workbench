@@ -1,0 +1,31 @@
+{
+  "fixture": "sm_louver_bank_curved",
+  "notes": "",
+  "feature_count": 16,
+  "severity": {
+    "error": 0,
+    "warn": 4,
+    "info": 2
+  },
+  "by_category": {
+    "sheet": 6
+  },
+  "by_rule": {
+    "sheet_louver_tall": 1,
+    "sheet_formed_pitch": 3,
+    "sheet_formed_feature": 1,
+    "sheet_feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_FREEFORM_SURFACE": 10,
+    "type_BEND": 1,
+    "is_hem_false": 1,
+    "bend_family_cylindrical": 1,
+    "type_SHEET_FORMED": 5,
+    "subtype_louver": 5,
+    "open_edges_1": 5
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "SHEET_METAL"
+}

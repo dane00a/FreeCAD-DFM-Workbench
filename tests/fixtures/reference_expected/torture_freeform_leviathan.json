@@ -1,0 +1,42 @@
+{
+  "fixture": "torture_freeform_leviathan",
+  "notes": "",
+  "feature_count": 12,
+  "severity": {
+    "error": 0,
+    "warn": 8,
+    "info": 2
+  },
+  "by_category": {
+    "pocket": 1,
+    "thin_feature": 1,
+    "tool_access": 1,
+    "setup": 2,
+    "freeform": 1,
+    "rib": 1,
+    "hole": 2,
+    "part": 1
+  },
+  "by_rule": {
+    "pocket_square_corner": 1,
+    "thin_wall": 1,
+    "undercut_present": 1,
+    "no_orthogonal_datum_trio": 1,
+    "turned_profile_radius": 1,
+    "rib_height_aspect": 1,
+    "hole_breakout_scar": 2,
+    "setup_count_high": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_COUNTERSINK": 4,
+    "type_POCKET": 1,
+    "type_RIB": 1,
+    "type_UNDERCUT": 4,
+    "type_TURNED_PROFILE": 1,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILL_TURN"
+}

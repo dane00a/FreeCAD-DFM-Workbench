@@ -1,0 +1,12 @@
+The reference engine's approved goldens: one JSON per fixture, giving the
+counts its own drift gate holds that fixture to (features by type and
+discriminant, findings by rule, category and severity, the process
+classification and the PMI tallies).
+
+Copied verbatim from the reference engine's tests/fixtures/expected/ at
+commit fa18e7fa (engine_version 2.0.0), the commit this port was last
+resynchronised to (docs/resync-ledger.md).
+
+tests/fixtures/check_golden.py reads them from here. To resynchronise to a
+newer reference, point DFM_REFERENCE_EXPECTED at that checkout's expected/
+directory while porting, then replace these files with its copies.

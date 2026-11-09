@@ -1,0 +1,32 @@
+{
+  "fixture": "electronics_enclosure_billet",
+  "notes": "",
+  "feature_count": 21,
+  "severity": {
+    "error": 0,
+    "warn": 8,
+    "info": 2
+  },
+  "by_category": {
+    "thin_feature": 8,
+    "setup": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "thin_wall": 8,
+    "setup_count_high": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 4,
+    "type_COUNTERSINK": 4,
+    "type_POCKET": 1,
+    "type_FILLET": 5,
+    "type_CHAMFER": 4,
+    "type_O_RING_GLAND": 1,
+    "type_PATTERN": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

@@ -1,0 +1,29 @@
+{
+  "fixture": "knurled_grip_shaft__seam37",
+  "notes": "",
+  "feature_count": 4,
+  "severity": {
+    "error": 2,
+    "warn": 1,
+    "info": 3
+  },
+  "by_category": {
+    "thin_feature": 2,
+    "part": 4
+  },
+  "by_rule": {
+    "thin_wall": 2,
+    "part_aspect_ratio": 1,
+    "feature_complexity": 1,
+    "knurl_present": 2
+  },
+  "pmi": {},
+  "features": {
+    "type_SLOT": 1,
+    "type_O_RING_GLAND": 1,
+    "type_KNURL": 2,
+    "subtype_straight": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILL_TURN"
+}

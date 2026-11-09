@@ -1,0 +1,30 @@
+{
+  "fixture": "servo_coupling_clamp__seam37",
+  "notes": "",
+  "feature_count": 6,
+  "severity": {
+    "error": 0,
+    "warn": 3,
+    "info": 2
+  },
+  "by_category": {
+    "hole": 2,
+    "setup": 1,
+    "slot": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "hole_intersecting": 2,
+    "setup_count_high": 1,
+    "flexure_slit_process": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_COUNTERBORE": 2,
+    "type_BLIND_HOLE": 2,
+    "type_FLEXURE_SLIT": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILL_TURN"
+}

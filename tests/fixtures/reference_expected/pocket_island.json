@@ -1,0 +1,25 @@
+{
+  "fixture": "pocket_island",
+  "notes": "",
+  "feature_count": 2,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 1
+  },
+  "by_category": {
+    "pocket": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "pocket_square_corner": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_POCKET": 1,
+    "type_BOSS": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

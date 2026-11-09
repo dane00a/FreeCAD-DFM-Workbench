@@ -1,0 +1,26 @@
+{
+  "fixture": "thin_wall__seam37",
+  "notes": "",
+  "feature_count": 2,
+  "severity": {
+    "error": 0,
+    "warn": 2,
+    "info": 1
+  },
+  "by_category": {
+    "hole": 1,
+    "thin_feature": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "hole_web_thickness": 1,
+    "thin_wall": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

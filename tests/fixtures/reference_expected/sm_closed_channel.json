@@ -1,0 +1,25 @@
+{
+  "fixture": "sm_closed_channel",
+  "notes": "",
+  "feature_count": 4,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 1
+  },
+  "by_category": {
+    "sheet": 2
+  },
+  "by_rule": {
+    "sheet_closed_flange_loop": 1,
+    "sheet_feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BEND": 4,
+    "is_hem_false": 4,
+    "bend_family_cylindrical": 4
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "SHEET_METAL"
+}

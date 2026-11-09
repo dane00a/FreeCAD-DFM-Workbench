@@ -1,0 +1,32 @@
+{
+  "by_category": {
+    "hole": 3,
+    "part": 1,
+    "pocket": 3,
+    "thin_feature": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_deep_risk": 1,
+    "hole_edge_distance": 1,
+    "hole_web_thickness": 1,
+    "pocket_aspect_ratio": 1,
+    "pocket_deep_risk": 1,
+    "pocket_square_corner": 1,
+    "thin_wall": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+    "type_POCKET": 2,
+    "type_THROUGH_HOLE": 4
+  },
+  "fixture": "cnc_test_part_dfm_violation",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 3,
+    "info": 1,
+    "warn": 4
+  }
+}

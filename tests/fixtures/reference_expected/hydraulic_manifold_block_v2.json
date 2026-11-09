@@ -1,0 +1,31 @@
+{
+  "fixture": "hydraulic_manifold_block_v2",
+  "notes": "",
+  "feature_count": 51,
+  "severity": {
+    "error": 2,
+    "warn": 4,
+    "info": 2
+  },
+  "by_category": {
+    "hole": 6,
+    "setup": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "hole_deep_risk": 3,
+    "setup_count_high": 1,
+    "hole_web_thickness": 2,
+    "hole_intersecting": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 40,
+    "type_BREAKTHROUGH_HOLE": 4,
+    "type_COUNTERBORE": 4,
+    "type_PATTERN": 3
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

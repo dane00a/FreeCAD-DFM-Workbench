@@ -1,0 +1,28 @@
+{
+  "by_category": {
+    "part": 16,
+    "pocket": 2,
+    "tool_access": 4
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "pocket_square_corner": 2,
+    "sharp_internal_edge": 15,
+    "undercut_present": 4
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+    "type_POCKET": 1,
+    "type_THROUGH_CAVITY": 1,
+    "type_UNDERCUT": 4
+  },
+  "fixture": "complex_undercut_part_v2",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 21
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "by_category": {
+    "blend": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "cutter_radius_suboptimal": 1,
+    "feature_complexity": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+    "type_PATTERN": 1,
+    "type_POCKET": 1,
+    "type_THROUGH_HOLE": 4
+  },
+  "fixture": "injection_mold_cavity_pattern",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 2,
+    "warn": 0
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "by_category": {
+    "hole": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_nonstandard_diameter": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+    "type_BLIND_HOLE": 6
+  },
+  "fixture": "tap_drill_index_plate",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 1
+  }
+}

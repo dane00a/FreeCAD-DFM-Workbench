@@ -1,0 +1,34 @@
+{
+  "fixture": "injection_mold_cavity_plate",
+  "notes": "",
+  "feature_count": 26,
+  "severity": {
+    "error": 4,
+    "warn": 3,
+    "info": 2
+  },
+  "by_category": {
+    "hole": 5,
+    "setup": 1,
+    "pocket": 1,
+    "part": 2
+  },
+  "by_rule": {
+    "hole_deep_risk": 4,
+    "setup_count_high": 1,
+    "pocket_square_corner": 1,
+    "sharp_internal_edge": 1,
+    "hole_intersecting": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BREAKTHROUGH_HOLE": 8,
+    "type_THROUGH_HOLE": 10,
+    "type_BLIND_HOLE": 2,
+    "type_POCKET": 4,
+    "type_PATTERN": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

@@ -1,0 +1,20 @@
+{
+  "by_category": {
+    "part": 2
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "sealed_void": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 0,
+  "features": {},
+  "fixture": "sealed_void",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 1,
+    "info": 1,
+    "warn": 0
+  }
+}

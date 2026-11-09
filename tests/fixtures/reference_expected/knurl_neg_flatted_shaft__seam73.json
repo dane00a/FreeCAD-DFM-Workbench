@@ -1,0 +1,25 @@
+{
+  "fixture": "knurl_neg_flatted_shaft__seam73",
+  "notes": "",
+  "feature_count": 3,
+  "severity": {
+    "error": 0,
+    "warn": 0,
+    "info": 2
+  },
+  "by_category": {
+    "part": 2
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "knurl_present": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_STEP": 2,
+    "type_KNURL": 1,
+    "subtype_straight": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILL_TURN"
+}

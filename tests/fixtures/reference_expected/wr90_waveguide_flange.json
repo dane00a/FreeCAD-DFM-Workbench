@@ -1,0 +1,29 @@
+{
+  "fixture": "wr90_waveguide_flange",
+  "notes": "",
+  "feature_count": 9,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 2
+  },
+  "by_category": {
+    "hole": 1,
+    "part": 1,
+    "blend": 1
+  },
+  "by_rule": {
+    "hole_edge_distance": 1,
+    "feature_complexity": 1,
+    "cutter_radius_suboptimal": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 6,
+    "type_SLOT": 1,
+    "type_THROUGH_CAVITY": 1,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

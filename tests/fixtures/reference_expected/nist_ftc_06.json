@@ -1,0 +1,41 @@
+{
+  "fixture": "nist_ftc_06",
+  "notes": "",
+  "feature_count": 43,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 2
+  },
+  "by_category": {
+    "setup": 1,
+    "part": 2
+  },
+  "by_rule": {
+    "setup_count_high": 1,
+    "feature_complexity": 1,
+    "part_marking": 1
+  },
+  "pmi": {
+    "tol_perpendicularity": 2,
+    "tol_position": 11,
+    "tol_flatness": 3,
+    "tol_profile_surface": 11,
+    "dimension_valued": 24,
+    "note": 1,
+    "datum_resolved": 6,
+    "datum_target": 6
+  },
+  "features": {
+    "type_BLIND_HOLE": 2,
+    "type_COUNTERBORE": 10,
+    "type_SLOT": 2,
+    "type_FILLET": 21,
+    "type_BOSS": 4,
+    "type_SPHERICAL_POCKET": 1,
+    "type_MARKING_TEXT": 1,
+    "type_PATTERN": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

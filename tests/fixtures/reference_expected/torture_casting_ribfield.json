@@ -1,0 +1,40 @@
+{
+  "fixture": "torture_casting_ribfield",
+  "notes": "",
+  "feature_count": 19,
+  "severity": {
+    "error": 0,
+    "warn": 9,
+    "info": 3
+  },
+  "by_category": {
+    "slot": 3,
+    "thin_feature": 1,
+    "part": 3,
+    "boss": 1,
+    "rib": 3,
+    "setup": 1
+  },
+  "by_rule": {
+    "slot_deep_risk": 2,
+    "thin_wall": 1,
+    "sharp_internal_edge": 2,
+    "boss_height_risk": 1,
+    "rib_height_aspect": 2,
+    "groove_square_corner": 1,
+    "setup_count_high": 1,
+    "feature_complexity": 1,
+    "rib_draft_angle": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BOSS": 4,
+    "type_RIB": 4,
+    "type_CHANNEL": 3,
+    "type_O_RING_GLAND": 1,
+    "type_GROOVE": 1,
+    "type_DRAFT_FACE": 6
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

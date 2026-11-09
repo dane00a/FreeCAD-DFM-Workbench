@@ -1,0 +1,22 @@
+{
+  "fixture": "blind_hole_drill_point__seam37",
+  "notes": "",
+  "feature_count": 1,
+  "severity": {
+    "error": 0,
+    "warn": 0,
+    "info": 1
+  },
+  "by_category": {
+    "part": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

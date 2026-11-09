@@ -1,0 +1,26 @@
+{
+  "fixture": "text_cyl_rotary_engraved",
+  "notes": "",
+  "feature_count": 2,
+  "severity": {
+    "error": 1,
+    "warn": 0,
+    "info": 2
+  },
+  "by_category": {
+    "setup": 1,
+    "part": 2
+  },
+  "by_rule": {
+    "setup_count_high": 1,
+    "feature_complexity": 1,
+    "part_marking": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 1,
+    "type_MARKING_TEXT": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILL_TURN"
+}

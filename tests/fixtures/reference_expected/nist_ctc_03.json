@@ -1,0 +1,35 @@
+{
+  "fixture": "nist_ctc_03",
+  "notes": "",
+  "feature_count": 27,
+  "severity": {
+    "error": 0,
+    "warn": 0,
+    "info": 1
+  },
+  "by_category": {
+    "sheet": 1
+  },
+  "by_rule": {
+    "sheet_feature_complexity": 1
+  },
+  "pmi": {
+    "tol_profile_surface": 3,
+    "tol_angularity": 1,
+    "tol_position": 6,
+    "tol_perpendicularity": 2,
+    "dimension_valued": 9,
+    "dimension_drawing_only": 1,
+    "datum_resolved": 5
+  },
+  "features": {
+    "type_THROUGH_HOLE": 15,
+    "type_THROUGH_CAVITY": 2,
+    "type_PATTERN": 3,
+    "type_BEND": 7,
+    "is_hem_false": 7,
+    "bend_family_cylindrical": 7
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "SHEET_METAL"
+}

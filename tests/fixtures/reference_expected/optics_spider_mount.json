@@ -1,0 +1,36 @@
+{
+  "fixture": "optics_spider_mount",
+  "notes": "",
+  "feature_count": 16,
+  "severity": {
+    "error": 2,
+    "warn": 3,
+    "info": 3
+  },
+  "by_category": {
+    "thin_feature": 2,
+    "part": 2,
+    "slot": 2,
+    "rib": 1,
+    "setup": 1
+  },
+  "by_rule": {
+    "thin_wall": 2,
+    "material_removal_high": 1,
+    "pocket_square_corner": 1,
+    "rib_height_aspect": 1,
+    "flexure_slit_process": 1,
+    "setup_count_high": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_COUNTERBORE": 5,
+    "type_SLOT": 2,
+    "type_FLEXURE_SLIT": 4,
+    "type_RIB": 4,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILL_TURN"
+}

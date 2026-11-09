@@ -1,0 +1,24 @@
+{
+  "by_category": {
+    "part": 1,
+    "pocket": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "pocket_square_corner": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+    "type_POCKET": 1,
+    "type_THROUGH_HOLE": 1
+  },
+  "fixture": "interacting_features",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 1
+  }
+}

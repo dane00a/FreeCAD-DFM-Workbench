@@ -1,0 +1,27 @@
+{
+  "fixture": "sm_hem_pair",
+  "notes": "",
+  "feature_count": 3,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 2
+  },
+  "by_category": {
+    "sheet": 3
+  },
+  "by_rule": {
+    "sheet_hem_dimensions": 1,
+    "sheet_bend_angle_extreme": 1,
+    "sheet_feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BEND": 3,
+    "is_hem_true": 2,
+    "bend_family_cylindrical": 3,
+    "is_hem_false": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "SHEET_METAL"
+}

@@ -1,0 +1,39 @@
+{
+  "fixture": "nist_ftc_07",
+  "notes": "",
+  "feature_count": 76,
+  "severity": {
+    "error": 1,
+    "warn": 1,
+    "info": 2
+  },
+  "by_category": {
+    "setup": 1,
+    "part": 2,
+    "freeform": 1
+  },
+  "by_rule": {
+    "setup_count_high": 1,
+    "material_removal_high": 1,
+    "feature_complexity": 1,
+    "freeform_internal_radius": 1
+  },
+  "pmi": {
+    "tol_profile_surface": 11,
+    "tol_perpendicularity": 1,
+    "tol_position": 12,
+    "tol_parallelism": 1,
+    "dimension_valued": 17,
+    "datum_resolved": 5
+  },
+  "features": {
+    "type_THROUGH_HOLE": 11,
+    "type_BLIND_HOLE": 8,
+    "type_COUNTERBORE": 4,
+    "type_FILLET": 45,
+    "type_BOSS": 4,
+    "type_PATTERN": 4
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

@@ -1,0 +1,30 @@
+{
+  "by_category": {
+    "part": 2,
+    "pocket": 1,
+    "process": 1,
+    "setup": 1,
+    "thin_feature": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "material_removal_high": 1,
+    "no_parallel_datum_pair": 1,
+    "pocket_square_corner": 1,
+    "sheet_intent_sharp_corners": 1,
+    "thin_wall": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+    "type_POCKET": 1
+  },
+  "fixture": "sm_hybrid_milled_pocket",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 1,
+    "info": 2,
+    "warn": 3
+  }
+}

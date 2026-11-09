@@ -1,0 +1,27 @@
+{
+  "fixture": "fixture_plate_dowels",
+  "notes": "",
+  "feature_count": 18,
+  "severity": {
+    "error": 0,
+    "warn": 3,
+    "info": 1
+  },
+  "by_category": {
+    "hole": 3,
+    "part": 1
+  },
+  "by_rule": {
+    "hole_intersecting": 2,
+    "hole_flat_bottom": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 4,
+    "type_THROUGH_HOLE": 12,
+    "type_PATTERN": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

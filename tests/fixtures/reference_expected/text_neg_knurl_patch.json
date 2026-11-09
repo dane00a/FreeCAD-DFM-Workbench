@@ -1,0 +1,25 @@
+{
+  "fixture": "text_neg_knurl_patch",
+  "notes": "",
+  "feature_count": 1,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 2
+  },
+  "by_category": {
+    "part": 3
+  },
+  "by_rule": {
+    "part_aspect_ratio": 1,
+    "feature_complexity": 1,
+    "knurl_present": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_KNURL": 1,
+    "subtype_diamond": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

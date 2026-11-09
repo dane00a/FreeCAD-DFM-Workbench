@@ -1,0 +1,24 @@
+{
+  "by_category": {
+    "part": 4
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "part_aspect_ratio": 1,
+    "part_marking": 1,
+    "raised_text_machined_face": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+    "type_MARKING_TEXT": 1
+  },
+  "fixture": "relieved_logo_plaque",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 2,
+    "warn": 2
+  }
+}

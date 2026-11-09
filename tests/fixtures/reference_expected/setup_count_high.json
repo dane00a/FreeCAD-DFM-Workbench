@@ -1,0 +1,26 @@
+{
+  "fixture": "setup_count_high",
+  "notes": "",
+  "feature_count": 4,
+  "severity": {
+    "error": 1,
+    "warn": 1,
+    "info": 1
+  },
+  "by_category": {
+    "setup": 1,
+    "hole": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "setup_count_high": 1,
+    "hole_flat_bottom": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 4
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

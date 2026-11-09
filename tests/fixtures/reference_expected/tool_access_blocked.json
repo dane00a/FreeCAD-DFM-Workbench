@@ -1,0 +1,23 @@
+{
+  "by_category": {
+    "part": 2
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "sealed_void": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 7,
+  "features": {
+    "type_POCKET": 1,
+    "type_UNDERCUT": 6
+  },
+  "fixture": "tool_access_blocked",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 1,
+    "info": 1,
+    "warn": 0
+  }
+}

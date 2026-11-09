@@ -1,0 +1,25 @@
+{
+  "fixture": "gearbox_flange",
+  "notes": "",
+  "feature_count": 9,
+  "severity": {
+    "error": 0,
+    "warn": 0,
+    "info": 1
+  },
+  "by_category": {
+    "part": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 6,
+    "type_BLIND_HOLE": 1,
+    "type_CHAMFER": 1,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "TURNED"
+}

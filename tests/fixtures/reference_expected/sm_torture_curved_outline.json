@@ -1,0 +1,29 @@
+{
+  "fixture": "sm_torture_curved_outline",
+  "notes": "",
+  "feature_count": 4,
+  "severity": {
+    "error": 0,
+    "warn": 2,
+    "info": 1
+  },
+  "by_category": {
+    "sheet": 3
+  },
+  "by_rule": {
+    "sheet_bend_relief_missing": 1,
+    "sheet_tab_narrow": 1,
+    "sheet_feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_CAVITY": 1,
+    "type_BEND": 1,
+    "is_hem_false": 1,
+    "bend_family_cylindrical": 1,
+    "type_TAB": 1,
+    "type_NOTCH": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "SHEET_METAL"
+}

@@ -1,0 +1,26 @@
+{
+  "fixture": "four_axis_hex_block__seam37",
+  "notes": "",
+  "feature_count": 6,
+  "severity": {
+    "error": 1,
+    "warn": 0,
+    "info": 5
+  },
+  "by_category": {
+    "setup": 1,
+    "tool_access": 4,
+    "part": 1
+  },
+  "by_rule": {
+    "setup_count_high": 1,
+    "tool_access_special_setup": 4,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 6
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

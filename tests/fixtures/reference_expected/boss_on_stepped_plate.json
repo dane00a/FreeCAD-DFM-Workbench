@@ -1,0 +1,23 @@
+{
+  "by_category": {
+    "part": 2
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "material_removal_high": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+    "type_BOSS": 1,
+    "type_STEP": 1
+  },
+  "fixture": "boss_on_stepped_plate",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 1
+  }
+}

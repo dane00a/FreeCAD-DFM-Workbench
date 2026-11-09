@@ -1,0 +1,28 @@
+{
+  "by_category": {
+    "part": 1,
+    "rib": 1,
+    "slot": 1,
+    "thin_feature": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "rib_height_aspect": 1,
+    "slot_nonstandard_width": 1,
+    "thin_wall": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 9,
+  "features": {
+    "type_RIB": 5,
+    "type_SLOT": 4
+  },
+  "fixture": "heat_sink_finned_block",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 3
+  }
+}

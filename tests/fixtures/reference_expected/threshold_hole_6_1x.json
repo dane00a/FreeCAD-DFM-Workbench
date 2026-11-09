@@ -1,0 +1,23 @@
+{
+  "by_category": {
+    "hole": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_deep_risk": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+    "type_THROUGH_HOLE": 1
+  },
+  "fixture": "threshold_hole_6_1x",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 1
+  }
+}

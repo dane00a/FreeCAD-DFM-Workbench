@@ -1,0 +1,26 @@
+{
+  "by_category": {
+    "hole": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_edge_distance": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 10,
+  "features": {
+    "type_COUNTERBORE": 6,
+    "type_PATTERN": 1,
+    "type_SLOT": 1,
+    "type_THROUGH_HOLE": 2
+  },
+  "fixture": "linear_rail_block",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 1
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "fixture": "structural_rib_panel",
+  "notes": "",
+  "feature_count": 4,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 1
+  },
+  "by_category": {
+    "rib": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "rib_height_aspect": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_RIB": 4
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

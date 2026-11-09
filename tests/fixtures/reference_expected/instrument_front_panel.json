@@ -1,0 +1,28 @@
+{
+  "fixture": "instrument_front_panel",
+  "notes": "",
+  "feature_count": 12,
+  "severity": {
+    "error": 0,
+    "warn": 2,
+    "info": 2
+  },
+  "by_category": {
+    "sheet": 4
+  },
+  "by_rule": {
+    "sheet_hole_small": 2,
+    "sheet_thickness_out_of_range": 1,
+    "sheet_feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 3,
+    "type_COUNTERSINK": 4,
+    "type_THROUGH_CAVITY": 1,
+    "type_MARKING_TEXT": 3,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "SHEET_METAL"
+}

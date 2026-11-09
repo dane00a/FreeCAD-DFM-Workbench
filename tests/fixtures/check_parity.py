@@ -84,21 +84,11 @@ from freecad.DFM.core.baselines.spec import BaselineSpec  # noqa: E402
 from freecad.DFM.core.baselines.store import BaselineStore  # noqa: E402
 
 
-#: Where the reference's approved answers live when both repositories are
-#: checked out side by side, which is how they are worked on. Overridable,
-#: because "side by side" is a convention and not a guarantee.
-DEFAULT_REFERENCE = os.path.abspath(
-    os.path.join(
-        _REPO,
-        "..",
-        "brooklineind-website",
-        "apps",
-        "geometry-service",
-        "tests",
-        "fixtures",
-        "expected",
-    )
-)
+#: The reference's approved answers: the copy committed beside the fixtures
+#: (tests/fixtures/reference_expected). Overridable, to compare against a
+#: newer reference while resynchronising.
+DEFAULT_REFERENCE = os.path.join(_REPO, "tests", "fixtures", "reference_expected")
+
 
 #: The backlog this report grades against.
 PARITY_TASKS = os.path.join(_REPO, "docs", "parity-tasks.md")

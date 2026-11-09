@@ -1,0 +1,36 @@
+{
+  "fixture": "nist_ctc_02_logo",
+  "notes": "",
+  "feature_count": 177,
+  "severity": {
+    "error": 1,
+    "warn": 1,
+    "info": 3
+  },
+  "by_category": {
+    "setup": 1,
+    "part": 3,
+    "freeform": 1
+  },
+  "by_rule": {
+    "setup_count_high": 1,
+    "material_removal_high": 1,
+    "feature_complexity": 1,
+    "part_marking": 1,
+    "freeform_finishing": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 74,
+    "type_COUNTERBORE": 10,
+    "type_THROUGH_CAVITY": 1,
+    "type_FILLET": 81,
+    "type_BOSS": 5,
+    "type_GROOVE": 1,
+    "type_DRAFT_FACE": 2,
+    "type_FREEFORM_SURFACE": 2,
+    "type_MARKING_TEXT": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

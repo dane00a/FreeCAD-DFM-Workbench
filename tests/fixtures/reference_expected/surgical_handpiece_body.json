@@ -1,0 +1,29 @@
+{
+  "by_category": {
+    "hole": 1,
+    "part": 2,
+    "setup": 1,
+    "slot": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_deep_risk": 1,
+    "part_aspect_ratio": 1,
+    "pocket_square_corner": 1,
+    "setup_count_high": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+    "type_COUNTERBORE": 1,
+    "type_SLOT": 1
+  },
+  "fixture": "surgical_handpiece_body",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "severity": {
+    "error": 1,
+    "info": 2,
+    "warn": 2
+  }
+}

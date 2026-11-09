@@ -1,0 +1,23 @@
+{
+  "by_category": {
+    "freeform": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "turned_profile_radius": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+    "type_TURNED_PROFILE": 1
+  },
+  "fixture": "profiled_spindle_tight_valley",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 1
+  }
+}

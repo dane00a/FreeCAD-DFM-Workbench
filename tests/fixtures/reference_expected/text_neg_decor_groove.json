@@ -1,0 +1,28 @@
+{
+  "fixture": "text_neg_decor_groove",
+  "notes": "",
+  "feature_count": 6,
+  "severity": {
+    "error": 0,
+    "warn": 3,
+    "info": 1
+  },
+  "by_category": {
+    "slot": 2,
+    "part": 2
+  },
+  "by_rule": {
+    "pocket_square_corner": 1,
+    "slot_nonstandard_width": 1,
+    "part_aspect_ratio": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_SLOT": 3,
+    "type_GROOVE": 2,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

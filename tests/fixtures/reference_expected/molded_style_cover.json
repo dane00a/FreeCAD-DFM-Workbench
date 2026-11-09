@@ -1,0 +1,25 @@
+{
+  "by_category": {
+    "freeform": 1,
+    "part": 9
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "freeform_finishing": 1,
+    "sharp_internal_edge": 8
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+    "type_FREEFORM_SURFACE": 2,
+    "type_THROUGH_HOLE": 2
+  },
+  "fixture": "molded_style_cover",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 2,
+    "warn": 8
+  }
+}

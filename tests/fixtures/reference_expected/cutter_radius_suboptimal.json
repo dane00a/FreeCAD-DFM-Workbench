@@ -1,0 +1,23 @@
+{
+  "by_category": {
+    "blend": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "cutter_radius_suboptimal": 1,
+    "feature_complexity": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+    "type_POCKET": 1
+  },
+  "fixture": "cutter_radius_suboptimal",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 2,
+    "warn": 0
+  }
+}

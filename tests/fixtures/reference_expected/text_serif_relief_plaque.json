@@ -1,0 +1,25 @@
+{
+  "fixture": "text_serif_relief_plaque",
+  "notes": "",
+  "feature_count": 1,
+  "severity": {
+    "error": 0,
+    "warn": 2,
+    "info": 2
+  },
+  "by_category": {
+    "part": 4
+  },
+  "by_rule": {
+    "part_aspect_ratio": 1,
+    "raised_text_machined_face": 1,
+    "feature_complexity": 1,
+    "part_marking": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_MARKING_TEXT": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

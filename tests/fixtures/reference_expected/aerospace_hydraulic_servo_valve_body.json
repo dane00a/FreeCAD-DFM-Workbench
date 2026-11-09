@@ -1,0 +1,34 @@
+{
+  "fixture": "aerospace_hydraulic_servo_valve_body",
+  "notes": "",
+  "feature_count": 20,
+  "severity": {
+    "error": 2,
+    "warn": 3,
+    "info": 3
+  },
+  "by_category": {
+    "hole": 6,
+    "setup": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "hole_deep_risk": 4,
+    "hole_flat_bottom": 1,
+    "setup_count_high": 1,
+    "feature_complexity": 1,
+    "hole_intersects_cavity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 1,
+    "type_BREAKTHROUGH_HOLE": 5,
+    "type_THROUGH_HOLE": 2,
+    "type_FILLET": 4,
+    "type_RETAINING_RING_GROOVE": 3,
+    "type_O_RING_GLAND": 4,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

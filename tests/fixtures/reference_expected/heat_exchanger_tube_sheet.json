@@ -1,0 +1,35 @@
+{
+  "fixture": "heat_exchanger_tube_sheet",
+  "notes": "",
+  "feature_count": 242,
+  "severity": {
+    "error": 2,
+    "warn": 2,
+    "info": 2
+  },
+  "by_category": {
+    "thin_feature": 2,
+    "hole": 1,
+    "slot": 1,
+    "setup": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "thin_wall": 2,
+    "hole_flat_bottom": 1,
+    "groove_square_corner": 1,
+    "setup_count_high": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 1,
+    "type_THROUGH_HOLE": 121,
+    "type_CHAMFER": 116,
+    "type_STEP": 1,
+    "type_O_RING_GLAND": 1,
+    "type_PATTERN": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

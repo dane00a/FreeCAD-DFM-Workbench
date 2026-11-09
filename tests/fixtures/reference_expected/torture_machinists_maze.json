@@ -1,0 +1,46 @@
+{
+  "fixture": "torture_machinists_maze",
+  "notes": "",
+  "feature_count": 14,
+  "severity": {
+    "error": 1,
+    "warn": 31,
+    "info": 3
+  },
+  "by_category": {
+    "part": 21,
+    "hole": 1,
+    "pocket": 2,
+    "slot": 3,
+    "tool_access": 6,
+    "rib": 1,
+    "setup": 1
+  },
+  "by_rule": {
+    "sealed_void": 1,
+    "hole_flat_bottom": 1,
+    "pocket_square_corner": 3,
+    "slot_deep_risk": 1,
+    "slot_overhang": 1,
+    "undercut_present": 4,
+    "sharp_internal_edge": 19,
+    "spherical_pocket_undercut": 1,
+    "rib_height_aspect": 1,
+    "tool_access_special_setup": 1,
+    "setup_count_high": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 1,
+    "type_POCKET": 3,
+    "type_SLOT": 1,
+    "type_THROUGH_CAVITY": 1,
+    "type_STEP": 1,
+    "type_RIB": 1,
+    "type_SPHERICAL_POCKET": 2,
+    "type_UNDERCUT": 4
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

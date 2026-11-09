@@ -1,0 +1,30 @@
+{
+  "fixture": "sm_louver_bank",
+  "notes": "",
+  "feature_count": 7,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 3
+  },
+  "by_category": {
+    "sheet": 4
+  },
+  "by_rule": {
+    "sheet_louver_tall": 1,
+    "sheet_formed_feature": 2,
+    "sheet_feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_FREEFORM_SURFACE": 4,
+    "type_BEND": 1,
+    "is_hem_false": 1,
+    "bend_family_cylindrical": 1,
+    "type_SHEET_FORMED": 2,
+    "subtype_louver": 2,
+    "open_edges_1": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "SHEET_METAL"
+}

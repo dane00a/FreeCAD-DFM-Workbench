@@ -1,0 +1,38 @@
+{
+  "fixture": "inertial_sensor_housing",
+  "notes": "",
+  "feature_count": 16,
+  "severity": {
+    "error": 0,
+    "warn": 9,
+    "info": 2
+  },
+  "by_category": {
+    "hole": 2,
+    "pocket": 1,
+    "tool_access": 2,
+    "setup": 1,
+    "part": 5
+  },
+  "by_rule": {
+    "hole_deep_risk": 1,
+    "hole_edge_distance": 1,
+    "pocket_square_corner": 1,
+    "undercut_present": 1,
+    "setup_count_high": 1,
+    "sharp_internal_edge": 4,
+    "tool_access_special_setup": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 6,
+    "type_COUNTERBORE": 4,
+    "type_POCKET": 1,
+    "type_GROOVE": 1,
+    "type_UNDERCUT": 2,
+    "type_PATTERN": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

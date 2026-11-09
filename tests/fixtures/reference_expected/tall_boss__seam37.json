@@ -1,0 +1,25 @@
+{
+  "fixture": "tall_boss__seam37",
+  "notes": "",
+  "feature_count": 1,
+  "severity": {
+    "error": 1,
+    "warn": 1,
+    "info": 1
+  },
+  "by_category": {
+    "part": 2,
+    "boss": 1
+  },
+  "by_rule": {
+    "material_removal_high": 1,
+    "boss_height_risk": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BOSS": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

@@ -1,0 +1,29 @@
+{
+  "by_category": {
+    "hole": 1,
+    "part": 21,
+    "pocket": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_flat_bottom": 1,
+    "pocket_square_corner": 1,
+    "sharp_internal_edge": 20
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 8,
+  "features": {
+    "type_BLIND_HOLE": 2,
+    "type_PATTERN": 1,
+    "type_THROUGH_CAVITY": 1,
+    "type_THROUGH_HOLE": 4
+  },
+  "fixture": "progressive_die_punch",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 22
+  }
+}

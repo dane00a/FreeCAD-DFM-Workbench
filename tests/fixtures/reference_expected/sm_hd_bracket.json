@@ -1,0 +1,38 @@
+{
+  "fixture": "sm_hd_bracket",
+  "notes": "",
+  "feature_count": 17,
+  "severity": {
+    "error": 0,
+    "warn": 5,
+    "info": 3
+  },
+  "by_category": {
+    "sheet": 8
+  },
+  "by_rule": {
+    "sheet_hole_small": 1,
+    "sheet_bend_relief_missing": 1,
+    "sheet_tab_narrow": 1,
+    "sheet_hem_dimensions": 1,
+    "sheet_sharp_fold": 1,
+    "sheet_bend_operations": 1,
+    "sheet_bend_angle_extreme": 1,
+    "sheet_feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 5,
+    "type_THROUGH_CAVITY": 2,
+    "type_PATTERN": 1,
+    "type_BEND": 6,
+    "is_hem_true": 2,
+    "bend_family_cylindrical": 5,
+    "is_hem_false": 3,
+    "type_TAB": 1,
+    "type_NOTCH": 2,
+    "bend_family_sharp": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "SHEET_METAL"
+}

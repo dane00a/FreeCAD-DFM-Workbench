@@ -1,0 +1,25 @@
+{
+  "by_category": {
+    "hole": 2,
+    "part": 5
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_deep_risk": 1,
+    "hole_multi_pass": 1,
+    "sharp_internal_edge": 4
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+    "type_THROUGH_HOLE": 1
+  },
+  "fixture": "hole_crosses_wide_cavity",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 2,
+    "warn": 5
+  }
+}

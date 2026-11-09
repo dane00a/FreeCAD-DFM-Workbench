@@ -1,18 +1,16 @@
-Copied unmodified from the reference engine (apps/geometry-service/tests/fixtures/fonts/
-at brooklineind-website fa18e7fa) for the ported text_* fixture recipes in
-tests/fixtures/builders/. The account below is the reference's, verbatim.
-
-Bundled test fonts — apps/geometry-service/tests/fixtures/fonts/
+Bundled test fonts
 ================================================================
 
+The same unmodified font files the reference engine's fixtures are built
+from (at fa18e7fa), for the ported text_* fixture recipes in
+tests/fixtures/builders/.
+
 These font files exist for ONE reason: the real-font marking fixtures
-(`text_*` in tests/fixtures/fixture_generator.cpp) initialise
-Font_BRepFont from a FILE PATH in this directory, never from a family
-name. A fixture whose geometry depends on which fonts happen to be
-installed on the host is not reproducible between this machine, CI and
-the Fly.io image, and a non-reproducible fixture is worse than no
-fixture. Nothing outside the fixture generator reads these files; they
-are not shipped to a client and not served by the web app.
+(text_*) initialise Font_BRepFont from a FILE PATH in this directory,
+never from a family name. A fixture whose geometry depends on which fonts
+happen to be installed is not reproducible from one machine to the next,
+and a non-reproducible fixture is worse than no fixture. Nothing outside
+the fixture recipes reads these files; the workbench does not ship them.
 
 --------------------------------------------------------------------
 Liberation fonts 2.1.5

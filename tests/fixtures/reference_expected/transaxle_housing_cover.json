@@ -1,0 +1,31 @@
+{
+  "fixture": "transaxle_housing_cover",
+  "notes": "",
+  "feature_count": 32,
+  "severity": {
+    "error": 0,
+    "warn": 0,
+    "info": 2
+  },
+  "by_category": {
+    "setup": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "setup_count_high": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 8,
+    "type_COUNTERBORE": 1,
+    "type_POCKET": 1,
+    "type_FILLET": 4,
+    "type_CHAMFER": 8,
+    "type_O_RING_GLAND": 1,
+    "type_DRAFT_FACE": 8,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

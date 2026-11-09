@@ -1,0 +1,34 @@
+{
+  "fixture": "five_axis_compound_angles",
+  "notes": "",
+  "feature_count": 8,
+  "severity": {
+    "error": 2,
+    "warn": 7,
+    "info": 5
+  },
+  "by_category": {
+    "thin_feature": 1,
+    "setup": 1,
+    "hole": 4,
+    "tool_access": 7,
+    "part": 1
+  },
+  "by_rule": {
+    "thin_wall": 1,
+    "setup_count_high": 1,
+    "hole_edge_distance": 1,
+    "hole_intersecting": 2,
+    "hole_flat_bottom": 1,
+    "undercut_present": 3,
+    "tool_access_special_setup": 4,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 4,
+    "type_UNDERCUT": 4
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

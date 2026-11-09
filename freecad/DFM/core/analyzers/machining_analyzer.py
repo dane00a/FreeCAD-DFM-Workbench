@@ -62,7 +62,7 @@ CONTEXT_KEY = ("Part", 0)
 
 
 # The reference's STEP import meshes every part before anything measures it
-# (XdeProcessor::compute_model_hash, xde_processor.cpp:878): linear deflection
+# (in the model hash its STEP processor computes): linear deflection
 # 1.0, not relative, angular 0.5.
 _MESH_DEFLECTION = 1.0
 _MESH_ANGLE = 0.5

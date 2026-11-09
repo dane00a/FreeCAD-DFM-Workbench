@@ -24,9 +24,11 @@ save and reports which fixtures were fixed and which were broken since. That
 pair is what makes porting the reference one commit at a time safe: every
 change is meant to fix some fixtures and break none.
 
-Nothing is written to the reference tree or to ``dfm_baseline.json``. The
-reference directory is found beside this repository, or at
-``DFM_REFERENCE_EXPECTED``. Needs ``.venv311`` (Python with OCP).
+Nothing is written to the goldens or to ``dfm_baseline.json``. The goldens
+are the copy in ``reference_expected/`` beside this script (see its
+PROVENANCE.txt for the reference commit they were taken at), or whatever
+directory ``DFM_REFERENCE_EXPECTED`` names -- a live reference checkout,
+when resynchronising to a newer one. Needs ``.venv311`` (Python with OCP).
 """
 
 from __future__ import annotations
@@ -45,18 +47,9 @@ for _path in (_REPO, os.path.join(_REPO, "tests", "stubs"), _HERE):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-DEFAULT_EXPECTED = os.path.abspath(
-    os.path.join(
-        _REPO,
-        "..",
-        "brooklineind-website",
-        "apps",
-        "geometry-service",
-        "tests",
-        "fixtures",
-        "expected",
-    )
-)
+#: The reference's approved goldens, copied into this repository so the gate
+#: runs anywhere. Refresh them from the reference when resynchronising.
+DEFAULT_EXPECTED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reference_expected")
 
 
 def expected_dir() -> str:

@@ -1,0 +1,45 @@
+{
+  "fixture": "nist_ctc_05",
+  "notes": "",
+  "feature_count": 38,
+  "severity": {
+    "error": 2,
+    "warn": 2,
+    "info": 2
+  },
+  "by_category": {
+    "setup": 1,
+    "part": 3,
+    "thread": 2
+  },
+  "by_rule": {
+    "setup_count_high": 1,
+    "material_removal_high": 1,
+    "thread_runout_insufficient": 2,
+    "feature_complexity": 1,
+    "part_marking": 1
+  },
+  "pmi": {
+    "tol_circular_runout": 3,
+    "tol_perpendicularity": 2,
+    "tol_straightness": 1,
+    "tol_concentricity": 1,
+    "tol_circularity": 1,
+    "tol_total_runout": 2,
+    "note": 2,
+    "dimension_valued": 6,
+    "datum_resolved": 2,
+    "datum_target": 2
+  },
+  "features": {
+    "type_THREADED_HOLE": 10,
+    "type_COUNTERBORE": 10,
+    "type_BLIND_HOLE": 1,
+    "type_FILLET": 12,
+    "type_STEP": 2,
+    "type_MARKING_TEXT": 1,
+    "type_PATTERN": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILL_TURN"
+}

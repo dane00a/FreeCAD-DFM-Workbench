@@ -1,0 +1,25 @@
+{
+  "fixture": "holes_near_edges",
+  "notes": "",
+  "feature_count": 5,
+  "severity": {
+    "error": 1,
+    "warn": 0,
+    "info": 1
+  },
+  "by_category": {
+    "thin_feature": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "thin_wall": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 4,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

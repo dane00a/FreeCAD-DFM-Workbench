@@ -1,0 +1,22 @@
+{
+  "fixture": "single_datum_dome__seam37",
+  "notes": "",
+  "feature_count": 0,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 1
+  },
+  "by_category": {
+    "setup": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "no_parallel_datum_pair": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {},
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

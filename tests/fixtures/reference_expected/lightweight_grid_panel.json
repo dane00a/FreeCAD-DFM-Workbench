@@ -1,0 +1,24 @@
+{
+  "by_category": {
+    "part": 9
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "material_removal_high": 1,
+    "part_aspect_ratio": 1,
+    "sharp_internal_edge": 6
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 9,
+  "features": {
+    "type_STEP": 9
+  },
+  "fixture": "lightweight_grid_panel",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 8
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "by_category": {
+    "part": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+    "type_STEP": 1
+  },
+  "fixture": "boss_flush_edge",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 1,
+    "warn": 0
+  }
+}

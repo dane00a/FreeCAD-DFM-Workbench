@@ -1,0 +1,26 @@
+{
+  "by_category": {
+    "hole": 2,
+    "part": 1,
+    "setup": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "hole_deep_risk": 1,
+    "hole_intersecting": 1,
+    "setup_count_high": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+    "type_THROUGH_HOLE": 2
+  },
+  "fixture": "hole_intersecting",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 0,
+    "info": 2,
+    "warn": 2
+  }
+}

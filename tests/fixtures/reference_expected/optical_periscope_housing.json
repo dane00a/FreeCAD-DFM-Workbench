@@ -1,0 +1,41 @@
+{
+  "fixture": "optical_periscope_housing",
+  "notes": "",
+  "feature_count": 31,
+  "severity": {
+    "error": 2,
+    "warn": 13,
+    "info": 3
+  },
+  "by_category": {
+    "thin_feature": 3,
+    "setup": 1,
+    "hole": 1,
+    "pocket": 1,
+    "slot": 3,
+    "tool_access": 8,
+    "part": 1
+  },
+  "by_rule": {
+    "thin_wall": 3,
+    "setup_count_high": 1,
+    "hole_deep_risk": 1,
+    "pocket_square_corner": 2,
+    "slot_deep_risk": 1,
+    "slot_overhang": 1,
+    "undercut_present": 6,
+    "tool_access_special_setup": 2,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 5,
+    "type_THROUGH_HOLE": 5,
+    "type_POCKET": 1,
+    "type_SLOT": 10,
+    "type_UNDERCUT": 8,
+    "type_PATTERN": 2
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

@@ -1,0 +1,28 @@
+{
+  "by_category": {
+    "freeform": 1,
+    "part": 1,
+    "pocket": 1,
+    "thin_feature": 1
+  },
+  "by_rule": {
+    "feature_complexity": 1,
+    "freeform_finishing": 1,
+    "pocket_square_corner": 1,
+    "thin_wall": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+    "type_FREEFORM_SURFACE": 1,
+    "type_POCKET": 2
+  },
+  "fixture": "sculpted_lid_thin_web",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "severity": {
+    "error": 1,
+    "info": 2,
+    "warn": 1
+  }
+}

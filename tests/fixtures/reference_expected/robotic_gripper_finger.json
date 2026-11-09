@@ -1,0 +1,35 @@
+{
+  "fixture": "robotic_gripper_finger",
+  "notes": "",
+  "feature_count": 18,
+  "severity": {
+    "error": 2,
+    "warn": 9,
+    "info": 1
+  },
+  "by_category": {
+    "thin_feature": 3,
+    "setup": 1,
+    "hole": 6,
+    "pocket": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "thin_wall": 3,
+    "setup_count_high": 1,
+    "hole_edge_distance": 1,
+    "hole_web_thickness": 1,
+    "hole_flat_bottom": 4,
+    "pocket_square_corner": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_BLIND_HOLE": 9,
+    "type_PARTIAL_BORE": 6,
+    "type_POCKET": 2,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

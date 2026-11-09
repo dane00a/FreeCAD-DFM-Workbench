@@ -1,0 +1,28 @@
+{
+  "fixture": "sensor_housing",
+  "notes": "",
+  "feature_count": 10,
+  "severity": {
+    "error": 0,
+    "warn": 1,
+    "info": 2
+  },
+  "by_category": {
+    "pocket": 1,
+    "setup": 1,
+    "part": 1
+  },
+  "by_rule": {
+    "pocket_square_corner": 1,
+    "setup_count_high": 1,
+    "feature_complexity": 1
+  },
+  "pmi": {},
+  "features": {
+    "type_THROUGH_HOLE": 8,
+    "type_POCKET": 1,
+    "type_PATTERN": 1
+  },
+  "engine_version": "2.0.0",
+  "part_process_type": "MILLED"
+}

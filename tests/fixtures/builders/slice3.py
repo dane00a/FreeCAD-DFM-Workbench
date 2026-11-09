@@ -204,23 +204,26 @@ def _cut_under_fold(
 
 
 @fixture("single_datum_dome")
-def build_single_datum_dome() -> TopoDS_Shape:
+def build_single_datum_dome(seam_deg: float = 0.0) -> TopoDS_Shape:
     """A hemisphere: one planar face, and nothing to hold it parallel to.
 
     The flat base is large, so the missing-datum rule stays quiet and the
     no-parallel-pair rule is left on its own.
     """
-    return cut(sphere(0.0, 0.0, 0.0, 30.0), box(-40.0, -40.0, -40.0, 80.0, 80.0, 40.0))
+    return cut(
+        sphere(0.0, 0.0, 0.0, 30.0, seam=seam_deg),
+        box(-40.0, -40.0, -40.0, 80.0, 80.0, 40.0),
+    )
 
 
 @fixture("sealed_void")
-def build_sealed_void() -> TopoDS_Shape:
+def build_sealed_void(seam_deg: float = 0.0) -> TopoDS_Shape:
     """A cube with a fully enclosed spherical cavity -- no way in, so no way to cut it.
 
     Built as two halves each carved by the same sphere and fused back
     together, which is the only way to get a void with no opening.
     """
-    cavity = sphere(25.0, 25.0, 25.0, 12.0)
+    cavity = sphere(25.0, 25.0, 25.0, 12.0, seam=seam_deg)
     lower = cut(box(0.0, 0.0, 0.0, 50.0, 50.0, 25.0), cavity)
     upper = cut(box(0.0, 0.0, 25.0, 50.0, 50.0, 25.0), cavity)
     return fuse(lower, upper)
@@ -286,23 +289,32 @@ def build_sensor_housing() -> TopoDS_Shape:
 
 
 @fixture("shaft_endcap")
-def build_shaft_endcap() -> TopoDS_Shape:
+def build_shaft_endcap(seam_deg: float = 0.0) -> TopoDS_Shape:
     """Turned and then milled: a bored cap with a bolt circle and a side tap.
 
     The side hole is the interesting part -- it needs a second setup on a
     part that is otherwise all one turning operation.
     """
+    seam = seam_deg
     part = cut(
-        cylinder(0.0, 0.0, 0.0, 25.0, 30.0), cylinder(0.0, 0.0, 15.0, 10.0, 16.0)
+        cylinder(0.0, 0.0, 0.0, 25.0, 30.0, seam=seam),
+        cylinder(0.0, 0.0, 15.0, 10.0, 16.0, seam=seam),
     )
     for index in range(4):
         angle = index * math.pi / 2.0
         part = cut(
             part,
-            cylinder(18.0 * math.cos(angle), 18.0 * math.sin(angle), -1.0, 3.0, 32.0),
+            cylinder(
+                18.0 * math.cos(angle),
+                18.0 * math.sin(angle),
+                -1.0,
+                3.0,
+                32.0,
+                seam=seam,
+            ),
         )
     # M8 tap drill entering from outside the part, along +Y.
-    part = cut(part, cylinder(0.0, -26.0, 15.0, 3.4, 14.0, (0, 1, 0)))
+    part = cut(part, cylinder(0.0, -26.0, 15.0, 3.4, 14.0, (0, 1, 0), seam=seam))
 
     def outer_top_rim(edge, start, end) -> bool:
         radius = math.hypot(start.X(), start.Y())
@@ -312,7 +324,7 @@ def build_shaft_endcap() -> TopoDS_Shape:
 
 
 @fixture("servo_coupling_clamp")
-def build_servo_coupling_clamp() -> TopoDS_Shape:
+def build_servo_coupling_clamp(seam_deg: float = 0.0) -> TopoDS_Shape:
     """A dual-bore clamp coupling: two bores, two slits, two clamp screws.
 
     Each slit reaches 1 mm past its bore wall. It has to: a clamp needs the
@@ -320,15 +332,16 @@ def build_servo_coupling_clamp() -> TopoDS_Shape:
     with the wall leaves slivers of material at the slit's edges that the
     recognizer reads as a closed pocket instead.
     """
-    part = cylinder(0.0, 0.0, 0.0, 16.0, 38.0)
-    part = cut(part, cylinder(0.0, 0.0, -0.1, 4.0, 18.1))
-    part = cut(part, cylinder(0.0, 0.0, 20.0, 5.0, 18.1))
+    seam = seam_deg
+    part = cylinder(0.0, 0.0, 0.0, 16.0, 38.0, seam=seam)
+    part = cut(part, cylinder(0.0, 0.0, -0.1, 4.0, 18.1, seam=seam))
+    part = cut(part, cylinder(0.0, 0.0, 20.0, 5.0, 18.1, seam=seam))
     part = cut(part, box(3.0, -0.8, 0.0, 13.5, 1.6, 18.0))
-    part = cut(part, cylinder(0.0, -17.0, 10.0, 1.65, 34.0, (0, 1, 0)))
-    part = cut(part, cylinder(0.0, 12.0, 10.0, 3.5, 4.1, (0, 1, 0)))
+    part = cut(part, cylinder(0.0, -17.0, 10.0, 1.65, 34.0, (0, 1, 0), seam=seam))
+    part = cut(part, cylinder(0.0, 12.0, 10.0, 3.5, 4.1, (0, 1, 0), seam=seam))
     part = cut(part, box(-16.5, -0.8, 20.0, 12.5, 1.6, 18.0))
-    part = cut(part, cylinder(0.0, -17.0, 28.0, 1.65, 34.0, (0, 1, 0)))
-    return cut(part, cylinder(0.0, 12.0, 28.0, 3.5, 4.1, (0, 1, 0)))
+    part = cut(part, cylinder(0.0, -17.0, 28.0, 1.65, 34.0, (0, 1, 0), seam=seam))
+    return cut(part, cylinder(0.0, 12.0, 28.0, 3.5, 4.1, (0, 1, 0), seam=seam))
 
 
 @fixture("robotic_gripper_finger")
@@ -903,29 +916,6 @@ def build_sm_corner_relief_round() -> TopoDS_Shape:
 # -- formed features ----------------------------------------------------------
 
 
-@fixture("sm_emboss_field")
-def build_sm_emboss_field() -> TopoDS_Shape:
-    """Four closed embosses: one control, one too deep, and a pair too close.
-
-    Draw much past three gauges and the metal thins at the corners; put two
-    draws closer than two gauges apart and the web between them tears. Every
-    footprint stays 10 mm clear of the bend, so the near-bend rule is quiet.
-    """
-    part = _bracket_profile(40.0, 30.0, 40.0)
-
-    def emboss(x0: float, y0: float, x1: float, y1: float, height: float):
-        raised = fuse(part, box_between((x0, y0, 2.0), (x1, y1, 2.0 + height)))
-        return cut(
-            raised,
-            box_between((x0 + 2.0, y0 + 2.0, -1.0), (x1 - 2.0, y1 - 2.0, height)),
-        )
-
-    part = emboss(15.0, 4.0, 25.0, 14.0, 4.0)
-    part = emboss(30.0, 4.0, 39.0, 14.0, 7.0)
-    part = emboss(15.0, 22.0, 23.0, 30.0, 4.0)
-    return emboss(25.0, 22.0, 33.0, 30.0, 4.0)
-
-
 @fixture("sm_emboss_gallery")
 def build_sm_emboss_gallery() -> TopoDS_Shape:
     """Embosses that are not rectangles: a stadium, an L, and a ring.
@@ -1029,108 +1019,6 @@ def build_sm_formed_shapes() -> TopoDS_Shape:
     )
     part = fuse(part, cap)
     return cut(part, sphere(14.0, 29.0, 2.0, 5.0))
-
-
-@fixture("sm_lance_bridge")
-def build_sm_lance_bridge() -> TopoDS_Shape:
-    """A bridge lance: a hood sheared open at both ends rather than one.
-
-    Two open edges instead of one is what separates a lance from a louver,
-    and at two and a half gauges tall it is under every threshold -- so it
-    is also the all-silent control for the formed recognizer's subtype
-    logic.
-    """
-    part = _bracket_profile(40.0, 30.0, 40.0)
-    part = fuse(part, box_between((16.0, 14.0, 2.0), (36.0, 26.0, 7.0)))
-    part = cut(part, box_between((18.0, 16.0, -1.0), (34.0, 24.0, 5.0)))
-    part = cut(part, box_between((15.0, 14.0, -1.0), (37.0, 16.0, 5.0)))
-    return cut(part, box_between((15.0, 24.0, -1.0), (37.0, 26.0, 5.0)))
-
-
-@fixture("sm_louver_bank")
-def build_sm_louver_bank() -> TopoDS_Shape:
-    """Two boxy louvers, one three gauges tall and one four and a half.
-
-    The front wall is sheared away entirely below the crest, side posts
-    included, leaving a gauge-thin band hanging from the plateau. That band
-    is the recognizer's witness that the hood was sheared open rather than
-    drawn closed.
-    """
-    part = _bracket_profile(40.0, 30.0, 50.0)
-
-    def louver(x0: float, y0: float, x1: float, y1: float, height: float):
-        raised = fuse(part, box_between((x0, y0, 2.0), (x1, y1, 2.0 + height)))
-        drawn = cut(
-            raised,
-            box_between((x0 + 2.0, y0 + 2.0, -1.0), (x1 - 2.0, y1 - 2.0, height)),
-        )
-        return cut(
-            drawn, box_between((x0 - 1.0, y0, -1.0), (x1 + 1.0, y0 + 2.0, height))
-        )
-
-    part = louver(15.0, 8.0, 35.0, 18.0, 6.0)
-    return louver(15.0, 30.0, 35.0, 40.0, 9.0)
-
-
-@fixture("sm_curved_louver")
-def build_sm_curved_louver() -> TopoDS_Shape:
-    """Louvers that are half-pipes rather than boxes -- the cylindrical crest.
-
-    Each hood's axis lies in the deck's top plane, so it arches over the
-    panel instead of standing on it, and it is sheared open 60 degrees round
-    the arc. That angle is the point: the lip it leaves is a radial band
-    tilted 60 degrees off the deck normal, so a test comparing the lip
-    against the host panel's normal would not count it and the hood would
-    census as an emboss. Against the crest's own outward direction the
-    answer is exactly perpendicular, because a sheared edge is by definition
-    a cut through the thickness.
-
-    This is not read as a bend, and not by exception: the arch meets the
-    deck at right angles, so the inner cylinder has no tangent planar
-    neighbour and the bend seed never forms. A hood blending tangentially
-    into its panel would be a genuine bend by every measure the engine has,
-    which is why a real louver is lanced first.
-    """
-    t = 2.0
-    part = _bracket_profile(50.0, 30.0, 50.0)
-
-    def louver(x0: float, x1: float, yc: float, outer_r: float, shear_deg: float):
-        inner_r = outer_r - t
-        # The bore runs a millimetre past each end of the outer wall so the
-        # tube is open at both. Capped, it would read as a cylindrical pocket
-        # with two flat floors -- a blind hole, which is solid-stock evidence
-        # and vetoes the sheet classification outright.
-        hood = cut(
-            cylinder(x0, yc, t, outer_r, x1 - x0, (1, 0, 0)),
-            cylinder(x0 - 1.0, yc, t, inner_r, (x1 - x0) + 2.0, (1, 0, 0)),
-        )
-        hood = common(
-            hood,
-            box_between(
-                (x0 - 1.0, yc - outer_r - 1.0, t),
-                (x1 + 1.0, yc + outer_r + 1.0, t + outer_r + 1.0),
-            ),
-        )
-        # Shear with a radial half-space -- a plane through the arc axis --
-        # so the lip is one gauge thick whatever angle it is cut at. Applied
-        # to the hood alone: the same half-space would halve the deck.
-        blade = rotated(
-            box_between((x0 - 2.0, yc, t - 60.0), (x1 + 2.0, yc + 60.0, t + 60.0)),
-            (0.0, yc, t),
-            (1, 0, 0),
-            -shear_deg,
-        )
-        raised = fuse(part, cut(hood, blade))
-        # The lanced opening, cut with a box so no plane is ever tangent to
-        # the bore: a cut at y = yc - r would graze it exactly where it meets
-        # the deck, and boolean tangency is how sliver faces grow.
-        return cut(
-            raised,
-            box_between((x0, yc - inner_r + 1.5, -1.0), (x1, yc + outer_r, t)),
-        )
-
-    part = louver(20.0, 40.0, 13.0, 5.0, 60.0)
-    return louver(20.0, 40.0, 33.0, 8.0, 60.0)
 
 
 # -- the standard louver forms ------------------------------------------------
@@ -1555,128 +1443,6 @@ def build_sm_hybrid_milled_pocket() -> TopoDS_Shape:
 
 
 # -- engineered parts ---------------------------------------------------------
-
-
-@fixture("sm_e_chassis")
-def build_sm_e_chassis() -> TopoDS_Shape:
-    """A 1.5 mm electronics chassis: U section, return flanges, front hem.
-
-    One bare bend end, one undersized hole, one hole near a bend, one tight
-    hole pitch and one tall louver, each with clean controls beside it. The
-    wall bands are built explicitly per edge rather than mirrored -- a mirror
-    transform flips face orientation and breaks the inner-to-outer bend
-    pairing that makes a fold recognizable at all.
-    """
-    t = 1.5
-    outer_r = 3.0
-    part = box_between((0, 0, 0), (160, 100, t))
-
-    def wall_band(edge: float, sign: float) -> TopoDS_Shape:
-        def place(u, v):
-            return gp_Pnt(5, edge + sign * u, v)
-
-        # Exact arc midpoints: a rounded value makes the three-point circle
-        # about a micron off, and the under-fold cut then shaves a tangency
-        # sliver that breaks bend recognition.
-        outer_mid = 3.0 - 3.0 / math.sqrt(2.0)
-        inner_mid = 3.0 - 1.5 / math.sqrt(2.0)
-        return (
-            _Profile(place)
-            .arc(3, 0, outer_mid, outer_mid, 0, 3)
-            .line(0, 3, 0, 37)
-            .arc(0, 37, outer_mid, 40.0 - outer_mid, 3, 40)
-            .line(3, 40, 15, 40)
-            .line(15, 40, 15, 38.5)
-            .line(15, 38.5, 3, 38.5)
-            .arc(3, 38.5, inner_mid, 40.0 - inner_mid, 1.5, 37)
-            .line(1.5, 37, 1.5, 3)
-            .arc(1.5, 3, inner_mid, inner_mid, 3, 1.5)
-            .line(3, 1.5, 3, 0)
-            .prism(150, 0, 0)
-        )
-
-    part = fuse(part, wall_band(0, 1))
-    part = fuse(part, wall_band(100, -1))
-    part = _cut_under_fold(
-        part, (4, -1, -1), (156, 3, t), (4, 3, 3), (1, 0, 0), 152, outer_r
-    )
-    part = _cut_under_fold(
-        part, (4, 97, -1), (156, 101, t), (4, 97, 3), (1, 0, 0), 152, outer_r
-    )
-
-    # Front hem on the x=0 edge: open, r1.5, 8 mm return.
-    hem = (
-        _Profile(_in_xz(10.0))
-        .arc(3, 0, 0, 3, 3, 6)
-        .line(3, 6, 11, 6)
-        .line(11, 6, 11, 4.5)
-        .line(11, 4.5, 3, 4.5)
-        .arc(3, 4.5, 1.5, 3, 3, 1.5)
-        .line(3, 1.5, 3, 0)
-        .prism(0, 80, 0)
-    )
-    part = fuse(part, hem)
-    part = _cut_under_fold(
-        part, (-1, 9, -1), (3, 91, t), (3, 9, 3), (0, 1, 0), 82, outer_r
-    )
-
-    # Flush reliefs at both hem ends, kept clear of the wall-bend corners so
-    # the corner rule stays out of reach.
-    part = cut(part, box_between((-1, 6.5, -1), (4.6, 10, 7)))
-    part = cut(part, box_between((-1, 90, -1), (4.6, 95.5, 7)))
-    # Bend-end reliefs: both ends of the right bend and one end of the left.
-    # The left bend's other end stays bare, which is the bait.
-    part = cut(part, box_between((155, -1, -1), (161, 4.6, t + 1)))
-    part = cut(part, box_between((155, 95.4, -1), (161, 101, t + 1)))
-    part = cut(part, box_between((-1, 95.4, -1), (5, 101, t + 1)))
-
-    def hole(x: float, y: float, radius: float) -> TopoDS_Shape:
-        return cut(part, cylinder(x, y, -1, radius, t + 2))
-
-    for x, y in ((20, 20), (140, 20), (20, 80), (140, 80)):
-        part = hole(x, y, 2.0)
-    for x in (40.0, 80.0, 120.0):
-        for y in (30.0, 70.0):
-            part = hole(x, y, 1.6)
-    # Keyhole mounts: a slot and a wider circle, one opening each.
-    part = cut(part, box_between((48, 45, -1), (52, 55, t + 1)))
-    part = hole(50, 58, 3.5)
-    part = cut(part, box_between((108, 45, -1), (112, 55, t + 1)))
-    part = hole(110, 42, 3.5)
-    part = hole(80, 50, 0.6)
-    part = hole(70, 93, 2.0)
-    part = hole(95, 25, 2.0)
-    part = hole(101.5, 25, 2.0)
-
-    # Wall cutouts in the left wall: a rounded window and a trapezoid, the
-    # latter a canary for the documented limit on non-rectangular openings.
-    window = box_between((62, -1, 14), (88, 3, 26))
-    window = fuse(window, box_between((60, -1, 16), (90, 3, 24)))
-    for cx in (62.0, 88.0):
-        for cz in (16.0, 24.0):
-            window = fuse(window, cylinder(cx, -1, cz, 2.0, 4.0, (0, 1, 0)))
-    part = cut(part, window)
-    part = cut(
-        part,
-        _polygon_prism(
-            [(110, -1, 16), (130, -1, 16), (127, -1, 24), (113, -1, 24)], 0, 4, 0
-        ),
-    )
-
-    # Louvers on the right wall, hoods opening downward.
-    def wall_louver(x0: float, x1: float, z0: float, z1: float, height: float):
-        raised = fuse(part, box_between((x0, 100, z0), (x1, 100 + height, z1)))
-        drawn = cut(
-            raised,
-            box_between((x0 + t, 97, z0 + t), (x1 - t, 100 + height - t, z1 - t)),
-        )
-        return cut(
-            drawn, box_between((x0, 100, z0), (x1, 100 + height - t, z0 + t))
-        )
-
-    for x in (20.0, 50.0, 80.0, 110.0):
-        part = wall_louver(x, x + 20, 12, 20, 4.0)
-    return wall_louver(134, 154, 12, 20, 7.0)
 
 
 @fixture("sm_hd_bracket")

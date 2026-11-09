@@ -38,10 +38,10 @@ def build_simple_box() -> TopoDS_Shape:
 
 
 @fixture("through_hole")
-def build_through_hole() -> TopoDS_Shape:
+def build_through_hole(seam_deg: float = 0.0) -> TopoDS_Shape:
     # The drill runs past both faces so it pierces cleanly rather than
     # leaving a coincident-face mess at the surface.
-    return cut(plate(), cylinder(25, 25, -1, 5.0, 27.0))
+    return cut(plate(), cylinder(25, 25, -1, 5.0, 27.0, seam=seam_deg))
 
 
 @fixture("blind_hole")
@@ -52,16 +52,16 @@ def build_blind_hole() -> TopoDS_Shape:
 
 
 @fixture("counterbore")
-def build_counterbore() -> TopoDS_Shape:
-    stepped = cut(plate(), cylinder(25, 25, 20, 7.0, 10.0))
-    return cut(stepped, cylinder(25, 25, 5, 4.0, 25.0))
+def build_counterbore(seam_deg: float = 0.0) -> TopoDS_Shape:
+    stepped = cut(plate(), cylinder(25, 25, 20, 7.0, 10.0, seam=seam_deg))
+    return cut(stepped, cylinder(25, 25, 5, 4.0, 25.0, seam=seam_deg))
 
 
 @fixture("countersink")
-def build_countersink() -> TopoDS_Shape:
+def build_countersink(seam_deg: float = 0.0) -> TopoDS_Shape:
     # A 90 degree included angle: the cone widens from 3 to 8 over 5 mm.
-    sunk = cut(plate(), cone(25, 25, 20, 3.0, 8.0, 5.0))
-    return cut(sunk, cylinder(25, 25, 5, 3.0, 25.0))
+    sunk = cut(plate(), cone(25, 25, 20, 3.0, 8.0, 5.0, seam=seam_deg))
+    return cut(sunk, cylinder(25, 25, 5, 3.0, 25.0, seam=seam_deg))
 
 
 @fixture("rectangular_pocket")
@@ -82,10 +82,12 @@ def build_step_feature() -> TopoDS_Shape:
 
 
 @fixture("thin_wall")
-def build_thin_wall() -> TopoDS_Shape:
+def build_thin_wall(seam_deg: float = 0.0) -> TopoDS_Shape:
     """Two bores 11 mm apart on 10 mm diameters: a 1 mm web between them."""
-    drilled = cut(box(0, 0, 0, 60.0, 50.0, 25.0), cylinder(20, 25, -1, 5.0, 27.0))
-    return cut(drilled, cylinder(31, 25, -1, 5.0, 27.0))
+    drilled = cut(
+        box(0, 0, 0, 60.0, 50.0, 25.0), cylinder(20, 25, -1, 5.0, 27.0, seam=seam_deg)
+    )
+    return cut(drilled, cylinder(31, 25, -1, 5.0, 27.0, seam=seam_deg))
 
 
 @fixture("deep_hole")
@@ -134,14 +136,21 @@ def build_grid_3x3() -> TopoDS_Shape:
 
 
 @fixture("bolt_circle_4x")
-def build_bolt_circle_4x() -> TopoDS_Shape:
+def build_bolt_circle_4x(seam_deg: float = 0.0) -> TopoDS_Shape:
     """Four holes on a 60 mm pitch circle, which is a bolt circle, not a row."""
-    shape = cylinder(0, 0, 0, 40.0, 10.0)
+    shape = cylinder(0, 0, 0, 40.0, 10.0, seam=seam_deg)
     for index in range(4):
         angle = index * math.pi / 2.0
         shape = cut(
             shape,
-            cylinder(30.0 * math.cos(angle), 30.0 * math.sin(angle), -1, 3.0, 12.0),
+            cylinder(
+                30.0 * math.cos(angle),
+                30.0 * math.sin(angle),
+                -1,
+                3.0,
+                12.0,
+                seam=seam_deg,
+            ),
         )
     return shape
 
@@ -196,17 +205,19 @@ def build_thin_sheet() -> TopoDS_Shape:
 
 
 @fixture("boss_on_plate")
-def build_boss_on_plate() -> TopoDS_Shape:
+def build_boss_on_plate(seam_deg: float = 0.0) -> TopoDS_Shape:
     """One round boss and one rectangular pad, so both paths get exercised."""
     plate = box(0, 0, 0, 80.0, 60.0, 5.0)
-    plate = fuse(plate, cylinder(40, 30, 5, 10.0, 15.0))
+    plate = fuse(plate, cylinder(40, 30, 5, 10.0, 15.0, seam=seam_deg))
     return fuse(plate, box(7.5, 25, 5, 15.0, 10.0, 12.0))
 
 
 @fixture("tall_boss")
-def build_tall_boss() -> TopoDS_Shape:
+def build_tall_boss(seam_deg: float = 0.0) -> TopoDS_Shape:
     """Five diameters tall: it will ring and deflect as the cutter passes."""
-    return fuse(box(0, 0, 0, 60.0, 60.0, 5.0), cylinder(30, 30, 5, 4.0, 40.0))
+    return fuse(
+        box(0, 0, 0, 60.0, 60.0, 5.0), cylinder(30, 30, 5, 4.0, 40.0, seam=seam_deg)
+    )
 
 
 @fixture("rib_on_plate")

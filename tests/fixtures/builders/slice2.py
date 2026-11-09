@@ -79,16 +79,17 @@ def _unit(direction) -> tuple:
     return dx / length, dy / length, dz / length
 
 
-def _drilled_blind(x, y, z, direction, radius, depth) -> TopoDS_Shape:
+def _drilled_blind(x, y, z, direction, radius, depth, seam=0.0) -> TopoDS_Shape:
     """A blind hole with the cone a twist drill actually leaves behind.
 
     A plain cylinder cut into a block bottoms out flat, and a flat floor is
     something no drill produces -- so a fixture built that way trips the
     flat-bottom rule for a reason that exists only in the model. The cone
-    sits apex-forward past the nominal depth, base flush with it.
+    sits apex-forward past the nominal depth, base flush with it. ``seam``
+    turns the parametric seam of both, as `shapes.seam_ax2` does.
     """
     dx, dy, dz = _unit(direction)
-    body = cylinder(x, y, z, radius, depth, (dx, dy, dz))
+    body = cylinder(x, y, z, radius, depth, (dx, dy, dz), seam=seam)
     point = cone(
         x + dx * depth,
         y + dy * depth,
@@ -97,6 +98,7 @@ def _drilled_blind(x, y, z, direction, radius, depth) -> TopoDS_Shape:
         0.0,
         radius / math.tan(_DRILL_HALF_ANGLE),
         (dx, dy, dz),
+        seam=seam,
     )
     return fuse(body, point)
 
@@ -244,11 +246,11 @@ def build_hole_partial_entry_blind() -> TopoDS_Shape:
 
 
 @fixture("hole_intersecting")
-def build_hole_intersecting() -> TopoDS_Shape:
+def build_hole_intersecting(seam_deg: float = 0.0) -> TopoDS_Shape:
     """Two cross-bores meeting at the centre of the block."""
     block = box(0, 0, 0, 60.0, 60.0, 30.0)
-    along_x = cylinder(-1, 30, 15, 4.0, 62.0, (1, 0, 0))
-    along_y = cylinder(30, -1, 15, 4.0, 62.0, (0, 1, 0))
+    along_x = cylinder(-1, 30, 15, 4.0, 62.0, (1, 0, 0), seam=seam_deg)
+    along_y = cylinder(30, -1, 15, 4.0, 62.0, (0, 1, 0), seam=seam_deg)
     return cut(block, along_x, along_y)
 
 
@@ -262,7 +264,7 @@ def build_hole_countersink_angle() -> TopoDS_Shape:
 
 
 @fixture("hole_breakout_into_pocket")
-def build_hole_breakout_into_pocket() -> TopoDS_Shape:
+def build_hole_breakout_into_pocket(seam_deg: float = 0.0) -> TopoDS_Shape:
     """A side bore that ends on the curved wall of a bowl, not on a floor.
 
     The far end of the bore lands in the sphere's void with no cap face and
@@ -271,8 +273,8 @@ def build_hole_breakout_into_pocket() -> TopoDS_Shape:
     for a reason no hole-pair pairing can explain away.
     """
     block = box(0, 0, 0, 60.0, 50.0, 40.0)
-    bowled = cut(block, sphere(30, 25, 32, 12.0))
-    return cut(bowled, cylinder(-1, 25, 30, 3.0, 25.0, (1, 0, 0)))
+    bowled = cut(block, sphere(30, 25, 32, 12.0, seam=seam_deg))
+    return cut(bowled, cylinder(-1, 25, 30, 3.0, 25.0, (1, 0, 0), seam=seam_deg))
 
 
 @fixture("hole_crosses_wide_cavity")
@@ -421,14 +423,14 @@ def build_kitchen_sink() -> TopoDS_Shape:
 
 
 @fixture("inspection_test_block")
-def build_inspection_test_block() -> TopoDS_Shape:
+def build_inspection_test_block(seam_deg: float = 0.0) -> TopoDS_Shape:
     """The clean part. Nothing above INFO may fire on it.
 
     A false-positive guard rather than a feature test: every edge is broken,
     the bore is generous, and any rule that speaks up here is wrong.
     """
     cube = box(0, 0, 0, 60.0, 60.0, 60.0)
-    with_bore = cut(cube, cylinder(30, 30, -1, 10.0, 62.0))
+    with_bore = cut(cube, cylinder(30, 30, -1, 10.0, 62.0, seam=seam_deg))
 
     def outer_at(z):
         def matches(edge, start, end) -> bool:
@@ -494,7 +496,7 @@ def build_injection_mold_cavity_pattern() -> TopoDS_Shape:
 
 
 @fixture("off_cardinal_viz_block")
-def build_off_cardinal_viz_block() -> TopoDS_Shape:
+def build_off_cardinal_viz_block(seam_deg: float = 0.0) -> TopoDS_Shape:
     """One feature per off-axis direction, for the analytic renderers.
 
     Every primitive class -- cylinder, cone, sphere, torus -- on an axis
@@ -502,22 +504,25 @@ def build_off_cardinal_viz_block() -> TopoDS_Shape:
     tessellation shortcuts shows up the moment anyone looks at it. The DFM
     findings this part provokes are expected and not the point.
     """
+    seam = seam_deg
     cube = box(0, 0, 0, 100.0, 100.0, 100.0)
 
     # A diagonal through-bore entering the +X face and leaving through -Y.
     diagonal = _unit((-0.7071067811865, -0.7071067811865, 0.0))
-    cube = cut(cube, cylinder(102.0, 52.0, 50.0, 4.0, 160.0, diagonal))
+    cube = cut(cube, cylinder(102.0, 52.0, 50.0, 4.0, 160.0, diagonal, seam=seam))
 
     # A compound-angle blind hole with its drill point, the direct repro
     # for the cone-rendering fault.
     into = _unit((0.5, -0.5, -0.7071067811865))
     entry = (30.0 - into[0], 70.0 - into[1], 100.0 - into[2])
-    cube = cut(cube, _drilled_blind(entry[0], entry[1], entry[2], into, 3.0, 13.0))
+    cube = cut(
+        cube, _drilled_blind(entry[0], entry[1], entry[2], into, 3.0, 13.0, seam=seam)
+    )
 
     # A counterbore tilted 30 degrees in the XZ plane.
     into = _unit((-0.8660254037844, 0.0, -0.5))
     entry = (100.0 - into[0], 25.0 - into[1], 85.0 - into[2])
-    outer = cylinder(entry[0], entry[1], entry[2], 6.0, 9.0, into)
+    outer = cylinder(entry[0], entry[1], entry[2], 6.0, 9.0, into, seam=seam)
     inner = cylinder(
         entry[0] + 8.0 * into[0],
         entry[1] + 8.0 * into[1],
@@ -525,13 +530,14 @@ def build_off_cardinal_viz_block() -> TopoDS_Shape:
         3.0,
         15.0,
         into,
+        seam=seam,
     )
     cube = cut(cube, fuse(outer, inner))
 
     # A 90 degree countersink tilted 60 degrees in the XY plane.
     into = _unit((-0.5, 0.8660254037844, 0.0))
     entry = (100.0 - into[0], 50.0 - into[1], 30.0 - into[2])
-    sink = cone(entry[0], entry[1], entry[2], 6.0, 3.0, 3.0, into)
+    sink = cone(entry[0], entry[1], entry[2], 6.0, 3.0, 3.0, into, seam=seam)
     bore = cylinder(
         entry[0] + 3.0 * into[0],
         entry[1] + 3.0 * into[1],
@@ -539,6 +545,7 @@ def build_off_cardinal_viz_block() -> TopoDS_Shape:
         3.0,
         14.0,
         into,
+        seam=seam,
     )
     cube = cut(cube, fuse(sink, bore))
 
@@ -546,12 +553,19 @@ def build_off_cardinal_viz_block() -> TopoDS_Shape:
     # one buried deep enough to leave a genuine overhang ring.
     cube = cut(
         cube,
-        sphere(50.0, 100.0 + (-0.8660254037844) * 3.0, 30.0 + (-0.5) * 3.0, 8.0),
+        sphere(
+            50.0,
+            100.0 + (-0.8660254037844) * 3.0,
+            30.0 + (-0.5) * 3.0,
+            8.0,
+            seam=seam,
+        ),
     )
-    cube = cut(cube, sphere(20.0, 94.0, 60.0, 8.0))
+    cube = cut(cube, sphere(20.0, 94.0, 60.0, 8.0, seam=seam))
 
     # A boss leaning out of the top face on a compound axis.
-    cube = fuse(cube, cylinder(75.0, 75.0, 99.0, 5.0, 21.0, _unit((0.5, 0.5, 0.7071067811865))))
+    lean = _unit((0.5, 0.5, 0.7071067811865))
+    cube = fuse(cube, cylinder(75.0, 75.0, 99.0, 5.0, 21.0, lean, seam=seam))
 
     # One R3 fillet, for a torus face. The edge is cardinal because walking
     # to an off-cardinal one after all those booleans is not something a
@@ -664,32 +678,42 @@ def build_micro_fluidic_channels() -> TopoDS_Shape:
 
 
 @fixture("hydraulic_actuator_end_cap")
-def build_hydraulic_actuator_end_cap() -> TopoDS_Shape:
+def build_hydraulic_actuator_end_cap(seam_deg: float = 0.0) -> TopoDS_Shape:
     """A turned end cap with the full seal-groove vocabulary on one bore.
 
     Wiper seat, O-ring gland, rod bore, an internal thread bore with its
     relief undercut, and a bolt circle drilled from the front so it does
     not pierce the thread.
     """
-    flange = cylinder(0, 0, 0, 42.5, 12.0)
-    body = cylinder(0, 0, 12, 40.0, 38.0)
+    seam = seam_deg
+    flange = cylinder(0, 0, 0, 42.5, 12.0, seam=seam)
+    body = cylinder(0, 0, 12, 40.0, 38.0, seam=seam)
     cap = fuse(flange, body)
 
-    cap = cut(cap, cylinder(0, 0, -0.001, 16.0, 6.001))
-    cap = cut(cap, cylinder(0, 0, 6, 14.0, 44.1))
+    cap = cut(cap, cylinder(0, 0, -0.001, 16.0, 6.001, seam=seam))
+    cap = cut(cap, cylinder(0, 0, 6, 14.0, 44.1, seam=seam))
 
-    gland = cut(cylinder(0, 0, 1.65, 17.83, 2.7), cylinder(0, 0, 1.55, 16.0, 2.9))
+    gland = cut(
+        cylinder(0, 0, 1.65, 17.83, 2.7, seam=seam),
+        cylinder(0, 0, 1.55, 16.0, 2.9, seam=seam),
+    )
     cap = cut(cap, gland)
 
-    cap = cut(cap, cylinder(0, 0, 32, 35.0, 18.1))
-    relief = cut(cylinder(0, 0, 31.0, 35.75, 3.0), cylinder(0, 0, 30.9, 35.0, 3.2))
+    cap = cut(cap, cylinder(0, 0, 32, 35.0, 18.1, seam=seam))
+    relief = cut(
+        cylinder(0, 0, 31.0, 35.75, 3.0, seam=seam),
+        cylinder(0, 0, 30.9, 35.0, 3.2, seam=seam),
+    )
     cap = cut(cap, relief)
 
     for index in range(4):
         angle = index * math.pi / 2.0
         x = 36.0 * math.cos(angle)
         y = 36.0 * math.sin(angle)
-        tap = fuse(cylinder(x, y, -0.1, 2.5, 15.1), cone(x, y, 15.0, 2.5, 0.0, 1.5))
+        tap = fuse(
+            cylinder(x, y, -0.1, 2.5, 15.1, seam=seam),
+            cone(x, y, 15.0, 2.5, 0.0, 1.5, seam=seam),
+        )
         cap = cut(cap, tap)
     return cap
 
@@ -1008,7 +1032,7 @@ def build_precision_spindle_end_cap() -> TopoDS_Shape:
     part = cut(part, cylinder(0, 0, 0, 22.5, 40.2))
     part = cut(part, cylinder(0, 0, -0.1, 27.5, 10.2))
 
-    ring = cut(cylinder(0, 0, 3.15, 28.6, 1.7), cylinder(0, 0, 3.05, 27.4, 1.9))
+    ring = cut(cylinder(0, 0, 2.9, 29.0, 2.2), cylinder(0, 0, 2.8, 27.4, 2.4))
     part = cut(part, ring)
 
     part = cut(part, cylinder(0, 0, 27.0, 24.2, 13.2))
@@ -1080,7 +1104,7 @@ def build_iso_k_vacuum_flange() -> TopoDS_Shape:
 
 
 @fixture("hygienic_manifold_plate")
-def build_hygienic_manifold_plate() -> TopoDS_Shape:
+def build_hygienic_manifold_plate(seam_deg: float = 0.0) -> TopoDS_Shape:
     """The canonical filleted-rim part: hygienic radii on every hole class.
 
     Food and pharma standards want R3 on any rim product touches, and a
@@ -1095,25 +1119,27 @@ def build_hygienic_manifold_plate() -> TopoDS_Shape:
     # the corner patches blend into each other.
     part = _blend_plate_edges(part)
 
+    seam = seam_deg
     gland = cut(
-        cylinder(55.0, 40.0, -0.1, 32.5, 2.9), cylinder(55.0, 40.0, -0.2, 29.0, 3.1)
+        cylinder(55.0, 40.0, -0.1, 32.5, 2.9, seam=seam),
+        cylinder(55.0, 40.0, -0.2, 29.0, 3.1, seam=seam),
     )
     part = cut(part, gland)
 
     for cx in (37.0, 73.0):
-        part = cut(part, cylinder(cx, 40.0, -1.0, 6.0, 22.0))
+        part = cut(part, cylinder(cx, 40.0, -1.0, 6.0, 22.0, seam=seam))
         part = fillet_edges(part, 3.0, _rim(cx, 40.0, 20.0, 6.0))
         part = fillet_edges(part, 3.0, _rim(cx, 40.0, 0.0, 6.0))
 
-    part = cut(part, cylinder(55.0, 52.0, 10.0, 8.0, 11.0))
+    part = cut(part, cylinder(55.0, 52.0, 10.0, 8.0, 11.0, seam=seam))
     part = fillet_edges(part, 3.0, _rim(55.0, 52.0, 20.0, 8.0))
 
-    part = cut(part, cylinder(55.0, 26.0, 12.0, 5.0, 9.0))
+    part = cut(part, cylinder(55.0, 26.0, 12.0, 5.0, 9.0, seam=seam))
     part = fillet_edges(part, 2.0, _rim(55.0, 26.0, 12.0, 5.0))
 
     for cx, cy in ((12.0, 12.0), (98.0, 12.0), (12.0, 68.0), (98.0, 68.0)):
-        part = cut(part, cylinder(cx, cy, -1.0, 3.3, 22.0))
-        part = cut(part, cone(cx, cy, 20.0, 3.8, 3.3, 0.5, (0, 0, -1)))
+        part = cut(part, cylinder(cx, cy, -1.0, 3.3, 22.0, seam=seam))
+        part = cut(part, cone(cx, cy, 20.0, 3.8, 3.3, 0.5, (0, 0, -1), seam=seam))
     return part
 
 

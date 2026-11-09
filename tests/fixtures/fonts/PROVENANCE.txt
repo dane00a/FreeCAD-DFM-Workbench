@@ -1,0 +1,56 @@
+Copied unmodified from the reference engine (apps/geometry-service/tests/fixtures/fonts/
+at brooklineind-website fa18e7fa) for the ported text_* fixture recipes in
+tests/fixtures/builders/. The account below is the reference's, verbatim.
+
+Bundled test fonts — apps/geometry-service/tests/fixtures/fonts/
+================================================================
+
+These font files exist for ONE reason: the real-font marking fixtures
+(`text_*` in tests/fixtures/fixture_generator.cpp) initialise
+Font_BRepFont from a FILE PATH in this directory, never from a family
+name. A fixture whose geometry depends on which fonts happen to be
+installed on the host is not reproducible between this machine, CI and
+the Fly.io image, and a non-reproducible fixture is worse than no
+fixture. Nothing outside the fixture generator reads these files; they
+are not shipped to a client and not served by the web app.
+
+--------------------------------------------------------------------
+Liberation fonts 2.1.5
+    LiberationSans-Regular.ttf
+    LiberationSans-Bold.ttf
+    LiberationSerif-Regular.ttf
+    LiberationMono-Regular.ttf
+
+  Source:  https://github.com/liberationfonts/liberation-fonts
+           release liberation-fonts-ttf-2.1.5.tar.gz
+  Licence: SIL Open Font License, Version 1.1
+           -> LICENSE-Liberation-OFL-1.1.txt (verbatim from the release)
+           -> AUTHORS-Liberation.txt (verbatim from the release)
+  Copyright: Digitized data (c) 2010 Google Corporation with Reserved
+             Font Names Arimo, Tinos and Cousine;
+             (c) 2012 Red Hat, Inc. with Reserved Font Name Liberation.
+
+  OFL 1.1 permits redistribution, bundled or sold with other software,
+  in a closed-source product, provided the licence travels with the
+  font files and the Reserved Font Names are not used for modified
+  versions. These files are unmodified, so both conditions hold.
+
+--------------------------------------------------------------------
+DejaVu Sans (from the DejaVu 2.37 set redistributed by matplotlib)
+    DejaVuSans.ttf
+
+  Licence: Bitstream Vera Fonts Copyright / DejaVu changes public domain
+           -> LICENSE-DejaVu-BitstreamVera.txt (verbatim)
+  Copyright: (c) 2003 Bitstream, Inc.; DejaVu changes are public domain;
+             glyphs imported from Arev are (c) Tavmjong Bah.
+
+  The Bitstream Vera licence grants redistribution and sale as part of
+  a larger software package, with the copyright and permission notice
+  included, and forbids selling the font by itself. Both hold here.
+  NOTE: this is NOT the SIL OFL. It is a separate permissive licence
+  and is kept in its own file for that reason.
+
+--------------------------------------------------------------------
+Adding a font here: keep the .ttf UNMODIFIED, copy its licence file
+verbatim next to it, and add a block above naming the version, the
+source and the licence. Do not point Font_BRepFont at a family name.

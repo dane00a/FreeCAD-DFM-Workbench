@@ -70,7 +70,7 @@ _ABSOLUTE_TOLERANCE = 1e-3
 #: Fixtures whose edge count differs from the recording for a reason that is
 #: understood and is not a fault in the recipe.
 #:
-#: All five are lofted-hood louvers whose crest runs out flush into the deck.
+#: All seven are lofted-hood louvers whose crest runs out flush into a panel.
 #: That run-out is a near-tangential boolean, and it leaves slivers -- the
 #: measured extras here are between 3e-5 and 8e-4 mm long, sitting exactly at
 #: the run-outs. How many of those a kernel merges away is a version
@@ -88,6 +88,10 @@ _KNOWN_EDGE_DIFFERENCES = {
     "sm_louver_standard_sym",
     "sm_louver_bank_curved",
     "sm_hd_bracket",
+    # Hood run-outs on the lofted wall louvers (two each) and the deck louver:
+    # sliver edges of 1e-4 mm or less, faces, volume and area all exact.
+    "sm_e_chassis",
+    "sm_louver_bank",
 }
 
 

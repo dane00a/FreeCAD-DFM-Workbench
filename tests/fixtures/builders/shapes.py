@@ -63,6 +63,36 @@ def box_between(p0: Sequence[float], p1: Sequence[float]) -> TopoDS_Shape:
     return BRepPrimAPI_MakeBox(gp_Pnt(*p0), gp_Pnt(*p1)).Shape()
 
 
+# -- seams --------------------------------------------------------------------
+#
+# A closed surface -- cylinder, cone, sphere, torus, solid of revolution -- has
+# to be cut somewhere to bound a face, and where the cut lands is decided by
+# the X-direction of its gp_Ax2: an artefact of how the solid was authored,
+# not anything about the part. The reference corpus ships a ``__seam<deg>``
+# variant of 27 fixtures, the same solid with that cut rotated, to prove that
+# no recognized feature or finding depends on where it fell.
+#
+# ``seam_deg == 0`` is always the original two-argument constructor, verbatim,
+# so a control fixture is the very shape its baseline was approved against.
+
+
+def seam_ax2(origin: gp_Pnt, axis: gp_Dir, seam_deg: float = 0.0) -> gp_Ax2:
+    """An axis frame whose parametric seam is rotated ``seam_deg`` degrees.
+
+    The rotation is applied to OpenCascade's own choice of X-direction rather
+    than to a fixed (1, 0, 0), so it is right on an axis that is not +Z too.
+    The direction is turned about an axis through the global origin, because a
+    direction carries no position; the frame's origin is untouched, so the
+    axis line is identical to the control's and only the parametrisation
+    moves. A port of the reference's ``seam_ax2``.
+    """
+    if seam_deg == 0.0:
+        return gp_Ax2(origin, axis)
+    xdir = gp_Ax2(origin, axis).XDirection()
+    xdir.Rotate(gp_Ax1(gp_Pnt(0.0, 0.0, 0.0), axis), math.radians(seam_deg))
+    return gp_Ax2(origin, axis, xdir)
+
+
 def cylinder(
     x: float,
     y: float,
@@ -70,8 +100,9 @@ def cylinder(
     radius: float,
     height: float,
     direction: Sequence[float] = (0, 0, 1),
+    seam: float = 0.0,
 ) -> TopoDS_Shape:
-    axis = gp_Ax2(gp_Pnt(x, y, z), gp_Dir(*direction))
+    axis = seam_ax2(gp_Pnt(x, y, z), gp_Dir(*direction), seam)
     return BRepPrimAPI_MakeCylinder(axis, radius, height).Shape()
 
 
@@ -83,13 +114,25 @@ def cone(
     upper_radius: float,
     height: float,
     direction: Sequence[float] = (0, 0, 1),
+    seam: float = 0.0,
 ) -> TopoDS_Shape:
-    axis = gp_Ax2(gp_Pnt(x, y, z), gp_Dir(*direction))
+    axis = seam_ax2(gp_Pnt(x, y, z), gp_Dir(*direction), seam)
     return BRepPrimAPI_MakeCone(axis, lower_radius, upper_radius, height).Shape()
 
 
-def sphere(x: float, y: float, z: float, radius: float) -> TopoDS_Shape:
-    return BRepPrimAPI_MakeSphere(gp_Pnt(x, y, z), radius).Shape()
+def sphere(x: float, y: float, z: float, radius: float, seam: float = 0.0) -> TopoDS_Shape:
+    """A sphere, its seam meridian rotated about +Z by ``seam`` degrees.
+
+    A non-zero angle gets an extra half turn, as the reference's
+    ``seam_sphere`` does. That is a workaround for OpenCascade 8's STEP reader,
+    which builds a pole-to-pole side-opening face inside out; it does not
+    change the solid, only which meridian carries the seam, and keeping it
+    means a variant here has its seam where the reference's has.
+    """
+    if seam == 0.0:
+        return BRepPrimAPI_MakeSphere(gp_Pnt(x, y, z), radius).Shape()
+    axis = seam_ax2(gp_Pnt(x, y, z), gp_Dir(0, 0, 1), seam + 180.0)
+    return BRepPrimAPI_MakeSphere(axis, radius).Shape()
 
 
 def torus(
@@ -99,8 +142,9 @@ def torus(
     major: float,
     minor: float,
     direction: Sequence[float] = (0, 0, 1),
+    seam: float = 0.0,
 ) -> TopoDS_Shape:
-    axis = gp_Ax2(gp_Pnt(x, y, z), gp_Dir(*direction))
+    axis = seam_ax2(gp_Pnt(x, y, z), gp_Dir(*direction), seam)
     return BRepPrimAPI_MakeTorus(axis, major, minor).Shape()
 
 
@@ -254,6 +298,7 @@ def revolved_profile(
     points: Iterable[Sequence[float]],
     origin: Sequence[float] = (0, 0, 0),
     direction: Sequence[float] = (0, 0, 1),
+    seam: float = 0.0,
 ) -> TopoDS_Shape:
     """A solid of revolution from a closed profile in the XZ plane.
 
@@ -265,7 +310,24 @@ def revolved_profile(
     polygon.Close()
     face = BRepBuilderAPI_MakeFace(polygon.Wire()).Face()
     axis = gp_Ax1(gp_Pnt(*origin), gp_Dir(*direction))
-    return BRepPrimAPI_MakeRevol(face, axis).Shape()
+    return revolve(face, axis, seam)
+
+
+def revolve(profile: TopoDS_Shape, axis: gp_Ax1, seam: float = 0.0) -> TopoDS_Shape:
+    """A full revolution of ``profile``, its seam turned ``seam`` degrees.
+
+    A revolution's axis carries no X-direction: its seam is wherever the
+    profile itself sits, since the sweep starts and ends on it. So the seam
+    moves by spinning the profile about the axis first, which sweeps out the
+    same point set. ``seam == 0`` revolves the profile untouched, as the
+    reference does.
+    """
+    if seam == 0.0:
+        return BRepPrimAPI_MakeRevol(profile, axis).Shape()
+    spin = gp_Trsf()
+    spin.SetRotation(axis, math.radians(seam))
+    turned = BRepBuilderAPI_Transform(profile, spin, True).Shape()
+    return BRepPrimAPI_MakeRevol(turned, axis).Shape()
 
 
 # -- edge treatments ----------------------------------------------------------

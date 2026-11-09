@@ -38,7 +38,6 @@ from OCP.BRepBuilderAPI import (
 from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections
 from OCP.BRepPrimAPI import (
     BRepPrimAPI_MakePrism,
-    BRepPrimAPI_MakeRevol,
     BRepPrimAPI_MakeTorus,
 )
 from OCP.Convert import Convert_ParameterisationType
@@ -61,6 +60,7 @@ from .shapes import (
     fuse,
     moved,
     polygon_prism,
+    revolve,
     revolved_profile,
     rotated,
     rounded_rect_prism,
@@ -215,16 +215,15 @@ def _prism_wire(wire, dx: float, dy: float, dz: float) -> TopoDS_Shape:
     return BRepPrimAPI_MakePrism(face, gp_Vec(dx, dy, dz)).Shape()
 
 
-def _revolve_wire(edges) -> TopoDS_Shape:
+def _revolve_wire(edges, seam: float = 0.0) -> TopoDS_Shape:
     """A solid of revolution about Z from a closed chain of XZ edges.
 
     `shapes.revolved_profile` takes a polygon; these profiles carry spline
-    and arc edges, so they are assembled edge by edge instead.
+    and arc edges, so they are assembled edge by edge instead. ``seam``
+    turns the seam as `shapes.revolve` does; 0 revolves the profile as is.
     """
     face = BRepBuilderAPI_MakeFace(_wire_of(edges)).Face()
-    return BRepPrimAPI_MakeRevol(
-        face, gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
-    ).Shape()
+    return revolve(face, gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), seam)
 
 
 # -- sheet-metal helpers ------------------------------------------------------
@@ -515,7 +514,7 @@ def build_wr90_waveguide_flange() -> TopoDS_Shape:
 
 
 @fixture("turned_valley_tight_radius")
-def build_turned_valley_tight_radius() -> TopoDS_Shape:
+def build_turned_valley_tight_radius(seam_deg: float = 0.0) -> TopoDS_Shape:
     """A turned profile with a 0.2 mm concave valley.
 
     Below the nose radius of any turning insert that would be run on this
@@ -543,7 +542,8 @@ def build_turned_valley_tight_radius() -> TopoDS_Shape:
             upper,
             _line_edge((9.0, 44.0), (0, 44.0)),
             _line_edge((0, 44.0), (0, 0)),
-        ]
+        ],
+        seam=seam_deg,
     )
 
 
@@ -741,7 +741,7 @@ def build_worm_gearbox_housing() -> TopoDS_Shape:
     ):
         block = cut(block, _drilled_blind(x, y, 90.1, (0, 0, -1), 2.5, 12.1))
 
-    block = cut(block, cylinder(25.0, -0.1, 75.0, 7.0, 22.0, (0, 1, 0)))
+    block = cut(block, cylinder(29.0, -0.1, 75.0, 7.0, 22.0, (0, 1, 0)))
     block = cut(block, cylinder(95.0, -0.1, 55.0, 4.25, 22.0, (0, 1, 0)))
     block = cut(block, cylinder(30.0, 28.0, -1.0, 4.25, 47.0))
 
@@ -1052,7 +1052,7 @@ def build_torture_freeform_leviathan() -> TopoDS_Shape:
 
 
 @fixture("sm_punch_grid")
-def build_sm_punch_grid() -> TopoDS_Shape:
+def build_sm_punch_grid(seam_deg: float = 0.0) -> TopoDS_Shape:
     """Punched holes with a tight pitch, a close edge, and one below gauge.
 
     The layout keeps every hole that is not a bait at least 6 mm of web from
@@ -1062,7 +1062,7 @@ def build_sm_punch_grid() -> TopoDS_Shape:
     part = _bracket_profile(40.0, 30.0, 30.0)
 
     def punch(x, y, radius):
-        return cylinder(x, y, -1, radius, 4.0)
+        return cylinder(x, y, -1, radius, 4.0, seam=seam_deg)
 
     part = cut(part, punch(16.0, 8.0, 2.0))
     part = cut(part, punch(16.0, 15.0, 2.0))
@@ -1102,16 +1102,6 @@ def build_sm_tab_notch_comb() -> TopoDS_Shape:
     ):
         part = cut(part, box_between((x0, y0, -1.0), (x1, y1, 3.0)))
     return part
-
-
-@fixture("sm_tall_lance")
-def build_sm_tall_lance() -> TopoDS_Shape:
-    """A bridge lance formed 9 mm proud -- four and a half times the gauge."""
-    part = _bracket_profile(40.0, 30.0, 40.0)
-    part = fuse(part, box_between((16.0, 14.0, 2.0), (36.0, 26.0, 11.0)))
-    part = cut(part, box_between((18.0, 16.0, -1.0), (34.0, 24.0, 9.0)))
-    part = cut(part, box_between((15.0, 14.0, -1.0), (37.0, 16.0, 9.0)))
-    return cut(part, box_between((15.0, 24.0, -1.0), (37.0, 26.0, 9.0)))
 
 
 @fixture("sm_sharp_fold_shell")

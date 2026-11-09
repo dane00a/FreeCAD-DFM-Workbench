@@ -308,15 +308,15 @@ def build_chamfer_edges() -> TopoDS_Shape:
 
 
 @fixture("blind_hole_drill_point")
-def build_blind_hole_drill_point() -> TopoDS_Shape:
+def build_blind_hole_drill_point(seam_deg: float = 0.0) -> TopoDS_Shape:
     """A blind bore ending the way a drill would end it.
 
     Diameter is 9 rather than 8 on purpose. 8 is the tap drill for
     3/8-16 UNC, and the hole would come back tagged as a thread, which
     muddies the one thing this part is here to say.
     """
-    bore = cylinder(25.0, 25.0, 10.0, 4.5, 16.0)
-    tip = cone(25.0, 25.0, 7.3, 0.0, 4.5, 2.7)
+    bore = cylinder(25.0, 25.0, 10.0, 4.5, 16.0, seam=seam_deg)
+    tip = cone(25.0, 25.0, 7.3, 0.0, 4.5, 2.7, seam=seam_deg)
     return cut(box(0, 0, 0, 50.0, 50.0, 25.0), fuse(bore, tip))
 
 
@@ -526,7 +526,7 @@ def build_four_sided_milled_block() -> TopoDS_Shape:
 
 
 @fixture("four_axis_hex_block")
-def build_four_axis_hex_block() -> TopoDS_Shape:
+def build_four_axis_hex_block(seam_deg: float = 0.0) -> TopoDS_Shape:
     """A hex prism drilled normal to each of its six flats.
 
     One rotary axis about Z can bring any flat vertical, so this is the
@@ -558,7 +558,9 @@ def build_four_axis_hex_block() -> TopoDS_Shape:
         entry_x = (face_distance + 1.0) * outward_x
         entry_y = (face_distance + 1.0) * outward_y
         entry_z = height / 2.0
-        bore = cylinder(entry_x, entry_y, entry_z, radius, bore_length, inward)
+        bore = cylinder(
+            entry_x, entry_y, entry_z, radius, bore_length, inward, seam=seam_deg
+        )
         tip = cone(
             entry_x + bore_length * inward[0],
             entry_y + bore_length * inward[1],
@@ -567,6 +569,7 @@ def build_four_axis_hex_block() -> TopoDS_Shape:
             0.0,
             cone_height,
             inward,
+            seam=seam_deg,
         )
         prism = cut(prism, fuse(bore, tip))
     return prism
@@ -606,37 +609,6 @@ def build_five_axis_compound_angles() -> TopoDS_Shape:
         )
         block = cut(block, drill)
     return block
-
-
-@fixture("five_axis_candidate")
-def build_five_axis_candidate() -> TopoDS_Shape:
-    """One tilted hole plus three cardinal features -- the near miss.
-
-    The name is the one the part shipped under, and it overstates the case:
-    a single tilted feature alongside cardinal ones indexes fine on three
-    axes plus a rotary. It sits next to `five_axis_compound_angles` so the
-    setup rule has to tell a 3+1 job from one that really needs five.
-    """
-    block = box(0, 0, 0, 60.0, 60.0, 40.0)
-    tilted = rotated(
-        cylinder(15.0, 30.0, -10.0, 5.0, 60.0), (15.0, 30.0, 20.0), (0, 1, 0), 30.0
-    )
-    block = cut(block, tilted)
-    block = cut(block, cylinder(-1.0, 45.0, 30.0, 4.0, 20.0, (1, 0, 0)))
-    block = cut(block, cylinder(45.0, 61.0, 30.0, 4.0, 20.0, (0, -1, 0)))
-    return cut(block, box(35.0, 5.0, 32.0, 20.0, 20.0, 10.0))
-
-
-@fixture("datum_blocks_access")
-def build_datum_blocks_access() -> TopoDS_Shape:
-    """One blind hole in the largest planar face of a plain plate.
-
-    The part behind a retired rule: the biggest flat face is the obvious
-    datum, and this one has a feature in it. The rule went because a
-    two-setup flip is ordinary CNC rather than a manufacturing problem, but
-    the part stays in the corpus as a silence check.
-    """
-    return cut(box(0, 0, 0, 80.0, 60.0, 20.0), cylinder(40.0, 30.0, -1.0, 3.0, 11.0))
 
 
 # -- brackets, plates and fixtures --------------------------------------------
@@ -714,16 +686,21 @@ def build_bracket_with_thread_array() -> TopoDS_Shape:
 
 
 @fixture("gearbox_flange")
-def build_gearbox_flange() -> TopoDS_Shape:
+def build_gearbox_flange(seam_deg: float = 0.0) -> TopoDS_Shape:
     """A turned flange: input-shaft seat, six bolt holes on a PCD, chamfered rim."""
-    flange = cylinder(0.0, 0.0, 0.0, 50.0, 15.0)
-    flange = cut(flange, cylinder(0.0, 0.0, 5.0, 25.0, 11.0))
+    flange = cylinder(0.0, 0.0, 0.0, 50.0, 15.0, seam=seam_deg)
+    flange = cut(flange, cylinder(0.0, 0.0, 5.0, 25.0, 11.0, seam=seam_deg))
     for index in range(6):
         angle = index * math.pi / 3.0
         flange = cut(
             flange,
             cylinder(
-                40.0 * math.cos(angle), 40.0 * math.sin(angle), -1.0, 3.5, 17.0
+                40.0 * math.cos(angle),
+                40.0 * math.sin(angle),
+                -1.0,
+                3.5,
+                17.0,
+                seam=seam_deg,
             ),
         )
 
@@ -1094,29 +1071,33 @@ def build_freeform_transition_bracket() -> TopoDS_Shape:
 
 
 @fixture("aerospace_tensioner_pulley")
-def build_aerospace_tensioner_pulley() -> TopoDS_Shape:
+def build_aerospace_tensioner_pulley(seam_deg: float = 0.0) -> TopoDS_Shape:
     """A belt pulley: flanges either side of a recessed belt face, bearing bore, ring groove.
 
     Every recess and groove is cut as the difference of two cylinders, so
     they come out as real annular channels rather than as steps. The
     retainer groove inside the bearing bore is the awkward one -- it is a
     concave feature inside a bore, which is the case the groove orientation
-    gate exists to get right.
+    gate exists to get right. It is sized to DIN 472 for a 47 mm bore: 49.5
+    groove diameter, 1.9 wide.
     """
-    body = cylinder(0.0, 0.0, 0.0, 49.5, 38.0)
+    seam = seam_deg
+    body = cylinder(0.0, 0.0, 0.0, 49.5, 38.0, seam=seam)
 
     belt_face = cut(
-        cylinder(0.0, 0.0, 6.5, 49.7, 25.0), cylinder(0.0, 0.0, 6.4, 47.5, 25.2)
+        cylinder(0.0, 0.0, 6.5, 49.7, 25.0, seam=seam),
+        cylinder(0.0, 0.0, 6.4, 47.5, 25.2, seam=seam),
     )
     body = cut(body, belt_face)
 
-    body = cut(body, cylinder(0.0, 0.0, 34.0, 39.0, 4.1))
-    body = cut(body, cylinder(0.0, 0.0, -0.1, 23.5, 18.2))
-    body = cut(body, cylinder(0.0, 0.0, 18.0, 25.0, 10.0))
-    body = cut(body, cylinder(0.0, 0.0, 28.0, 6.5, 10.1))
+    body = cut(body, cylinder(0.0, 0.0, 34.0, 39.0, 4.1, seam=seam))
+    body = cut(body, cylinder(0.0, 0.0, -0.1, 23.5, 18.2, seam=seam))
+    body = cut(body, cylinder(0.0, 0.0, 18.0, 25.0, 10.0, seam=seam))
+    body = cut(body, cylinder(0.0, 0.0, 28.0, 6.5, 10.1, seam=seam))
 
     groove = cut(
-        cylinder(0.0, 0.0, 13.725, 25.0, 1.55), cylinder(0.0, 0.0, 13.625, 23.5, 1.75)
+        cylinder(0.0, 0.0, 13.725, 24.75, 1.9, seam=seam),
+        cylinder(0.0, 0.0, 13.625, 23.5, 2.1, seam=seam),
     )
     return cut(body, groove)
 
@@ -1156,7 +1137,7 @@ def build_cf_knife_edge_flange() -> TopoDS_Shape:
 
 
 @fixture("euro_lock_cylinder")
-def build_euro_lock_cylinder() -> TopoDS_Shape:
+def build_euro_lock_cylinder(seam_deg: float = 0.0) -> TopoDS_Shape:
     """A euro-profile lock body, where several of the "faults" are the design.
 
     The pin chambers break into the plug bore on purpose -- the pin stack
@@ -1165,15 +1146,16 @@ def build_euro_lock_cylinder() -> TopoDS_Shape:
     are 3.0 rather than 3.1 so the nonstandard-diameter rule does not fire
     five times over something incidental.
     """
-    body = cylinder(0.0, 0.0, 24.5, 8.5, 70.0, (1, 0, 0))
+    seam = seam_deg
+    body = cylinder(0.0, 0.0, 24.5, 8.5, 70.0, (1, 0, 0), seam=seam)
     stem = box(0.0, -5.0, 0.0, 70.0, 10.0, 20.0)
     part = fuse(body, stem)
 
     # The plug bores run all the way to the cam cavity, as they do on a
     # real cylinder: the plug tail engages the cam. Stopping them short
     # left the last chamber half-drilled into solid brass.
-    part = cut(part, cylinder(-0.1, 0.0, 24.5, 6.5, 30.2, (1, 0, 0)))
-    part = cut(part, cylinder(70.1, 0.0, 24.5, 6.5, 30.2, (-1, 0, 0)))
+    part = cut(part, cylinder(-0.1, 0.0, 24.5, 6.5, 30.2, (1, 0, 0), seam=seam))
+    part = cut(part, cylinder(70.1, 0.0, 24.5, 6.5, 30.2, (-1, 0, 0), seam=seam))
 
     part = cut(part, box(30.0, -8.6, 8.0, 10.0, 17.2, 26.0))
 
@@ -1183,12 +1165,12 @@ def build_euro_lock_cylinder() -> TopoDS_Shape:
     for index in range(5):
         x = 6.0 + index * 5.5
         chamber = fuse(
-            cylinder(x, 0.0, -0.1, radius, depth),
-            cone(x, 0.0, -0.1 + depth, radius, 0.0, cone_height),
+            cylinder(x, 0.0, -0.1, radius, depth, seam=seam),
+            cone(x, 0.0, -0.1 + depth, radius, 0.0, cone_height, seam=seam),
         )
         part = cut(part, chamber)
 
-    return cut(part, cylinder(35.0, 0.0, -0.1, 2.1, 8.2))
+    return cut(part, cylinder(35.0, 0.0, -0.1, 2.1, 8.2, seam=seam))
 
 
 @fixture("door_closer_body")
@@ -1297,7 +1279,7 @@ def build_aerospace_hydraulic_servo_valve_body() -> TopoDS_Shape:
 
     for centre in (2.5, 117.5):
         ring = cut(
-            cylinder(centre - 0.45, 40.0, 30.0, 4.4, 0.9, (1, 0, 0)),
+            cylinder(centre - 0.45, 40.0, 30.0, 4.2, 0.9, (1, 0, 0)),
             cylinder(centre - 0.55, 40.0, 30.0, 4.0, 1.1, (1, 0, 0)),
         )
         part = cut(part, ring)

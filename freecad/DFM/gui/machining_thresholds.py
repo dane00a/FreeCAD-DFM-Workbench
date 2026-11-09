@@ -723,15 +723,15 @@ class MachiningThresholds:
     # -- persistence --------------------------------------------------------
 
     def loadSettings(self) -> None:
-        import FreeCAD as App  # type: ignore
+        from ..app.prefs import dfm_params  # FreeCAD, so not at module scope
 
-        params = App.ParamGet("User parameter:BaseApp/Preferences/Mod/DFM")
+        params = dfm_params()
         for panel in self.panels:
             panel.load(params)
 
     def saveSettings(self) -> None:
-        import FreeCAD as App  # type: ignore
+        from ..app.prefs import dfm_params
 
-        params = App.ParamGet("User parameter:BaseApp/Preferences/Mod/DFM")
+        params = dfm_params()
         for panel in self.panels:
             panel.save(params)

@@ -27,9 +27,10 @@ from PySide6 import QtGui, QtWidgets
 
 import FreeCAD as App  # type: ignore
 
+from ..app.prefs import dfm_params
+
 from ..core.machining.config import BLANK_FORMS, MACHINE_MODES, UNIT_SYSTEMS
 
-_PARAM_PATH = "User parameter:BaseApp/Preferences/Mod/DFM"
 
 
 # Each entry is the stored value, the label a machinist would recognize, and
@@ -213,7 +214,7 @@ class MachiningPreferences:
     # -- persistence --------------------------------------------------------
 
     def loadSettings(self) -> None:
-        params = App.ParamGet(_PARAM_PATH)
+        params = dfm_params()
         self._select(self.machine_mode, params.GetString("MachiningMachineMode", "3axis"))
         self._select(self.unit_system, params.GetString("MachiningUnitSystem", "both"))
         self._select(self.blank_form, params.GetString("MachiningBlankForm", ""))
@@ -224,7 +225,7 @@ class MachiningPreferences:
         self._refresh_tooltips()
 
     def saveSettings(self) -> None:
-        params = App.ParamGet(_PARAM_PATH)
+        params = dfm_params()
         params.SetString("MachiningMachineMode", self._value(self.machine_mode, MACHINE_MODES))
         params.SetString("MachiningUnitSystem", self._value(self.unit_system, UNIT_SYSTEMS))
         params.SetString("MachiningBlankForm", self._value(self.blank_form, BLANK_FORMS))

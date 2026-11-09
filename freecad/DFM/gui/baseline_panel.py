@@ -48,12 +48,14 @@ from ..core.baselines.harness import (
 )
 from ..core.baselines.spec import BaselineSpec, check_drift, spec_from_observation
 from ..core.baselines.store import BaselineStore
+from ..core.models import Severity
 from ..core.utils.conversion import ocp_to_freecad
 from ..gui import DFM_rc  # noqa: F401
 from ..gui.preferences import fixture_baselines_enabled
 from ..gui.results.bridge import DFMViewProvider
 from ..gui.results.models import DFMReportModel
 from ..gui.results.presenter import TaskResultsPresenter
+from ..gui.results.visuals import severity_color
 from ..gui.task_results import TaskResults
 
 
@@ -66,9 +68,9 @@ _COLUMNS = ("Fixture", "Status", "Process", "Error", "Warn", "Features", "Change
 
 # Status colours, matched to the severity palette the results tree already
 # uses, so red means the same thing in both places.
-_OK_COLOUR = QtGui.QColor("#639922")
-_DRIFT_COLOUR = QtGui.QColor("#E24B4A")
-_UNAPPROVED_COLOUR = QtGui.QColor("#D4900A")
+_OK_COLOUR = QtGui.QColor(severity_color(Severity.SUCCESS))
+_DRIFT_COLOUR = QtGui.QColor(severity_color(Severity.ERROR))
+_UNAPPROVED_COLOUR = QtGui.QColor(severity_color(Severity.WARNING))
 
 
 def _why_it_cannot_run(name: str) -> str:

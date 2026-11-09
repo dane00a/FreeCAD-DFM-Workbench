@@ -39,6 +39,8 @@ from PySide6 import QtGui, QtWidgets
 
 import FreeCAD as App  # type: ignore
 
+from ..app.prefs import dfm_params
+
 from ..core.machining.cam_tools import (
     describe as describe_cam,
     lathe_tooling,
@@ -65,7 +67,6 @@ from ..core.machining.config import (
     encode_tool_library,
 )
 
-_PARAM_PATH = "User parameter:BaseApp/Preferences/Mod/DFM"
 
 # Column order matches the stored line, so a row and its text read the same
 # way round.
@@ -466,7 +467,7 @@ class MachiningTooling:
     # -- persistence --------------------------------------------------------
 
     def loadSettings(self) -> None:
-        params = App.ParamGet(_PARAM_PATH)
+        params = dfm_params()
 
         stored = params.GetString(TOOL_LIBRARY_PREF_KEY, "")
         self._custom = decode_tool_library(stored)
@@ -491,7 +492,7 @@ class MachiningTooling:
         )
 
     def saveSettings(self) -> None:
-        params = App.ParamGet(_PARAM_PATH)
+        params = dfm_params()
         params.SetString(TOOL_SOURCE_PREF_KEY, self._source_value())
         params.SetString(TOOL_LIBRARY_PREF_KEY, self._library_to_store())
         params.SetString(

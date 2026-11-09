@@ -5,12 +5,13 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional, TypeVar
 
-from PySide6 import QtGui, QtWidgets, QtCore
+from PySide6 import QtCore, QtGui, QtWidgets
 
-import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
 
-from ..gui.widgets import ToleranceSpinBox
+from ..app.prefs import dfm_params
+from ..app.contour.colormap import COLORMAPS
+from .utils.widgets import ToleranceSpinBox
 
 _PREF_PATH = "Mod/DFM"
 
@@ -70,6 +71,51 @@ class ToleranceField:
 class FieldGroup:
     title: str
     fields: list = field(default_factory=list)
+
+
+@dataclass
+class ComboField:
+    key: str
+    label: str
+    options: list[str] = field(default_factory=list)
+    default: str = ""
+    tooltip: str = ""
+
+
+@dataclass
+class StringField:
+    key: str
+    label: str
+    default: str = ""
+    tooltip: str = ""
+
+
+@dataclass
+class ColorField:
+    key: str
+    label: str
+    default: tuple = (1.0, 1.0, 1.0)  # (r, g, b) floats 0.0-1.0
+    tooltip: str = ""
+
+
+# ---- Color helpers ----------------------------------------------------------
+
+
+def _rgb_to_uint(r: float, g: float, b: float) -> int:
+    """Pack (0.0-1.0) RGB into FreeCAD's 32-bit unsigned integer (0xRRGGBBAA)."""
+    ri = max(0, min(255, int(round(r * 255))))
+    gi = max(0, min(255, int(round(g * 255))))
+    bi = max(0, min(255, int(round(b * 255))))
+    return (ri << 24) | (gi << 16) | (bi << 8) | 0xFF
+
+
+def _uint_to_rgb(val: int) -> tuple[float, float, float]:
+    """Unpack FreeCAD's 32-bit unsigned integer to (0.0-1.0) RGB tuple."""
+    return (
+        ((val >> 24) & 0xFF) / 255.0,
+        ((val >> 16) & 0xFF) / 255.0,
+        ((val >> 8) & 0xFF) / 255.0,
+    )
 
 
 class AnalyzerPanel(QtWidgets.QWidget):
@@ -165,6 +211,35 @@ class AnalyzerPanel(QtWidgets.QWidget):
                 w.setToolTip(f.tooltip)
             return w
 
+        if isinstance(f, ComboField):
+            w = _pref(QtWidgets.QComboBox(), f.key)
+            w.addItems(f.options)
+            w.setSizePolicy(
+                QtWidgets.QSizePolicy.Policy.Expanding,
+                QtWidgets.QSizePolicy.Policy.Fixed,
+            )
+            if f.tooltip:
+                w.setToolTip(f.tooltip)
+            return w
+
+        if isinstance(f, StringField):
+            w = _pref(QtWidgets.QLineEdit(), f.key)
+            w.setPlaceholderText(str(f.default))
+            if f.tooltip:
+                w.setToolTip(f.tooltip)
+            return w
+
+        if isinstance(f, ColorField):
+            loader = Gui.UiLoader()
+            w = loader.createWidget("Gui::PrefColorButton")
+            w.setProperty("prefPath", _PREF_PATH)
+            w.setProperty("prefEntry", f.key)
+            w.setProperty("color", QtGui.QColor.fromRgbF(*f.default))
+            w.setProperty("_dfm_is_color", True)
+            if f.tooltip:
+                w.setToolTip(f.tooltip)
+            return w
+
         raise TypeError(f"Unknown field type: {type(f)}")
 
     def load(self, params):
@@ -176,8 +251,16 @@ class AnalyzerPanel(QtWidgets.QWidget):
                 widget.setValue(params.GetFloat(key, default))
             elif isinstance(widget, ToleranceSpinBox):
                 widget.setValue(params.GetFloat(key, default))
+            elif widget.property("_dfm_is_color"):
+                uint_default = _rgb_to_uint(*default)
+                r, g, b = _uint_to_rgb(params.GetUnsigned(key, uint_default))
+                widget.setProperty("color", QtGui.QColor.fromRgbF(r, g, b))
+            elif isinstance(widget, QtWidgets.QComboBox):
+                widget.setCurrentText(params.GetString(key, default))
             elif isinstance(widget, QtWidgets.QSpinBox):
                 widget.setValue(params.GetInt(key, default))
+            elif isinstance(widget, QtWidgets.QLineEdit):
+                widget.setText(params.GetString(key, default))
 
     def save(self, params):
         for key, widget in self._widgets.items():
@@ -187,8 +270,16 @@ class AnalyzerPanel(QtWidgets.QWidget):
                 params.SetFloat(key, widget.value())
             elif isinstance(widget, ToleranceSpinBox):
                 params.SetFloat(key, widget.value())
+            elif widget.property("_dfm_is_color"):
+                c = widget.property("color")
+                if isinstance(c, QtGui.QColor):
+                    params.SetUnsigned(key, _rgb_to_uint(c.redF(), c.greenF(), c.blueF()))
+            elif isinstance(widget, QtWidgets.QComboBox):
+                params.SetString(key, widget.currentText())
             elif isinstance(widget, QtWidgets.QSpinBox):
                 params.SetInt(key, widget.value())
+            elif isinstance(widget, QtWidgets.QLineEdit):
+                params.SetString(key, widget.text().strip())
 
 
 # =============================================================================
@@ -247,6 +338,12 @@ class SphereThicknessPanel(AnalyzerPanel):
                     "SphereIntersectorTol",
                     "Ray intersector tolerance",
                     tooltip="Sets the load tolerance of the shape intersector.",
+                ),
+                ToleranceField(
+                    "SphereDeflection",
+                    "Extrema deflection",
+                    default=1e-3,
+                    tooltip="Sets the deflection tolerance for the BRepExtrema distance tool.",
                 ),
             ],
         ),
@@ -310,15 +407,6 @@ class RayThicknessPanel(AnalyzerPanel):
                     suffix="°",
                     tooltip="Controls how strict the face must be roughly perpendicular to the ray for it to be considered a valid thickness.",
                 ),
-                IntField(
-                    "RaySeedCoverageThreshold",
-                    "Seed coverage threshold",
-                    default=50,
-                    min=0,
-                    max=100,
-                    suffix="%",
-                    tooltip="Controls the percentage of seeds required before the analyzer skips a face.",
-                ),
             ],
         ),
     ]
@@ -340,6 +428,17 @@ class BridgeSpanPanel(AnalyzerPanel):
             "Detection Settings",
             [
                 FloatField(
+                    "BridgeHorizontalTolerance",
+                    "Horizontal tolerance",
+                    default=1.0,
+                    max=10.0,
+                    step=0.1,
+                    decimals=2,
+                    suffix="°",
+                    tooltip="Maximum angle from horizontal (degrees) for a face to be "
+                    "considered a bridge candidate.",
+                ),
+                FloatField(
                     "BridgeBedTolerance",
                     "Bed contact tolerance",
                     default=0.5,
@@ -348,6 +447,16 @@ class BridgeSpanPanel(AnalyzerPanel):
                     suffix=" mm",
                     tooltip="How close to the lowest point of the model a face must sit to be "
                     "considered resting on the bed, and so exempt from bridging.",
+                ),
+                FloatField(
+                    "BridgeProbeDepth",
+                    "Probe depth",
+                    default=0.01,
+                    max=1.0,
+                    step=0.005,
+                    suffix=" mm",
+                    tooltip="Distance below the face to probe for solid material when "
+                    "detecting supported edges.",
                 ),
             ],
         ),
@@ -359,6 +468,301 @@ class BridgeSpanPanel(AnalyzerPanel):
                     "Solid classifier tolerance",
                     default=1e-6,
                     tooltip="Sets the tolerance of the inside/outside test used to find walls.",
+                ),
+            ],
+        ),
+    ]
+
+
+class DraftAnglePanel(AnalyzerPanel):
+    title = "Draft Angle"
+    groups = [
+        FieldGroup(
+            "Sampling Settings",
+            [
+                IntField(
+                    "DraftSamples",
+                    "Sampling density",
+                    default=20,
+                    min=3,
+                    max=100,
+                    suffix="²",
+                    tooltip="Number of UV samples per axis for curved faces.",
+                ),
+                FloatField(
+                    "DraftMargin",
+                    "Boundary margin",
+                    default=0.01,
+                    max=0.495,
+                    step=0.005,
+                    suffix="%",
+                    tooltip="UV boundary margin. Prevents sampling too close to face edges.",
+                ),
+            ],
+        ),
+        FieldGroup(
+            "Algorithm Settings",
+            [
+                ToleranceField(
+                    "DraftClassifierTol",
+                    "Solid classifier tolerance",
+                    default=1e-6,
+                    tooltip="Tolerance for the mold-side classifier that determines "
+                    "core vs. cavity faces.",
+                ),
+            ],
+        ),
+    ]
+
+
+class OverhangPanel(AnalyzerPanel):
+    title = "Overhang"
+    groups = [
+        FieldGroup(
+            "Sampling Settings",
+            [
+                IntField(
+                    "OverhangSamples",
+                    "Sampling density",
+                    default=15,
+                    min=3,
+                    max=100,
+                    suffix="²",
+                    tooltip="Number of UV samples per axis for curved faces.",
+                ),
+                FloatField(
+                    "OverhangMargin",
+                    "Boundary margin",
+                    default=0.01,
+                    max=0.495,
+                    step=0.005,
+                    suffix="%",
+                    tooltip="UV boundary margin. Prevents sampling too close to face edges.",
+                ),
+            ],
+        ),
+        FieldGroup(
+            "Detection Settings",
+            [
+                FloatField(
+                    "OverhangBedTolerance",
+                    "Bed contact tolerance",
+                    default=0.5,
+                    max=5.0,
+                    step=0.05,
+                    suffix=" mm",
+                    tooltip="Height tolerance for considering a face to be resting "
+                    "on the print bed.",
+                ),
+            ],
+        ),
+    ]
+
+
+class UndercutPanel(AnalyzerPanel):
+    title = "Undercut"
+    groups = [
+        FieldGroup(
+            "Sampling Settings",
+            [
+                IntField(
+                    "UndercutSamples",
+                    "Sampling density",
+                    default=10,
+                    min=3,
+                    max=100,
+                    suffix="²",
+                    tooltip="Number of UV samples per axis for each face.",
+                ),
+                FloatField(
+                    "UndercutMargin",
+                    "Boundary margin",
+                    default=0.01,
+                    max=0.495,
+                    step=0.005,
+                    suffix="%",
+                    tooltip="UV boundary margin. Prevents sampling too close to face edges.",
+                ),
+            ],
+        ),
+        FieldGroup(
+            "Algorithm Settings",
+            [
+                ToleranceField(
+                    "UndercutIntersectorTol",
+                    "Ray intersector tolerance",
+                    default=1e-6,
+                    tooltip="Load tolerance for the shape intersector used in ray casting.",
+                ),
+                FloatField(
+                    "UndercutSelfHitThreshold",
+                    "Self-hit threshold",
+                    default=0.05,
+                    max=1.0,
+                    step=0.01,
+                    suffix=" mm",
+                    tooltip="Minimum distance from the ray origin before a hit is "
+                    "considered a blocking surface rather than a self-intersection.",
+                ),
+            ],
+        ),
+    ]
+
+
+class SharpCornersPanel(AnalyzerPanel):
+    title = "Sharp Corners"
+    groups = [
+        FieldGroup(
+            "Detection Thresholds",
+            [
+                IntField(
+                    "SharpExternalMinAngle",
+                    "Min external corner angle",
+                    default=1,
+                    min=0,
+                    max=90,
+                    suffix="°",
+                    tooltip="Edges with a dihedral angle below this value (degrees) "
+                    "are not flagged as sharp external corners.",
+                ),
+                IntField(
+                    "SharpInternalMinAngle",
+                    "Min internal corner angle",
+                    default=1,
+                    min=0,
+                    max=90,
+                    suffix="°",
+                    tooltip="Edges with a dihedral angle below this value (degrees) "
+                    "are not flagged as sharp internal corners.",
+                ),
+            ],
+        ),
+    ]
+
+
+class ContourSettingsPanel(AnalyzerPanel):
+    title = "Contour Settings"
+    groups = [
+        FieldGroup(
+            "Meshing",
+            [
+                ComboField(
+                    "ContourDefaultResolution",
+                    "Default resolution",
+                    options=["Rough", "Coarse", "Fine", "Ultra Fine"],
+                    default="Fine",
+                    tooltip="Default mesh resolution preset. Finer resolutions produce "
+                    "more triangles and take longer to compute.",
+                ),
+                IntField(
+                    "ContourTriangleWarn",
+                    "Triangle warning threshold",
+                    default=300_000,
+                    min=10_000,
+                    max=10_000_000,
+                    tooltip="Triangle count above which a warning is shown before meshing.",
+                ),
+                IntField(
+                    "ContourTriangleHardCap",
+                    "Triangle hard cap",
+                    default=1_500_000,
+                    min=100_000,
+                    max=10_000_000,
+                    tooltip="Maximum triangle count allowed. Mesh requests above this are refused.",
+                ),
+                ToleranceField(
+                    "ContourMinElementSize",
+                    "Min element size",
+                    default=1e-3,
+                    tooltip="Smallest allowed mesh element size (mm). Prevents "
+                    "accidentally requesting an impossibly fine mesh.",
+                ),
+            ],
+        ),
+        FieldGroup(
+            "Parallel Processing",
+            [
+                IntField(
+                    "ContourMinParallelTasks",
+                    "Min tasks for parallel",
+                    default=2000,
+                    min=100,
+                    max=100_000,
+                    tooltip="Minimum number of measurement tasks before the solver "
+                    "uses multiple workers instead of running serially.",
+                ),
+                IntField(
+                    "ContourWorkerTimeout",
+                    "Worker probe timeout",
+                    default=60,
+                    min=5,
+                    max=600,
+                    suffix=" s",
+                    tooltip="Seconds to wait for a worker probe before falling back "
+                    "to serial measurement.",
+                ),
+            ],
+        ),
+        FieldGroup(
+            "Scene Rendering",
+            [
+                FloatField(
+                    "ContourCreaseAngle",
+                    "Crease angle",
+                    default=35.0,
+                    min=0.0,
+                    max=90.0,
+                    step=1.0,
+                    decimals=1,
+                    suffix="°",
+                    tooltip="Edges sharper than this angle stay crisp in the contour "
+                    "overlay; smoother edges blend colors (Gouraud shading).",
+                ),
+                FloatField(
+                    "ContourDisplayOffset",
+                    "Display offset",
+                    default=0.1,
+                    min=0.0,
+                    max=2.0,
+                    step=0.05,
+                    decimals=2,
+                    suffix=" %",
+                    tooltip="How far the contour sits off the model, as a share of the "
+                    "model's diagonal. The model stays visible underneath; raise this if "
+                    "its faces show through the contour on curved surfaces.",
+                ),
+                IntField(
+                    "ContourTargetPerChunk",
+                    "Triangles per chunk",
+                    default=2500,
+                    min=500,
+                    max=50_000,
+                    tooltip="Target triangle count per spatial chunk for pick-ray "
+                    "culling. Smaller chunks speed up hover but add scene overhead.",
+                ),
+            ],
+        ),
+        FieldGroup(
+            "Default Colormaps",
+            [
+                ComboField(
+                    "ContourDefaultColormap",
+                    "Default colormap",
+                    options=list(COLORMAPS.keys()),
+                    default="Cool-Warm",
+                    tooltip="Colormap used when no measure-specific default is set.",
+                ),
+                ColorField(
+                    "ContourHighlightInColor",
+                    "Highlight in-band color",
+                    default=(0.85, 0.15, 0.15),
+                    tooltip="Color for triangles inside the highlight band.",
+                ),
+                ColorField(
+                    "ContourHighlightOutColor",
+                    "Highlight out-of-band color",
+                    default=(0.62, 0.62, 0.62),
+                    tooltip="Color for triangles outside the highlight band.",
                 ),
             ],
         ),
@@ -381,9 +785,207 @@ PREF_FIXTURE_BASELINES = "GeneralEnableFixtureBaselines"
 
 
 def fixture_baselines_enabled() -> bool:
-    return App.ParamGet("User parameter:BaseApp/Preferences/Mod/DFM").GetBool(
-        PREF_FIXTURE_BASELINES, False
-    )
+    return dfm_params().GetBool(PREF_FIXTURE_BASELINES, False)
+
+
+class ResultsSettingsPanel(AnalyzerPanel):
+    title = "Results Settings"
+    groups = [
+        FieldGroup(
+            "Viewport Markers",
+            [
+                BoolField(
+                    "ResultsShowMarkersDefault",
+                    "Show viewport markers by default",
+                    tooltip="When enabled, viewport markers are shown automatically\n"
+                    "when the results panel opens. When disabled, markers\n"
+                    "must be turned on manually from the toolbar.",
+                ),
+                IntField(
+                    "MarkersMaxShowAll",
+                    "Max visible markers",
+                    default=10,
+                    min=1,
+                    max=500,
+                    tooltip="Show every marker when the total count is at or below "
+                    "this threshold. Above this, density filtering kicks in.",
+                ),
+                IntField(
+                    "MarkersMinScreenDist",
+                    "Min marker spacing",
+                    default=30,
+                    min=1,
+                    max=200,
+                    suffix=" px",
+                    tooltip="Minimum screen-pixel distance between visible markers "
+                    "during density filtering.",
+                ),
+                FloatField(
+                    "MarkersOcclusionThreshold",
+                    "Occlusion threshold",
+                    default=0.15,
+                    min=0.0,
+                    max=1.0,
+                    step=0.01,
+                    decimals=2,
+                    tooltip="Dot-product threshold for face-normal vs camera direction. "
+                    "Markers on faces angled away more than this are hidden.",
+                ),
+                FloatField(
+                    "MarkersNormalSize",
+                    "Marker point size",
+                    default=10.0,
+                    min=1.0,
+                    max=50.0,
+                    step=0.5,
+                    decimals=1,
+                    tooltip="Diameter in pixels for normal (unhighlighted) markers.",
+                ),
+                FloatField(
+                    "MarkersHighlightSize",
+                    "Marker highlight size",
+                    default=16.0,
+                    min=1.0,
+                    max=50.0,
+                    step=0.5,
+                    decimals=1,
+                    tooltip="Diameter in pixels for the highlighted marker ring.",
+                ),
+                IntField(
+                    "MarkersHitRadius",
+                    "Marker click radius",
+                    default=14,
+                    min=1,
+                    max=100,
+                    suffix=" px",
+                    tooltip="Screen-pixel radius within which a click or hover "
+                    "registers as hitting a marker.",
+                ),
+            ],
+        ),
+        FieldGroup(
+            "Highlighting",
+            [
+                BoolField(
+                    "ResultsXRay",
+                    "Show findings behind the model",
+                    default=True,
+                    tooltip="Findings hidden behind other parts of the model show through "
+                    "it: faces as a faint tint, edges as dashed lines.",
+                ),
+                IntField(
+                    "ResultsXRayOpacity",
+                    "Hidden findings strength",
+                    default=35,
+                    min=5,
+                    max=100,
+                    suffix=" %",
+                    tooltip="How strongly hidden findings show through the model.",
+                ),
+                IntField(
+                    "ResultsRestTransparency",
+                    "Rest of the model transparency",
+                    default=0,
+                    min=0,
+                    max=90,
+                    suffix=" %",
+                    tooltip="Makes the faces without findings see-through. Findings stay "
+                    "opaque. Above 0, hidden findings show through this instead.",
+                ),
+                IntField(
+                    "ResultsOverlayEdgeWidth",
+                    "Edge highlight width",
+                    default=3,
+                    min=1,
+                    max=20,
+                    suffix=" px",
+                    tooltip="Line width of highlighted edges.",
+                ),
+            ],
+        ),
+        FieldGroup(
+            "Camera Animation",
+            [
+                FloatField(
+                    "ResultsCameraAnimDuration",
+                    "Zoom animation duration",
+                    default=0.6,
+                    min=0.0,
+                    max=5.0,
+                    step=0.1,
+                    decimals=1,
+                    suffix=" s",
+                    tooltip="Time in seconds for the zoom-to-selection camera animation. "
+                    "Set to 0 for instant zoom.",
+                ),
+                FloatField(
+                    "ResultsCameraPadding",
+                    "Zoom padding factor",
+                    default=1.7,
+                    min=1.0,
+                    max=5.0,
+                    step=0.1,
+                    decimals=1,
+                    tooltip="Multiplier applied to the bounding-box size when framing "
+                    "the camera on a selection.",
+                ),
+            ],
+        ),
+        FieldGroup(
+            "Finding Overlay Card",
+            [
+                IntField(
+                    "OverlayOffsetX",
+                    "Card X offset",
+                    default=30,
+                    min=-500,
+                    max=500,
+                    suffix=" px",
+                    tooltip="Default horizontal pixel offset of the finding card "
+                    "from its anchor point.",
+                ),
+                IntField(
+                    "OverlayOffsetY",
+                    "Card Y offset",
+                    default=-40,
+                    min=-500,
+                    max=500,
+                    suffix=" px",
+                    tooltip="Default vertical pixel offset of the finding card "
+                    "from its anchor point.",
+                ),
+                IntField(
+                    "OverlayCardMinWidth",
+                    "Card min width",
+                    default=260,
+                    min=100,
+                    max=800,
+                    suffix=" px",
+                    tooltip="Minimum pixel width for the finding overlay card.",
+                ),
+            ],
+        ),
+    ]
+
+
+class DFMPreferencesResults:
+    """Preference page for Results panel settings."""
+
+    def __init__(self):
+        self.form = QtWidgets.QWidget()
+        self.form.setWindowTitle("Results")
+        self.form.setWindowIcon(QtGui.QIcon(":/icons/dfm_analysis.svg"))
+
+        self.panel = ResultsSettingsPanel()
+
+        layout = QtWidgets.QVBoxLayout(self.form)
+        layout.addWidget(self.panel)
+
+    def loadSettings(self):
+        self.panel.load(dfm_params())
+
+    def saveSettings(self):
+        self.panel.save(dfm_params())
 
 
 class DFMPreferencesGeneral:
@@ -413,27 +1015,121 @@ class DFMPreferencesGeneral:
             "a plain install. Takes effect after FreeCAD is restarted."
         )
 
+        self.recognition_bench = _pref(
+            QtWidgets.QCheckBox("Feature recognition test bench"), "DeveloperRecognitionBench"
+        )
+        self.recognition_bench.setToolTip(
+            "Adds the Feature Recognition Bench to a DFM Developer toolbar and menu:\n"
+            "inspect what the recognition finds, run its test suite and approve results.\n"
+            "The toolbar appears the next time the workbench is loaded."
+        )
+
         layout = QtWidgets.QVBoxLayout(self.form)
+        layout.addWidget(self._build_parallel_group())
         group = QtWidgets.QGroupBox("Developer Options")
-        group_layout = QtWidgets.QVBoxLayout(group)
-        group_layout.addWidget(self.print_timing_report)
-        group_layout.addWidget(self.fixture_baselines)
+        dev = QtWidgets.QVBoxLayout(group)
+        dev.addWidget(self.print_timing_report)
+        dev.addWidget(self.recognition_bench)
+        dev.addWidget(self.fixture_baselines)
         layout.addWidget(group)
         layout.addStretch()
 
+    def _build_parallel_group(self) -> QtWidgets.QGroupBox:
+        group = QtWidgets.QGroupBox("Parallel Processing")
+        grid = QtWidgets.QGridLayout(group)
+
+        self.parallel_enabled = _pref(
+            QtWidgets.QCheckBox("Measure on several cores"), "ParallelEnabled")
+        self.parallel_enabled.setToolTip(
+            "Share the slow measurements (thickness, undercut, draft) between worker\n"
+            "processes, one per core. Results are the same as on one core. Workers run\n"
+            "a plain Python, never FreeCAD, so a crash in one can't take FreeCAD down.")
+        grid.addWidget(self.parallel_enabled, 0, 0, 1, 2)
+
+        def spin(label, entry, lo, hi, suffix, tip, row):
+            grid.addWidget(QtWidgets.QLabel(label), row, 0)
+            box = _pref(QtWidgets.QSpinBox(), entry)
+            box.setRange(lo, hi)
+            box.setSuffix(suffix)
+            box.setToolTip(tip)
+            grid.addWidget(box, row, 1)
+            return box
+
+        self.parallel_workers = spin(
+            "Worker processes", "ParallelWorkers", 0, 64, "",
+            "How many worker processes. 0 = automatic: one per core, less one, at most 12.", 1)
+        self.parallel_workers.setSpecialValueText("Automatic")
+        self.parallel_min_faces = spin(
+            "Only for models with at least", "ParallelMinFaces", 1, 100000, " faces",
+            "Smaller models are measured in FreeCAD's own process: starting work in\n"
+            "the workers would take longer than it saves.", 2)
+        self.parallel_timeout = spin(
+            "Give up on a batch after", "ParallelBatchTimeout", 10, 86400, " s",
+            "A worker taking longer than this on one batch of faces is taken to have\n"
+            "hung: it is replaced and the batch tried once more.", 3)
+
+        self.parallel_status = QtWidgets.QLabel()
+        self.parallel_status.setWordWrap(True)
+        self.parallel_status.setTextInteractionFlags(
+            QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
+        grid.addWidget(self.parallel_status, 4, 0, 1, 2)
+        test = QtWidgets.QPushButton("Check workers")
+        test.setToolTip("Look for the Python the workers run on, and try it.")
+        test.clicked.connect(self._check_workers)
+        grid.addWidget(test, 5, 0)
+        self._show_worker_status()
+        return group
+
+    def _show_worker_status(self, checked: bool = False) -> None:
+        try:
+            from ..app.parallel import interpreter
+
+            if not interpreter._searched:
+                text = "Workers start with the first analysis."
+            elif interpreter._found:
+                text = f"Workers run on {interpreter._found}."
+            else:
+                text = f"Workers can't run: {interpreter._reason}"
+        except Exception as exc:
+            text = f"Workers can't run: {exc}"
+        self.parallel_status.setText(text)
+
+    def _check_workers(self) -> None:
+        from ..app.parallel import interpreter
+        from ..app.parallel.pool import shutdown
+
+        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
+        try:
+            shutdown()
+            interpreter.forget()
+            interpreter.find_worker_python()
+        finally:
+            QtWidgets.QApplication.restoreOverrideCursor()
+        self._show_worker_status(True)
+
     def loadSettings(self):
-        params = App.ParamGet("User parameter:BaseApp/Preferences/Mod/DFM")
+        params = dfm_params()
         self.print_timing_report.setChecked(
             params.GetBool("GeneralPrintTimingReport", self.DEFAULT_PRINT_TIMING_REPORT)
         )
         self.fixture_baselines.setChecked(
             params.GetBool(PREF_FIXTURE_BASELINES, self.DEFAULT_FIXTURE_BASELINES)
         )
+        self.recognition_bench.setChecked(params.GetBool("DeveloperRecognitionBench", False))
+        self.parallel_enabled.setChecked(params.GetBool("ParallelEnabled", True))
+        self.parallel_workers.setValue(params.GetInt("ParallelWorkers", 0))
+        self.parallel_min_faces.setValue(params.GetInt("ParallelMinFaces", 24))
+        self.parallel_timeout.setValue(params.GetInt("ParallelBatchTimeout", 600))
 
     def saveSettings(self):
-        params = App.ParamGet("User parameter:BaseApp/Preferences/Mod/DFM")
+        params = dfm_params()
         params.SetBool("GeneralPrintTimingReport", self.print_timing_report.isChecked())
         params.SetBool(PREF_FIXTURE_BASELINES, self.fixture_baselines.isChecked())
+        params.SetBool("DeveloperRecognitionBench", self.recognition_bench.isChecked())
+        params.SetBool("ParallelEnabled", self.parallel_enabled.isChecked())
+        params.SetInt("ParallelWorkers", self.parallel_workers.value())
+        params.SetInt("ParallelMinFaces", self.parallel_min_faces.value())
+        params.SetInt("ParallelBatchTimeout", self.parallel_timeout.value())
 
 
 class DFMPreferencesAnalyzers:
@@ -452,6 +1148,10 @@ class DFMPreferencesAnalyzers:
         self._register(SphereThicknessPanel())
         self._register(RayThicknessPanel())
         self._register(BridgeSpanPanel())
+        self._register(DraftAnglePanel())
+        self._register(OverhangPanel())
+        self._register(UndercutPanel())
+        self._register(SharpCornersPanel())
 
         self.combo.currentIndexChanged.connect(self.stack.setCurrentIndex)
 
@@ -464,11 +1164,29 @@ class DFMPreferencesAnalyzers:
         self.panels.append(panel)
 
     def loadSettings(self):
-        params = App.ParamGet("User parameter:BaseApp/Preferences/Mod/DFM")
+        params = dfm_params()
         for p in self.panels:
             p.load(params)
 
     def saveSettings(self):
-        params = App.ParamGet("User parameter:BaseApp/Preferences/Mod/DFM")
+        params = dfm_params()
         for p in self.panels:
             p.save(params)
+
+
+class DFMPreferencesContour:
+    def __init__(self):
+        self.form = QtWidgets.QWidget()
+        self.form.setWindowTitle("Contour")
+        self.form.setWindowIcon(QtGui.QIcon(":/icons/dfm_analysis.svg"))
+
+        self.panel = ContourSettingsPanel()
+
+        layout = QtWidgets.QVBoxLayout(self.form)
+        layout.addWidget(self.panel)
+
+    def loadSettings(self):
+        self.panel.load(dfm_params())
+
+    def saveSettings(self):
+        self.panel.save(dfm_params())

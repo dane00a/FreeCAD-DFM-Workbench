@@ -2,21 +2,31 @@
 # SPDX-FileCopyrightText: 2025 Ryan Kembrey <ryan.FreeCAD@gmail.com>
 # SPDX-FileNotice: Part of the DFM addon.
 
+import contextlib
+import copy
+import dataclasses
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6 import QtWidgets, QtCore, QtGui
 
 import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
 
-from ..core.processes.process import Material, Process, RuleFeedback, RuleLimit
+from ..core.processes.process import Material, Process, ProcessArchetype, RuleFeedback, RuleLimit
 from ..core.registries.process_registry import ProcessRegistry
-from ..core.rules import Criticality, Rulebook
+from ..core.rules import SHAPE_FIELD_ATTRS, Criticality, Rulebook
 
-from .rule_cards import CARD_STYLE, BaseRuleCard, build_card
+from .rule_cards import (
+    ADD_SVG, CARD_STYLE, FILTER_SVG, GRID_VIEW_SVG, IMPORT_SVG, LIST_VIEW_SVG, OVERRIDE_COLOR,
+    REDO_SVG, REMOVE_SVG, UNDO_SVG, BaseRuleCard, UnitInput,
+    apply_svg_icon, build_card, limit_conflict_message,
+)
+from .rule_cards import _RESET_SVG, _resolve_badge
 
-from . import DFM_rc  # noqa: F401
+from .rule_information import RuleDiagramView
+from .utils import resources  # noqa: F401
+from .utils.flow_layout import FlowLayout
 
 
 TREE_FRAME_STYLE = """
@@ -40,22 +50,180 @@ QToolButton:hover {
 # =============================================================================
 
 
+_UNDO_LIMIT = 100
+
+
+@dataclasses.dataclass
+class _UndoStep:
+    """One undoable change: a copy of a process as it was before (or after) it."""
+
+    label: str
+    process_name: str
+    process: Process
+    material_name: Optional[str]
+
+
+def _process_state(process: Process) -> tuple:
+    """Comparable state of *process*; the order of active rules does not matter."""
+    return tuple(
+        frozenset(value) if f.name == "active_rules" else value
+        for f in dataclasses.fields(process)
+        for value in (getattr(process, f.name),)
+    )
+
+
 class ProcessLibraryModel:
-    """Application state, data persistence, and active selections."""
+    """Application state, data persistence, undo history and active selections.
+
+    Unsaved changes are found by comparing each process with a copy taken
+    when it was last loaded or saved, so undoing back to the saved state
+    clears them again.
+
+    Undo works on snapshots: before a change, a copy of the affected process
+    is stored, and undo puts that copy back. Changes that write to or delete
+    files at once (adding, deleting, importing or restoring a whole process)
+    are not undoable and clear that process's history.
+    """
 
     def __init__(self):
         self.registry = ProcessRegistry.get_instance()
         self.registry.discover_processes()
-        self.is_dirty = False
         self.active_process: Optional[Process] = None
         self.active_material: Optional[Material] = None
 
-    def mark_dirty(self):
-        self.is_dirty = True
+        self._saved: dict[str, Process] = {}
+        self._snapshot_saved()
+
+        self._undo: list[_UndoStep] = []
+        self._redo: list[_UndoStep] = []
+        self._group_depth = 0
+
+    # -- Unsaved changes -------------------------------------------------------
+
+    def _snapshot_saved(self, process_name: Optional[str] = None):
+        if process_name is None:
+            self._saved = {n: copy.deepcopy(p) for n, p in self.registry.processes.items()}
+            return
+        process = self.registry.processes.get(process_name)
+        if process is None:
+            self._saved.pop(process_name, None)
+        else:
+            self._saved[process_name] = copy.deepcopy(process)
+
+    @property
+    def is_dirty(self) -> bool:
+        return any(self.is_process_dirty(name) for name in self.registry.processes)
+
+    def is_process_dirty(self, process_name: str) -> bool:
+        current = self.registry.processes.get(process_name)
+        saved = self._saved.get(process_name)
+        if current is None or saved is None:
+            return current is not saved
+        return _process_state(current) != _process_state(saved)
+
+    def is_material_dirty(self, process_name: str, material_name: str) -> bool:
+        current = self.registry.processes.get(process_name)
+        saved = self._saved.get(process_name)
+        cur_mat = current.materials.get(material_name) if current else None
+        saved_mat = saved.materials.get(material_name) if saved else None
+        return cur_mat != saved_mat
+
+    def override_count(self, process: Process, material_name: str) -> int:
+        """Number of per-material rules whose values differ from Default."""
+        if material_name == "Default":
+            return 0
+        material = process.materials.get(material_name)
+        default = process.materials.get("Default")
+        if not material:
+            return 0
+        count = 0
+        for rule, limit in material.rule_limits.items():
+            if not rule.per_material:
+                continue
+            default_limit = default.rule_limits.get(rule) if default else None
+            for attr in SHAPE_FIELD_ATTRS.get(rule.shape, ()):
+                own = getattr(limit, attr, "")
+                base = getattr(default_limit, attr, "") if default_limit else ""
+                if own and str(own) != str(base or ""):
+                    count += 1
+                    break
+        return count
 
     def save(self):
         self.registry.save_all_processes()
-        self.is_dirty = False
+        self._snapshot_saved()
+
+    # -- Undo and redo ---------------------------------------------------------
+
+    @contextlib.contextmanager
+    def undo_group(self, label: str, material_name: Optional[str] = None):
+        """Record every change made inside the block as one undo step.
+
+        A copy of the active process is taken on entry. If the process ends
+        up unchanged, no step is recorded. Nested groups join the outer one.
+        """
+        step = None
+        redo = None
+        if self._group_depth == 0 and self.active_process is not None:
+            if material_name is None and self.active_material is not None:
+                material_name = self.active_material.name
+            step = _UndoStep(
+                label, self.active_process.name, copy.deepcopy(self.active_process), material_name
+            )
+            redo = list(self._redo)
+        self._group_depth += 1
+        try:
+            yield
+        finally:
+            self._group_depth -= 1
+            if step is not None:
+                current = self.registry.processes.get(step.process_name)
+                if current is not None and _process_state(current) != _process_state(step.process):
+                    self._undo.append(step)
+                    del self._undo[:-_UNDO_LIMIT]
+                    self._redo.clear()
+                else:
+                    self._redo = redo
+
+    @property
+    def undo_label(self) -> str:
+        return self._undo[-1].label if self._undo else ""
+
+    @property
+    def redo_label(self) -> str:
+        return self._redo[-1].label if self._redo else ""
+
+    def undo(self) -> Optional[tuple[str, Optional[str]]]:
+        """Undo the last change; return the (process, material) it was made in."""
+        return self._swap(self._undo, self._redo)
+
+    def redo(self) -> Optional[tuple[str, Optional[str]]]:
+        """Redo the last undone change; return the (process, material) it was made in."""
+        return self._swap(self._redo, self._undo)
+
+    def _swap(self, source: list, target: list) -> Optional[tuple[str, Optional[str]]]:
+        while source:
+            step = source.pop()
+            current = self.registry.processes.get(step.process_name)
+            if current is None:
+                continue  # the process no longer exists
+            target.append(
+                _UndoStep(step.label, step.process_name, copy.deepcopy(current), step.material_name)
+            )
+            self.registry.processes[step.process_name] = step.process
+            self.active_process = step.process
+            material = step.material_name
+            if material not in step.process.materials:
+                material = "Default" if "Default" in step.process.materials else None
+            self.active_material = step.process.materials.get(material) if material else None
+            return step.process_name, material
+        return None
+
+    def _forget_history(self, process_name: str):
+        self._undo = [s for s in self._undo if s.process_name != process_name]
+        self._redo = [s for s in self._redo if s.process_name != process_name]
+
+    # -- Queries ---------------------------------------------------------------
 
     def get_categorized_processes(self) -> dict:
         return {
@@ -75,36 +243,27 @@ class ProcessLibraryModel:
             self.active_material = None
         return self.active_material
 
-    def update_rule_feedback(self, rule: Rulebook, warning_msg: str, error_msg: str):
-        if self.active_process:
-            self.active_process.rule_feedback[rule] = RuleFeedback(warning_msg, error_msg)
-            self.mark_dirty()
+    def is_builtin(self, process_name: str) -> bool:
+        return self.registry.is_builtin(process_name)
 
-    def add_process(self, name: str, category: str) -> bool:
-        if self.registry.get_process_by_name(name):
-            return False
-        new_process = Process(
-            name=name,
-            category=category,
-            description="New manufacturing process.",
-            active_rules=[],
-            materials={
-                "Default": Material(
-                    name="Default", category="Default", is_active=True, rule_limits={}
-                )
-            },
-        )
-        self.registry.add_process(new_process)
-        self.mark_dirty()
-        return True
+    def has_user_override(self, process_name: str) -> bool:
+        return self.registry.has_user_override(process_name)
+
+    # -- Undoable edits --------------------------------------------------------
+
+    def update_rule_feedback(self, rule: Rulebook, warning_msg: str, error_msg: str):
+        if not self.active_process:
+            return
+        with self.undo_group(f"Edit feedback for {rule.label}"):
+            self.active_process.rule_feedback[rule] = RuleFeedback(warning_msg, error_msg)
 
     def add_material(self, name: str) -> bool:
         if not self.active_process or name in self.active_process.materials:
             return False
-        self.active_process.materials[name] = Material(
-            name=name, category="", is_active=True, rule_limits={}
-        )
-        self.mark_dirty()
+        with self.undo_group(f"Add material {name}", material_name=name):
+            self.active_process.materials[name] = Material(
+                name=name, category="", is_active=True, rule_limits={}
+            )
         return True
 
     def delete_material(self, name: str) -> bool:
@@ -114,64 +273,164 @@ class ProcessLibraryModel:
             or name == "Default"
         ):
             return False
-        del self.active_process.materials[name]
+        with self.undo_group(f"Delete material {name}", material_name=name):
+            del self.active_process.materials[name]
         if self.active_material and self.active_material.name == name:
             self.active_material = None
-        self.mark_dirty()
         return True
 
     def update_rule_limit(self, rule: Rulebook, attr: str, value: str):
         if not self.active_material:
             return
-        if rule not in self.active_material.rule_limits:
-            self.active_material.rule_limits[rule] = RuleLimit()
-        setattr(self.active_material.rule_limits[rule], attr, value)
-        self.mark_dirty()
+        with self.undo_group(f"Edit {rule.label} ({rule.field_label_for(attr)})"):
+            if rule not in self.active_material.rule_limits:
+                self.active_material.rule_limits[rule] = RuleLimit()
+            setattr(self.active_material.rule_limits[rule], attr, value)
 
     def reset_rule_limit(self, rule: Rulebook):
         if self.active_material and rule in self.active_material.rule_limits:
-            del self.active_material.rule_limits[rule]
-            self.mark_dirty()
+            with self.undo_group(f"Reset {rule.label}"):
+                del self.active_material.rule_limits[rule]
 
-    def update_active_rules(self, rules: list):
+    def reset_rule_field(self, rule: Rulebook, attr: str):
+        """Make one field of *rule* fall back to the Default material.
+
+        An empty value means "use Default" for numeric fields. When none of
+        the rule's fields keep a value of their own, the material's entry is
+        removed entirely; this is also how a severity is reset, since an
+        empty severity would otherwise override Default.
+        """
+        material = self.active_material
+        if not material or rule not in material.rule_limits:
+            return
+        with self.undo_group(f"Reset {rule.label} ({rule.field_label_for(attr)})"):
+            limit = material.rule_limits[rule]
+            setattr(limit, attr, "")
+            attrs = SHAPE_FIELD_ATTRS.get(rule.shape, ())
+            if all(not getattr(limit, a, "") for a in attrs):
+                del material.rule_limits[rule]
+
+    def update_active_rules(self, rules: list, label: str = "Change active rules"):
         if self.active_process:
-            self.active_process.active_rules = rules
-            self.mark_dirty()
+            with self.undo_group(label):
+                self.active_process.active_rules = rules
 
     def update_rule_criticality(self, rule: Rulebook, criticality: Criticality):
         if self.active_process:
-            self.active_process.rule_criticality[rule] = criticality
-            self.mark_dirty()
+            with self.undo_group(f"Change criticality of {rule.label}"):
+                self.active_process.rule_criticality[rule] = criticality
 
-    def is_builtin(self, process_name: str) -> bool:
-        return self.registry.is_builtin(process_name)
+    # -- Whole-process changes (not undoable) ----------------------------------
 
-    def has_user_override(self, process_name: str) -> bool:
-        return self.registry.has_user_override(process_name)
+    def add_process(self, name: str, category: str, archetype: ProcessArchetype = ProcessArchetype.GENERIC) -> bool:
+        if self.registry.get_process_by_name(name):
+            return False
+        new_process = Process(
+            name=name,
+            category=category,
+            archetype=archetype,
+            description="New manufacturing process.",
+            active_rules=[],
+            materials={
+                "Default": Material(
+                    name="Default", category="Default", is_active=True, rule_limits={}
+                )
+            },
+        )
+        self.registry.add_process(new_process)
+        self._forget_history(name)
+        return True
 
     def restore_default(self, process_name: str) -> bool:
         success = self.registry.restore_default(process_name)
         if success:
             self.active_process = self.registry.get_process_by_name(process_name)
             self.active_material = None
-            self.is_dirty = False
+            self._snapshot_saved(process_name)
+            self._forget_history(process_name)
         return success
 
     def delete_process(self, process_name: str) -> bool:
         success = self.registry.delete_custom_process(process_name)
-        if success and self.active_process and self.active_process.name == process_name:
-            self.active_process = None
-            self.active_material = None
+        if success:
+            self._snapshot_saved(process_name)
+            self._forget_history(process_name)
+            if self.active_process and self.active_process.name == process_name:
+                self.active_process = None
+                self.active_material = None
         return success
 
     def import_process(self, filepath: str) -> tuple[bool, str]:
         success, result = self.registry.import_process_from_file(Path(filepath))
         if success:
-            self.mark_dirty()
+            # Import writes the process to disk, so it starts out saved.
+            self._snapshot_saved(result)
+            self._forget_history(result)
         return success, result
 
 
 # =============================================================================
+
+
+_UNSAVED_MARK = " \u2022"
+_COUNT_ROLE = QtCore.Qt.ItemDataRole.UserRole + 1
+
+
+class _TreeCountDelegate(QtWidgets.QStyledItemDelegate):
+    """Draws a material's override count as a small orange badge at the right
+    of its row: the colour the rule cards give overridden values. The row's
+    tool tip says what it counts.
+
+    The badge is left out when the name leaves no room for it."""
+
+    _GAP = 12  # min space between the name and the badge
+    _MARGIN = 8  # from the row's right edge
+
+    def paint(self, painter, option, index):
+        super().paint(painter, option, index)
+        count = index.data(_COUNT_ROLE)
+        if not count:
+            return
+        text = str(count)
+        opt = QtWidgets.QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        style = opt.widget.style() if opt.widget else QtWidgets.QApplication.style()
+        text_rect = style.subElementRect(
+            QtWidgets.QStyle.SubElement.SE_ItemViewItemText, opt, opt.widget
+        )
+        text_end = text_rect.left() + opt.fontMetrics.horizontalAdvance(opt.text)
+
+        small = QtGui.QFont(option.font)
+        small.setPointSizeF(small.pointSizeF() * 0.8)
+        small.setBold(True)
+        fm = QtGui.QFontMetrics(small)
+        height = min(fm.height() + 2, option.rect.height() - 2)
+        width = max(height, fm.horizontalAdvance(text) + 10)
+        right = option.rect.right() - self._MARGIN
+        if text_end + self._GAP + width > right:
+            return
+        badge = QtCore.QRectF(right - width, option.rect.center().y() - height / 2 + 0.5,
+                              width, height)
+
+        painter.save()
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        selected = bool(option.state & QtWidgets.QStyle.StateFlag.State_Selected)
+        accent = QtGui.QColor(OVERRIDE_COLOR)
+        if selected:
+            # On the selection colour: a solid badge, the text in the highlight colour.
+            fill = QtGui.QColor(option.palette.color(QtGui.QPalette.ColorRole.HighlightedText))
+            ink = QtGui.QColor(option.palette.color(QtGui.QPalette.ColorRole.Highlight))
+        else:
+            fill = QtGui.QColor(accent)
+            fill.setAlphaF(0.18)
+            ink = accent
+        painter.setPen(QtCore.Qt.PenStyle.NoPen)
+        painter.setBrush(fill)
+        painter.drawRoundedRect(badge, height / 2, height / 2)
+        painter.setFont(small)
+        painter.setPen(ink)
+        painter.drawText(badge, int(QtCore.Qt.AlignmentFlag.AlignCenter), text)
+        painter.restore()
 
 
 class ProcessTreeView(QtCore.QObject):
@@ -182,28 +441,90 @@ class ProcessTreeView(QtCore.QObject):
         self.tree = tree
         self.tree.setHeaderHidden(True)
         self.tree.setIndentation(15)
+        self.tree.setItemDelegate(_TreeCountDelegate(self.tree))
         self.tree.itemSelectionChanged.connect(self._on_selection)
+        # Processes start collapsed; the ones opened stay open while the
+        # library is up (the tree is rebuilt after saving, renaming...).
+        self._expanded: set[str] = set()
+        self.tree.itemExpanded.connect(lambda item: self._remember(item, True))
+        self.tree.itemCollapsed.connect(lambda item: self._remember(item, False))
+
+    def _remember(self, item: QtWidgets.QTreeWidgetItem, expanded: bool) -> None:
+        data = item.data(0, QtCore.Qt.ItemDataRole.UserRole)
+        if data and data.get("type") == "process":
+            (self._expanded.add if expanded else self._expanded.discard)(data["name"])
+
+    def update_markers(self, model: "ProcessLibraryModel") -> None:
+        """Refresh unsaved dots and override counts without rebuilding the tree."""
+        processes = {
+            p.name: p for group in model.get_categorized_processes().values() for p in group
+        }
+        for node in self._iter_nodes():
+            data = node.data(0, QtCore.Qt.ItemDataRole.UserRole)
+            if not data:
+                continue
+            if data.get("type") == "process":
+                process = processes.get(data["name"])
+                if not process:
+                    continue
+                dirty = model.is_process_dirty(process.name)
+                node.setText(
+                    0, f"{process.name} ({len(process.materials)})" + (_UNSAVED_MARK if dirty else "")
+                )
+                node.setToolTip(0, "Unsaved changes" if dirty else "")
+            elif data.get("type") == "material":
+                process = processes.get(data["process"])
+                if not process:
+                    continue
+                name = data["name"]
+                dirty = model.is_material_dirty(process.name, name)
+                count = model.override_count(process, name)
+                node.setText(0, name + (_UNSAVED_MARK if dirty else ""))
+                node.setData(0, _COUNT_ROLE, count)
+                tips = []
+                if count:
+                    tips.append(
+                        f"{count} rule{'' if count == 1 else 's'} differ from the Default material"
+                    )
+                if dirty:
+                    tips.append("Unsaved changes")
+                node.setToolTip(0, "\n".join(tips))
 
     def populate(self, categories_dict: dict):
         self.tree.blockSignals(True)
         self.tree.clear()
 
+        first_cat = True
         for cat_name, processes in categories_dict.items():
             cat_node = QtWidgets.QTreeWidgetItem(self.tree)
-            cat_node.setText(0, cat_name)
+            cat_node.setText(0, cat_name.upper())
             cat_node.setFlags(cat_node.flags() & ~QtCore.Qt.ItemFlag.ItemIsSelectable)
-            font = cat_node.font(0)
-            font.setBold(True)
-            cat_node.setFont(0, font)
+
+            # Category headers: smaller, muted, uppercase structural labels
+            cat_font = cat_node.font(0)
+            cat_font.setPointSizeF(cat_font.pointSizeF() * 0.85)
+            cat_font.setLetterSpacing(QtGui.QFont.SpacingType.PercentageSpacing, 105)
+            cat_node.setFont(0, cat_font)
+
+            # Spacing above each category group (skip the first)
+            if not first_cat:
+                cat_node.setSizeHint(0, QtCore.QSize(-1, cat_node.sizeHint(0).height() + 10))
+            first_cat = False
 
             for process in processes:
+                mat_count = len(process.materials)
                 p_node = QtWidgets.QTreeWidgetItem(cat_node)
-                p_node.setText(0, process.name)
+                p_node.setText(0, f"{process.name} ({mat_count})")
                 p_node.setData(
                     0,
                     QtCore.Qt.ItemDataRole.UserRole,
                     {"type": "process", "name": process.name},
                 )
+
+                # Process names: bold
+                p_font = p_node.font(0)
+                p_font.setBold(True)
+                p_node.setFont(0, p_font)
 
                 mats = sorted(
                     process.materials.keys(),
@@ -218,7 +539,19 @@ class ProcessTreeView(QtCore.QObject):
                         {"type": "material", "name": m_name, "process": process.name},
                     )
 
-        self.tree.expandAll()
+                    # Default material: italic to indicate it's the template
+                    if m_name == "Default":
+                        m_font = m_node.font(0)
+                        m_font.setItalic(True)
+                        m_node.setFont(0, m_font)
+
+        # Categories open, processes as the user left them (closed at first).
+        for node in self._iter_nodes():
+            data = node.data(0, QtCore.Qt.ItemDataRole.UserRole)
+            if not data:
+                node.setExpanded(True)
+            elif data.get("type") == "process":
+                node.setExpanded(data["name"] in self._expanded)
         self.tree.blockSignals(False)
 
     def _iter_nodes(self):
@@ -243,7 +576,11 @@ class ProcessTreeView(QtCore.QObject):
                 and data.get("process") == process_name
                 and data.get("name") == mat_name
             ):
+                # Open its process, so the selection is in sight.
+                if node.parent() is not None:
+                    node.parent().setExpanded(True)
                 self.tree.setCurrentItem(node)
+                self.tree.scrollToItem(node)
                 return
 
     def _on_selection(self):
@@ -260,6 +597,18 @@ class ProcessTreeView(QtCore.QObject):
 
 class ParameterEdit(QtWidgets.QPlainTextEdit):
     """Text editor that suggests {placeholders} when '{' is typed."""
+
+    focused = QtCore.Signal()
+
+    def sizeHint(self) -> QtCore.QSize:
+        # Prefer the minimum height rather than Qt's tall default, so dialogs
+        # open compact and the boxes grow only when the dialog is resized.
+        hint = super().sizeHint()
+        return QtCore.QSize(hint.width(), max(self.minimumHeight(), 0) or hint.height())
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        self.focused.emit()
 
     def __init__(self, placeholders, parent=None):
         super().__init__(parent)
@@ -297,55 +646,98 @@ class ParameterEdit(QtWidgets.QPlainTextEdit):
 # =============================================================================
 
 
-class EditFeedbackDialog(QtWidgets.QDialog):
-    """Warning and error message editor with placeholder autocompletion."""
+@dataclasses.dataclass
+class RuleValueContext:
+    """Everything the rule dialog needs to show and edit a rule's values."""
 
-    ALLOWED_TAGS = {"measured", "limit", "target"}
+    limit: Optional[RuleLimit]
+    """The current material's own values (may be ``None``)."""
+    default_limit: Optional[RuleLimit]
+    """The Default material's values, used when the material has none."""
+    is_default_material: bool
+    material_name: Optional[str] = None
+    """Shown for material (M) rules; ``None`` for process and setup rules."""
+    derived_hint: str = ""
+    """For setup (S) rules: where the values come from. Hides the inputs."""
+    is_active: bool = True
+    """Whether the rule is turned on. Values of a rule that is off are shown
+    but cannot be edited, matching the rule card."""
+
+
+_RULE_DIALOG_STYLE = CARD_STYLE + """
+QFrame#RuleInfoCard {
+    border: 1px solid palette(mid);
+    border-radius: 6px;
+    background-color: rgba(127, 127, 127, 18);
+}
+QFrame#RuleInfoCard QLabel {
+    background-color: transparent;
+}
+QFrame#ValueTile {
+    border: 1px solid palette(mid);
+    border-radius: 4px;
+    background-color: transparent;
+}
+QToolButton#ParamChip {
+    border: 1px solid palette(mid);
+    border-radius: 10px;
+    padding: 2px 9px;
+}
+QToolButton#ParamChip:hover {
+    background-color: rgba(127, 127, 127, 40);
+}
+"""
+
+
+class EditFeedbackDialog(QtWidgets.QDialog):
+    """Rule details and feedback editor.
+
+    The left card explains the rule (brief and bad / good diagram) and edits
+    its values and criticality. The right column edits the warning and error
+    messages; clicking a placeholder chip inserts it into the message box that
+    was used last. The chips are the placeholders this rule's check fills in
+    (BaseCheck.message_placeholders), and OK accepts no others.
+    """
+
+    #: For a rule with no check (not expected): the placeholders every check fills.
+    FALLBACK_PARAMS = (
+        ("measured", "The measured value, with its unit"),
+        ("target", "The rule's target value"),
+        ("limit", "The rule's limit value"),
+    )
 
     def __init__(
         self,
         process_name: str,
-        rule_name: str,
+        rule: Rulebook,
         feedback: RuleFeedback,
         criticality: Criticality,
+        values: RuleValueContext,
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle(f"Edit Feedback: {rule_name}")
-        self.setMinimumWidth(480)
-        self.setMinimumHeight(450)
+        self.setWindowTitle(f"Edit Rule: {rule.label}")
+        self.setStyleSheet(_RULE_DIALOG_STYLE)
+
+        self._rule = rule
+        self._values = values
+        self._params = self._rule_params(rule)
+        self._fields: dict[str, UnitInput] = {}
+        self._initial: dict[str, str] = {}
+        self._reset_attrs: set[str] = set()
 
         layout = QtWidgets.QVBoxLayout(self)
+        layout.setSpacing(10)
 
-        layout.addWidget(self._build_header(process_name, rule_name, criticality))
+        title = QtWidgets.QLabel(f"{rule.label} ({process_name})")
+        title.setStyleSheet("font-size: 14px; font-weight: bold;")
+        layout.addWidget(title)
 
-        line = QtWidgets.QFrame()
-        line.setFrameShape(QtWidgets.QFrame.Shape.HLine)
-        line.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
-        layout.addWidget(line)
-        layout.addSpacing(10)
-
-        params = list(self.ALLOWED_TAGS)
-        self.warn_edit = self._build_message_field(
-            layout,
-            ":/icons/dfm_warning.svg",
-            "Warning Message",
-            feedback.warning_msg,
-            params,
-            "e.g., Feature is too small ({measured}), minimum required is {limit}",
-        )
-        layout.addSpacing(10)
-        self.err_edit = self._build_message_field(
-            layout,
-            ":/icons/dfm_error.svg",
-            "Error Message",
-            feedback.error_msg,
-            params,
-            "e.g., Critical failure: {measured} is far below the {limit} limit.",
-        )
-
-        layout.addSpacing(10)
-        layout.addWidget(self._build_help_panel())
+        body = QtWidgets.QHBoxLayout()
+        body.setSpacing(14)
+        body.addWidget(self._build_rule_card(criticality))
+        body.addLayout(self._build_messages(feedback), stretch=1)
+        layout.addLayout(body)
 
         self.buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok
@@ -355,16 +747,51 @@ class EditFeedbackDialog(QtWidgets.QDialog):
         self.buttons.rejected.connect(self.reject)
         layout.addWidget(self.buttons)
 
-    def _build_header(
-        self, process_name: str, rule_name: str, criticality: Criticality
-    ) -> QtWidgets.QWidget:
-        container = QtWidgets.QWidget()
-        vbox = QtWidgets.QVBoxLayout(container)
-        vbox.setContentsMargins(0, 0, 0, 10)
+    @classmethod
+    def _rule_params(cls, rule: Rulebook) -> tuple[tuple[str, str], ...]:
+        """(placeholder, what it is replaced with) for *rule*'s messages."""
+        from ..core import checks  # noqa: F401  (registers the checks)
+        from ..core.registries.checks_registry import get_check_class
 
-        title = QtWidgets.QLabel(f"{rule_name} ({process_name})")
-        title.setStyleSheet("font-size: 14px; font-weight: bold;")
-        vbox.addWidget(title)
+        try:
+            check = get_check_class(rule)
+        except KeyError:
+            check = None
+        if check is None:
+            return cls.FALLBACK_PARAMS
+        return tuple(check().message_placeholders(rule).items())
+
+    # ------------------------------------------------------------------
+    # Left: what the rule measures, its values and criticality
+    # ------------------------------------------------------------------
+
+    def _build_rule_card(self, criticality: Criticality) -> QtWidgets.QFrame:
+        card = QtWidgets.QFrame()
+        card.setObjectName("RuleInfoCard")
+        col = QtWidgets.QVBoxLayout(card)
+        col.setContentsMargins(12, 12, 12, 12)
+        col.setSpacing(10)
+
+        view = RuleDiagramView(self._rule, show_legend=False, parent=card)
+        col.addWidget(view)
+        # The card is exactly as wide as the diagram; inputs fit within it.
+        card.setFixedWidth(view.minimumSizeHint().width() + 24)
+
+        if self._values.derived_hint:
+            hint = QtWidgets.QLabel(self._values.derived_hint)
+            hint.setWordWrap(True)
+            hint.setStyleSheet("font-style: italic;")
+            col.addWidget(hint)
+        elif not self._rule.is_binary:
+            if self._values.material_name:
+                col.addWidget(QtWidgets.QLabel(f"Values for {self._values.material_name}"))
+            col.addLayout(self._build_value_tiles())
+            if not self._values.is_active:
+                note = QtWidgets.QLabel("Turn on this rule to edit its values.")
+                note.setStyleSheet("font-style: italic;")
+                col.addWidget(note)
+
+        col.addStretch(1)
 
         crit_row = QtWidgets.QHBoxLayout()
         crit_row.addWidget(QtWidgets.QLabel("Criticality"))
@@ -375,8 +802,110 @@ class EditFeedbackDialog(QtWidgets.QDialog):
         self.crit_combo.setFixedWidth(110)
         crit_row.addWidget(self.crit_combo)
         crit_row.addStretch()
-        vbox.addLayout(crit_row)
-        return container
+        col.addLayout(crit_row)
+        return card
+
+    def _build_value_tiles(self) -> QtWidgets.QHBoxLayout:
+        row = QtWidgets.QHBoxLayout()
+        row.setSpacing(8)
+        attrs = SHAPE_FIELD_ATTRS.get(self._rule.shape, ())
+        for attr, label in zip(attrs, self._rule.field_labels):
+            tile = QtWidgets.QFrame()
+            tile.setObjectName("ValueTile")
+            tv = QtWidgets.QVBoxLayout(tile)
+            tv.setContentsMargins(8, 6, 8, 8)
+            tv.setSpacing(4)
+            tv.addWidget(QtWidgets.QLabel(label))
+
+            field = UnitInput(self._rule.unit or "", tile)
+            font = field.line_edit().font()
+            font.setPointSizeF(font.pointSizeF() * 1.2)
+            field.line_edit().setFont(font)
+            display = self._display_value(attr)
+            field.set_text(display)
+            field.editing_finished.connect(lambda f=field, a=attr: self._on_tile_edited(f, a))
+            field.reset_clicked.connect(lambda f=field, a=attr: self._on_tile_reset(f, a))
+            self._refresh_override(field, attr)
+            field.setEnabled(self._values.is_active)
+            tv.addWidget(field)
+
+            self._fields[attr] = field
+            self._initial[attr] = display
+            row.addWidget(tile, stretch=1)
+        return row
+
+    def _display_value(self, attr: str) -> str:
+        """Match the rule card: own value, else the Default material's."""
+        own = getattr(self._values.limit, attr, "") if self._values.limit else ""
+        default = (
+            getattr(self._values.default_limit, attr, "") if self._values.default_limit else ""
+        )
+        return str(own if (own or self._values.is_default_material) else default)
+
+    def _default_value(self, attr: str) -> str:
+        limit = self._values.default_limit
+        return str(getattr(limit, attr, "") or "") if limit else ""
+
+    def _on_tile_edited(self, field: UnitInput, attr: str) -> None:
+        self._reset_attrs.discard(attr)
+        self._refresh_override(field, attr)
+
+    def _on_tile_reset(self, field: UnitInput, attr: str) -> None:
+        field.set_text(self._default_value(attr))
+        self._reset_attrs.add(attr)
+        self._refresh_override(field, attr)
+
+    def _refresh_override(self, field: UnitInput, attr: str) -> None:
+        default = (
+            getattr(self._values.default_limit, attr, "") if self._values.default_limit else ""
+        )
+        value = field.text().strip()
+        field.set_override(
+            bool(value and value != str(default) and not self._values.is_default_material),
+            str(default or ""),
+        )
+        self._refresh_conflicts()
+
+    def _refresh_conflicts(self) -> None:
+        attrs = SHAPE_FIELD_ATTRS.get(self._rule.shape, ())
+        if len(attrs) != 2 or any(a not in self._fields for a in attrs):
+            return
+        first, second = (self._fields[a] for a in attrs)
+        message = limit_conflict_message(self._rule, first.text(), second.text())
+        first.set_conflict(message)
+        second.set_conflict(message)
+
+    # ------------------------------------------------------------------
+    # Right: feedback messages
+    # ------------------------------------------------------------------
+
+    def _build_messages(self, feedback: RuleFeedback) -> QtWidgets.QVBoxLayout:
+        col = QtWidgets.QVBoxLayout()
+        col.setSpacing(10)
+
+        tags = [tag for tag, _ in self._params]
+        self.warn_edit = self._build_message_field(
+            col,
+            ":/icons/dfm_warning.svg",
+            "Warning Message",
+            feedback.warning_msg,
+            tags,
+            "e.g., Feature is too small ({measured}), minimum required is {limit}",
+        )
+        self.err_edit = self._build_message_field(
+            col,
+            ":/icons/dfm_error.svg",
+            "Error Message",
+            feedback.error_msg,
+            tags,
+            "e.g., Critical failure: {measured} is far below the {limit} limit.",
+        )
+        self._last_edit: ParameterEdit = self.warn_edit
+        for edit in (self.warn_edit, self.err_edit):
+            edit.focused.connect(lambda e=edit: setattr(self, "_last_edit", e))
+
+        col.addLayout(self._build_param_chips())
+        return col
 
     def _build_message_field(
         self,
@@ -388,6 +917,7 @@ class EditFeedbackDialog(QtWidgets.QDialog):
         placeholder_hint: str,
     ) -> ParameterEdit:
         header = QtWidgets.QHBoxLayout()
+        header.setSpacing(6)
         icon = QtWidgets.QLabel()
         icon.setPixmap(QtGui.QIcon(icon_path).pixmap(16, 16))
         header.addWidget(icon)
@@ -400,33 +930,41 @@ class EditFeedbackDialog(QtWidgets.QDialog):
         edit = ParameterEdit(placeholders, self)
         edit.setPlainText(initial_text)
         edit.setPlaceholderText(placeholder_hint)
-        parent_layout.addWidget(edit)
+        edit.setMinimumHeight(edit.fontMetrics().lineSpacing() * 4 + 14)
+        edit.setMinimumWidth(360)
+        parent_layout.addWidget(edit, stretch=1)
         return edit
 
-    def _build_help_panel(self) -> QtWidgets.QWidget:
-        panel = QtWidgets.QWidget()
-        panel.setObjectName("HelpContainer")
-        panel.setStyleSheet(
-            "#HelpContainer { border: 1px solid palette(mid); border-radius: 4px; }"
-        )
-        grid = QtWidgets.QGridLayout(panel)
-        grid.setContentsMargins(10, 10, 10, 10)
-        grid.setSpacing(6)
+    def _build_param_chips(self) -> QtWidgets.QHBoxLayout:
+        """"Insert:" and a chip per placeholder, wrapping onto more lines."""
+        row = QtWidgets.QHBoxLayout()
+        row.setSpacing(6)
+        label = QtWidgets.QLabel("Insert:")
+        label.setToolTip("Click a placeholder to insert it where you were typing. "
+                         "Hover over one to see what it is replaced with.")
+        row.addWidget(label, 0, QtCore.Qt.AlignmentFlag.AlignTop)
+        chips = QtWidgets.QWidget()
+        flow = FlowLayout(chips, spacing=6)
+        for tag, description in self._params:
+            chip = QtWidgets.QToolButton()
+            chip.setObjectName("ParamChip")
+            chip.setText(f"{{{tag}}}")
+            chip.setToolTip(description)
+            chip.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+            chip.clicked.connect(lambda _=False, t=tag: self._insert_param(t))
+            flow.addWidget(chip)
+        row.addWidget(chips, 1)
+        # The label sits level with the first line of chips.
+        label.setFixedHeight(chips.layout().itemAt(0).sizeHint().height() if flow.count() else 20)
+        return row
 
-        title = QtWidgets.QLabel("Available Parameters")
-        title.setStyleSheet("font-weight: bold; margin-bottom: 2px;")
-        grid.addWidget(title, 0, 0, 1, 2)
+    def _insert_param(self, tag: str) -> None:
+        self._last_edit.insertPlainText(f"{{{tag}}}")
+        self._last_edit.setFocus()
 
-        rows = [
-            ("<b>{measured}</b>", "Current measured value"),
-            ("<b>{limit}</b>", "The threshold value"),
-            ("<b>{target}</b>", "The ideal target value"),
-        ]
-        for i, (code, desc) in enumerate(rows, start=1):
-            grid.addWidget(QtWidgets.QLabel(code), i, 0)
-            grid.addWidget(QtWidgets.QLabel(desc), i, 1)
-        grid.setColumnStretch(1, 1)
-        return panel
+    # ------------------------------------------------------------------
+    # Results
+    # ------------------------------------------------------------------
 
     def get_data(self) -> tuple[str, str, Criticality]:
         return (
@@ -435,15 +973,36 @@ class EditFeedbackDialog(QtWidgets.QDialog):
             self.crit_combo.currentData(),
         )
 
+    def changed_values(self) -> dict[str, str]:
+        """Return the rule values the user edited, keyed by field attribute.
+
+        A field reset to the Default material's value is returned as an
+        empty string, meaning "use Default".
+        """
+        changed = {}
+        for attr, field in self._fields.items():
+            if attr in self._reset_attrs:
+                own = getattr(self._values.limit, attr, "") if self._values.limit else ""
+                if own:
+                    changed[attr] = ""
+                continue
+            value = field.text().strip()
+            if value != self._initial[attr]:
+                changed[attr] = value
+        return changed
+
     def accept(self):
         import re
 
         warn, err, _ = self.get_data()
-        found_tags = re.findall(r"\{(.*?)\}", warn + err)
-        for tag in found_tags:
-            if tag not in self.ALLOWED_TAGS:
+        allowed = [tag for tag, _ in self._params]
+        for tag in re.findall(r"\{(.*?)\}", warn + err):
+            if tag not in allowed:
                 QtWidgets.QMessageBox.warning(
-                    self, "Invalid Tag", f"The tag {{{tag}}} is not recognized."
+                    self, "Unknown Placeholder",
+                    f"{{{tag}}} isn't filled in for {self._rule.label}, so it would show as "
+                    f"typed. This rule's messages can use: "
+                    + ", ".join(f"{{{t}}}" for t in allowed) + ".",
                 )
                 return
         super().accept()
@@ -452,11 +1011,75 @@ class EditFeedbackDialog(QtWidgets.QDialog):
 # =============================================================================
 
 
+_PREF_PATH = "User parameter:BaseApp/Preferences/Mod/DFM"
+_PREF_OFF_COLLAPSED = "ProcessLibraryOffRulesCollapsed"
+_PREF_LAYOUT = "ProcessLibraryRuleLayout"  # "list" or "grid"
+
+# Grid view: smallest comfortable tile width, used to pick 2 or 3 columns.
+_GRID_TILE_MIN_WIDTH = 300
+_GRID_SPACING = 8
+
+
+def _get_pref_bool(name: str, default: bool) -> bool:
+    try:
+        return App.ParamGet(_PREF_PATH).GetBool(name, default)
+    except Exception:
+        return default
+
+
+def _set_pref_bool(name: str, value: bool) -> None:
+    try:
+        App.ParamGet(_PREF_PATH).SetBool(name, value)
+    except Exception:
+        pass
+
+
+def _get_pref_str(name: str, default: str) -> str:
+    try:
+        return App.ParamGet(_PREF_PATH).GetString(name, default) or default
+    except Exception:
+        return default
+
+
+def _set_pref_str(name: str, value: str) -> None:
+    try:
+        App.ParamGet(_PREF_PATH).SetString(name, value)
+    except Exception:
+        pass
+
+
+class _CardGrid(QtWidgets.QWidget):
+    """Lays rule cards out in rows of *columns*, in the order given.
+
+    Cards not passed to ``place`` are hidden, so filtering never leaves gaps.
+    One column gives the list view.
+    """
+
+    def __init__(self, parent: QtWidgets.QWidget):
+        super().__init__(parent)
+        self._grid = QtWidgets.QGridLayout(self)
+        self._grid.setContentsMargins(0, 0, 0, 0)
+        self._grid.setSpacing(_GRID_SPACING)
+        self._columns_used = 0
+
+    def place(self, cards: list, columns: int) -> None:
+        while self._grid.count():
+            self._grid.takeAt(0)
+        for i, card in enumerate(cards):
+            self._grid.addWidget(card, i // columns, i % columns)
+            card.show()
+        for col in range(max(columns, self._columns_used)):
+            self._grid.setColumnStretch(col, 1 if col < columns else 0)
+        self._columns_used = columns
+        self.setVisible(bool(cards))
+
+
 class MaterialEditView(QtCore.QObject):
     limit_changed = QtCore.Signal(object, str, str)
-    reset_requested = QtCore.Signal(object)
+    field_reset_requested = QtCore.Signal(object, str)
     rule_active_toggled = QtCore.Signal(object, bool)
     feedback_requested = QtCore.Signal(object)
+    criticality_changed = QtCore.Signal(object, object)  # Rulebook, Criticality
 
     def __init__(self, scroll_area: QtWidgets.QScrollArea):
         super().__init__()
@@ -478,6 +1101,59 @@ class MaterialEditView(QtCore.QObject):
         self._default_material: Optional[Material] = None
         self._active_rules: list = []
         self._editable: bool = True
+        self._archetype: Optional[ProcessArchetype] = None
+
+        # Filters; kept when switching material.
+        self._search = ""
+        self._only_overridden = False
+        self._only_on = False
+        self._scopes: set[str] = {"M", "P", "S"}
+
+        # Collapsible section holding the rules that are off.
+        self._off_collapsed = _get_pref_bool(_PREF_OFF_COLLAPSED, True)
+        self._off_header: Optional[QtWidgets.QToolButton] = None
+
+        # List (one wide row per rule) or grid (tiles with the rule diagram).
+        self._layout_mode = _get_pref_str(_PREF_LAYOUT, "list")
+        if self._layout_mode not in ("list", "grid"):
+            self._layout_mode = "list"
+        self._on_grid: Optional[_CardGrid] = None
+        self._off_grid: Optional[_CardGrid] = None
+        self._columns = 1
+        self._populate_args: Optional[dict] = None
+        self.scroll.viewport().installEventFilter(self)
+
+    @property
+    def layout_mode(self) -> str:
+        return self._layout_mode
+
+    def set_layout_mode(self, mode: str) -> None:
+        """Switch between "list" and "grid" and rebuild the cards."""
+        if mode == self._layout_mode or mode not in ("list", "grid"):
+            return
+        self._layout_mode = mode
+        _set_pref_str(_PREF_LAYOUT, mode)
+        if self._populate_args is not None:
+            self.populate(**self._populate_args)
+
+    def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        # Reflow the grid when the visible width changes the column count.
+        if (
+            obj is self.scroll.viewport()
+            and event.type() == QtCore.QEvent.Type.Resize
+            and self._layout_mode == "grid"
+            and self._column_count() != self._columns
+        ):
+            self._apply_filters()
+        return super().eventFilter(obj, event)
+
+    def _column_count(self) -> int:
+        if self._layout_mode != "grid":
+            return 1
+        margins = self._layout.contentsMargins()
+        width = self.scroll.viewport().width() - margins.left() - margins.right()
+        three = 3 * _GRID_TILE_MIN_WIDTH + 2 * _GRID_SPACING
+        return 3 if width >= three else 2
 
     def populate(
         self,
@@ -485,14 +1161,21 @@ class MaterialEditView(QtCore.QObject):
         default_material: Optional[Material],
         active_rules: list,
         editable: bool = True,
+        archetype: Optional[ProcessArchetype] = None,
+        criticality_of: Optional[Callable[[Rulebook], Criticality]] = None,
     ) -> None:
-        """Full rebuild. Used when switching material or process."""
+        """Full rebuild. Used when switching material, process or layout."""
+        self._populate_args = dict(
+            material=material, default_material=default_material, active_rules=active_rules,
+            editable=editable, archetype=archetype, criticality_of=criticality_of,
+        )
         scroll_pos = self.scroll.verticalScrollBar().value()
 
         self._material = material
         self._default_material = default_material
         self._active_rules = list(active_rules)
         self._editable = editable
+        self._archetype = archetype
 
         self._clear()
 
@@ -507,14 +1190,27 @@ class MaterialEditView(QtCore.QObject):
                 is_default_material=(material.name == "Default"),
                 is_active=is_active,
                 parent=self._container,
+                archetype=archetype,
+                layout_mode=self._layout_mode,
             )
+            card.hide()
             card.set_editable(editable)
+            if criticality_of is not None:
+                card.set_criticality(criticality_of(rule))
             if editable:
                 self._wire_card(card, rule)
-            self._layout.addWidget(card)
             self._cards[rule] = card
 
+        # On rules, the Off header, then the rules that are off.
+        self._on_grid = _CardGrid(self._container)
+        self._off_header = self._make_off_header()
+        self._off_grid = _CardGrid(self._container)
+        self._layout.addWidget(self._on_grid)
+        self._layout.addWidget(self._off_header)
+        self._layout.addWidget(self._off_grid)
         self._layout.addStretch(1)
+        self._wire_dependencies()
+        self._apply_filters()
 
         QtCore.QTimer.singleShot(0, lambda: self.scroll.verticalScrollBar().setValue(scroll_pos))
 
@@ -540,6 +1236,24 @@ class MaterialEditView(QtCore.QObject):
             )
 
         self._reorder_cards()
+        self._apply_filters()
+
+    def rule_context(self, rule: Rulebook) -> Optional[RuleValueContext]:
+        """Return what the rule dialog needs to show and edit *rule*'s values."""
+        if not self._material:
+            return None
+        badge = _resolve_badge(rule, self._archetype)
+        derived = self._archetype.derived_rules if self._archetype else {}
+        return RuleValueContext(
+            limit=self._material.rule_limits.get(rule),
+            default_limit=(
+                self._default_material.rule_limits.get(rule) if self._default_material else None
+            ),
+            is_default_material=(self._material.name == "Default"),
+            material_name=self._material.name if badge == "M" else None,
+            derived_hint=derived.get(rule, "") if badge == "S" else "",
+            is_active=rule in self._active_rules,
+        )
 
     def refresh_rule(self, rule: Rulebook) -> None:
         """Update a single card's values in place. Called after reset."""
@@ -556,16 +1270,101 @@ class MaterialEditView(QtCore.QObject):
             is_default_material=(self._material.name == "Default"),
             is_active=rule in self._active_rules,
         )
+        # Push refreshed values to any cards that depend on this rule.
+        for r in Rulebook:
+            dep = r.dependency
+            if dep is None:
+                continue
+            if dep.source_rule == rule.name:
+                dep_card = self._cards.get(r)
+                if dep_card and card:
+                    new_val = card.get_field_value(dep.source_field)
+                    dep_card.update_dep_value(new_val)
+        self._apply_filters()
+
+    def set_criticality(self, rule: Rulebook, criticality: Criticality) -> None:
+        card = self._cards.get(rule)
+        if card:
+            card.set_criticality(criticality)
 
     def clear(self) -> None:
         self._clear()
 
+    # -- Filtering -------------------------------------------------------------
+
     def filter_rules(self, text: str) -> None:
-        term = text.lower().strip()
+        self._search = text.lower().strip()
+        self._apply_filters()
+
+    def set_filters(self, only_overridden: bool, only_on: bool, scopes: set[str]) -> None:
+        self._only_overridden = only_overridden
+        self._only_on = only_on
+        self._scopes = set(scopes)
+        self._apply_filters()
+
+    def _passes_filters(self, card: BaseRuleCard) -> bool:
+        term = self._search
+        if term and term not in card.rule.label.lower() and term not in (
+            card.rule.description or ""
+        ).lower():
+            return False
+        if self._only_overridden and not card.has_overrides():
+            return False
+        if self._only_on and not card.is_active:
+            return False
+        return card.badge_type in self._scopes
+
+    def _apply_filters(self) -> None:
+        """Place the cards that pass the filters; hide the rest."""
+        if self._on_grid is None or self._off_grid is None:
+            return
+        # While searching, show matching rules that are off even if collapsed.
+        show_off = not self._off_collapsed or bool(self._search)
+        on_cards, off_cards = [], []
+        off_matching = 0
+        for rule in self._sorted_rules(self._active_rules):
+            card = self._cards.get(rule)
+            if card is None or not self._passes_filters(card):
+                continue
+            if card.is_active:
+                on_cards.append(card)
+            else:
+                off_matching += 1
+                if show_off:
+                    off_cards.append(card)
+        placed = set(on_cards) | set(off_cards)
         for card in self._cards.values():
-            label_match = term in card.rule.label.lower()
-            desc_match = term in (card.rule.description or "").lower()
-            card.setVisible(label_match or desc_match)
+            if card not in placed:
+                card.hide()
+        self._columns = self._column_count()
+        self._on_grid.place(on_cards, self._columns)
+        self._off_grid.place(off_cards, self._columns)
+        if self._off_header is not None:
+            self._off_header.setVisible(off_matching > 0)
+            self._off_header.setText(f"Off ({off_matching})")
+            self._off_header.setArrowType(
+                QtCore.Qt.ArrowType.DownArrow if show_off else QtCore.Qt.ArrowType.RightArrow
+            )
+
+    # -- Off section -----------------------------------------------------------
+
+    def _make_off_header(self) -> QtWidgets.QToolButton:
+        header = QtWidgets.QToolButton(self._container)
+        header.setObjectName("OffSectionHeader")
+        header.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        header.setAutoRaise(True)
+        header.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        header.setToolTip("Show or hide the rules that are turned off")
+        font = header.font()
+        font.setBold(True)
+        header.setFont(font)
+        header.clicked.connect(self._toggle_off_section)
+        return header
+
+    def _toggle_off_section(self) -> None:
+        self._off_collapsed = not self._off_collapsed
+        _set_pref_bool(_PREF_OFF_COLLAPSED, self._off_collapsed)
+        self._apply_filters()
 
     def _sorted_rules(self, active_rules) -> list:
         """Active rules first, then grouped by family.
@@ -580,30 +1379,113 @@ class MaterialEditView(QtCore.QObject):
         )
 
     def _reorder_cards(self) -> None:
-        """Move card widgets in the layout to match sorted order without rebuilding."""
-        desired_order = self._sorted_rules(self._active_rules)
-
-        for i, rule in enumerate(desired_order):
-            card = self._cards.get(rule)
-            if not card:
-                continue
-            current_index = self._layout.indexOf(card)
-            if current_index != i:
-                self._layout.removeWidget(card)
-                self._layout.insertWidget(i, card)
+        """Rules that are on come first; placement handles the order."""
+        self._apply_filters()
 
     def _wire_card(self, card: BaseRuleCard, rule: Rulebook) -> None:
-        card.value_changed.connect(lambda attr, val, r=rule: self.limit_changed.emit(r, attr, val))
-        card.reset_requested.connect(lambda r=rule: self.reset_requested.emit(r))
+        card.value_changed.connect(
+            lambda attr, val, r=rule: self._on_card_value_changed(r, attr, val)
+        )
+        card.field_reset_requested.connect(
+            lambda attr, r=rule: self.field_reset_requested.emit(r, attr)
+        )
         card.active_toggled.connect(lambda state, r=rule: self.rule_active_toggled.emit(r, state))
         card.feedback_requested.connect(lambda r=rule: self.feedback_requested.emit(r))
+        card.criticality_changed.connect(
+            lambda level, r=rule: self.criticality_changed.emit(r, level)
+        )
+        card.dep_link_clicked.connect(self._on_dep_link_clicked)
+
+    # -- Cross-rule dependency helpers -----------------------------------------
+
+    def _on_card_value_changed(
+        self, rule: Rulebook, attr: str, value: str,
+    ) -> None:
+        """Forward to the model signal, then update any dependent cards."""
+        self.limit_changed.emit(rule, attr, value)
+        self._update_dependent_cards(rule, attr, value)
+        self._apply_filters()
+
+    def _wire_dependencies(self) -> None:
+        """Set initial inline dependency values after cards are built."""
+        for rule in Rulebook:
+            dep = rule.dependency
+            if dep is None:
+                continue
+            dep_card = self._cards.get(rule)
+            source_rule = Rulebook[dep.source_rule]
+            source_card = self._cards.get(source_rule)
+            if dep_card and source_card:
+                initial_value = source_card.get_field_value(dep.source_field)
+                dep_card.update_dep_value(initial_value)
+
+    def _update_dependent_cards(
+        self, changed_rule: Rulebook, attr: str, value: str,
+    ) -> None:
+        """When a source rule's value changes, push it to dependent cards."""
+        for rule in Rulebook:
+            dep = rule.dependency
+            if dep is None:
+                continue
+            if dep.source_rule == changed_rule.name and dep.source_field == attr:
+                dep_card = self._cards.get(rule)
+                if dep_card:
+                    dep_card.update_dep_value(value)
+
+    def _on_dep_link_clicked(self, target_rule: Rulebook) -> None:
+        """Scroll to the source rule card and flash the linked field."""
+        card = self._cards.get(target_rule)
+        if not card:
+            return
+
+        # Find which field to highlight by looking up the dependency that
+        # points at target_rule.
+        source_field = None
+        for rule in Rulebook:
+            dep = rule.dependency
+            if dep and dep.source_rule == target_rule.name:
+                source_field = dep.source_field
+                break
+
+        widget = card.get_field_widget(source_field) if source_field else None
+        if not widget:
+            return
+
+        self.scroll.ensureWidgetVisible(card, 50, 50)
+        self._pulse_field(widget)
+
+    _PULSE_FIELD_STYLE = (
+        "QWidget#UnitInput { border: 1.5px solid #5b9bd5; border-radius: 3px; }"
+    )
+
+    def _pulse_field(self, widget: QtWidgets.QWidget) -> None:
+        """Flash a UnitInput border blue twice."""
+        # pulse 1: on
+        widget.setStyleSheet(self._PULSE_FIELD_STYLE)
+        # pulse 1: off
+        QtCore.QTimer.singleShot(250, lambda w=widget: w.setStyleSheet(""))
+        # pulse 2: on
+        QtCore.QTimer.singleShot(500, lambda w=widget: w.setStyleSheet(self._PULSE_FIELD_STYLE))
+        # pulse 2: off
+        QtCore.QTimer.singleShot(750, lambda w=widget: w.setStyleSheet(""))
+
+    # -------------------------------------------------------------------------
 
     def _clear(self) -> None:
+        # Hide before deleting: deletion waits for the event loop, and the old
+        # cards would otherwise show through the new ones until then.
+        for card in self._cards.values():
+            card.hide()
+            card.deleteLater()
         self._cards.clear()
+        self._off_header = None
+        self._on_grid = None
+        self._off_grid = None
         while self._layout.count():
             item = self._layout.takeAt(0)
             widget = item.widget()
             if widget:
+                widget.hide()
                 widget.deleteLater()
 
 
@@ -676,6 +1558,45 @@ class AddProcessDialog(_NamedCategoryDialog):
             parent=parent,
         )
 
+        # Insert archetype combo between Name and Category
+        self.archetype_combo = QtWidgets.QComboBox()
+        self.archetype_combo.setMinimumHeight(32)
+        for arch in ProcessArchetype:
+            self.archetype_combo.addItem(arch.label, arch)
+        self.archetype_combo.setToolTip(
+            "Determines how thresholds are derived and what the analysis asks for.\n"
+            + "\n".join(f"{arch.label}: {arch.description}" for arch in ProcessArchetype)
+        )
+
+        form_layout: QtWidgets.QFormLayout = self.layout()  # type: ignore
+        # Row 0 = Name, Row 1 = Category, Row 2 = Buttons
+        # Insert archetype at row 1, pushing Category to row 2
+        form_layout.insertRow(1, "Archetype:", self.archetype_combo)
+
+        # Auto-fill category when archetype changes
+        self._user_edited_category = False
+        self.cat_combo.lineEdit().textEdited.connect(self._on_category_edited)
+        self.archetype_combo.currentIndexChanged.connect(self._on_archetype_changed)
+        # Set initial category from default archetype
+        self._on_archetype_changed()
+
+    def _on_archetype_changed(self):
+        """Auto-fill category with the archetype's label unless the user typed their own."""
+        if not self._user_edited_category:
+            arch = self.archetype_combo.currentData()
+            if arch:
+                self.cat_combo.setCurrentText(arch.label)
+
+    def _on_category_edited(self):
+        """Once the user manually types in the category, stop overwriting it."""
+        self._user_edited_category = True
+
+    def get_data(self) -> tuple[str, str, ProcessArchetype]:  # type: ignore[override]
+        name = self.name_edit.text().strip()
+        category = self.cat_combo.currentText().strip()
+        archetype = self.archetype_combo.currentData()
+        return name, category, archetype
+
 
 # =============================================================================
 
@@ -720,6 +1641,7 @@ class ProcessLibraryController(QtCore.QObject):
         self._connect_signals()
         self._refresh_process_tree()
         self._auto_select_first()
+        self._update_dirty_state()
 
     def _connect_signals(self):
         f = self.view.form
@@ -730,6 +1652,21 @@ class ProcessLibraryController(QtCore.QObject):
         f.leSearchRules.textChanged.connect(self.view.material_edit_view.filter_rules)
         f.buttonBox.accepted.connect(self.on_save)
         f.buttonBox.rejected.connect(self.on_reject)
+        self.view.filters_changed.connect(self.view.material_edit_view.set_filters)
+        self.view.layout_mode_changed.connect(self.view.material_edit_view.set_layout_mode)
+        save_shortcut = QtGui.QShortcut(
+            QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.Save), self.view
+        )
+        save_shortcut.activated.connect(self.on_save_in_place)
+
+        self.view.tbUndo.clicked.connect(self.on_undo)
+        self.view.tbRedo.clicked.connect(self.on_redo)
+        for key, slot in (
+            (QtGui.QKeySequence.StandardKey.Undo, self.on_undo),
+            (QtGui.QKeySequence.StandardKey.Redo, self.on_redo),
+        ):
+            shortcut = QtGui.QShortcut(QtGui.QKeySequence(key), self.view)
+            shortcut.activated.connect(slot)
 
         tree = self.view.tree_view
         tree.selection_changed.connect(self.on_tree_selection_changed)
@@ -738,15 +1675,50 @@ class ProcessLibraryController(QtCore.QObject):
 
         edit = self.view.material_edit_view
         edit.limit_changed.connect(self.on_limit_changed)
-        edit.reset_requested.connect(self.on_limit_reset)
+        edit.field_reset_requested.connect(self.on_field_reset)
         edit.rule_active_toggled.connect(self.on_rule_toggled)
         edit.feedback_requested.connect(self.on_edit_feedback)
+        edit.criticality_changed.connect(self.on_criticality_changed)
 
     def _update_dirty_state(self):
         self.view.set_dirty_title(self.model.is_dirty)
+        save_btn = self.view.form.buttonBox.button(
+            QtWidgets.QDialogButtonBox.StandardButton.Save
+        )
+        if save_btn is not None:
+            save_btn.setEnabled(self.model.is_dirty)
+        self.view.tree_view.update_markers(self.model)
+        self.view.set_history_state(self.model.undo_label, self.model.redo_label)
+
+    def on_undo(self):
+        self._show_after_history(self.model.undo())
+
+    def on_redo(self):
+        self._show_after_history(self.model.redo())
+
+    def _show_after_history(self, where: Optional[tuple[str, Optional[str]]]):
+        """Show the process and material an undone or redone change was made in."""
+        if where is None:
+            return
+        process_name, material_name = where
+        tree = self.view.tree_view
+        tree.tree.blockSignals(True)
+        self._refresh_process_tree()
+        if material_name:
+            tree.select_material(process_name, material_name)
+        else:
+            tree.select_process(process_name)
+        tree.tree.blockSignals(False)
+        payload = (
+            {"type": "material", "name": material_name, "process": process_name}
+            if material_name else {"type": "process", "name": process_name}
+        )
+        self.on_tree_selection_changed(payload, clear_search=False)
+        self._update_dirty_state()
 
     def _refresh_process_tree(self):
         self.view.tree_view.populate(self.model.get_categorized_processes())
+        self.view.tree_view.update_markers(self.model)
 
     def _auto_select_first(self):
         for processes in self.model.get_categorized_processes().values():
@@ -765,13 +1737,14 @@ class ProcessLibraryController(QtCore.QObject):
             }
         )
 
-    def on_tree_selection_changed(self, payload: dict):
+    def on_tree_selection_changed(self, payload: dict, clear_search: bool = True):
         node_type = payload.get("type")
         name = payload.get("name")
         if not isinstance(name, str) or not name:
             return
 
-        self.view.form.leSearchRules.clear()
+        if clear_search:
+            self.view.form.leSearchRules.clear()
 
         is_builtin = self.model.is_builtin(name) if node_type == "process" else False
         has_override = self.model.has_user_override(name) if node_type == "process" else False
@@ -797,7 +1770,9 @@ class ProcessLibraryController(QtCore.QObject):
         default_mat = process.materials.get("Default")
         if default_mat:
             self.view.material_edit_view.populate(
-                default_mat, default_mat, process.active_rules, editable=False
+                default_mat, default_mat, process.active_rules,
+                editable=False, archetype=process.archetype,
+                criticality_of=process.get_criticality,
             )
 
     def _display_material(self, process_name: str, mat_name: str):
@@ -806,10 +1781,12 @@ class ProcessLibraryController(QtCore.QObject):
         if not (process and material):
             return
         self.view.set_process_label(process.name, process.description)
-        self.view.set_material_edit_title(f"Editing {material.name}")
+        self.view.set_material_edit_title(f"Editing {material.name} ({process.name})")
         default_mat = process.materials.get("Default", material)
         self.view.material_edit_view.populate(
-            material, default_mat, process.active_rules, editable=True
+            material, default_mat, process.active_rules,
+            editable=True, archetype=process.archetype,
+            criticality_of=process.get_criticality,
         )
 
     def on_new_request(self):
@@ -865,13 +1842,13 @@ class ProcessLibraryController(QtCore.QObject):
         dlg = AddProcessDialog(self.model.registry.get_categories(), self.view)
         if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
-        name, category = dlg.get_data()
+        name, category, archetype = dlg.get_data()
         if not name or not category:
             QtWidgets.QMessageBox.warning(
                 self.view, "Invalid Input", "Both name and category are required."
             )
             return
-        if not self.model.add_process(name, category):
+        if not self.model.add_process(name, category, archetype):
             QtWidgets.QMessageBox.warning(
                 self.view, "Duplicate", f"Process '{name}' already exists."
             )
@@ -925,6 +1902,7 @@ class ProcessLibraryController(QtCore.QObject):
         if self.model.restore_default(process.name):
             self._refresh_process_tree()
             self.view.tree_view.select_process(process.name)
+            self._update_dirty_state()
 
     def on_add_material(self, process_name: Optional[str] = None):
         """Updated: Removed category gathering and processing."""
@@ -990,32 +1968,62 @@ class ProcessLibraryController(QtCore.QObject):
             rules.add(rule)
         else:
             rules.discard(rule)
-        self.model.update_active_rules(list(rules))
+        self.model.update_active_rules(
+            list(rules), f"Turn {'on' if is_active else 'off'} {rule.label}"
+        )
         self._update_dirty_state()
         self.view.material_edit_view.refresh_active_rules(process.active_rules)
 
     def on_edit_feedback(self, rule: Rulebook):
         process = self.model.active_process
-        if not process:
+        values = self.view.material_edit_view.rule_context(rule)
+        if not process or values is None:
             return
         feedback = process.rule_feedback.get(rule) or RuleFeedback()
         criticality = process.get_criticality(rule)
 
-        dlg = EditFeedbackDialog(process.name, rule.label, feedback, criticality, self.view)
+        dlg = EditFeedbackDialog(process.name, rule, feedback, criticality, values, self.view)
         if not dlg.exec():
             return
         warn, err, crit = dlg.get_data()
-        process.rule_feedback[rule] = RuleFeedback(warn, err)
-        self.model.update_rule_criticality(rule, crit)
+        changed = dlg.changed_values()
+        with self.model.undo_group(f"Edit {rule.label}"):
+            self.model.update_rule_feedback(rule, warn, err)
+            self.model.update_rule_criticality(rule, crit)
+            for attr, value in changed.items():
+                if value:
+                    self.model.update_rule_limit(rule, attr, value)
+                else:
+                    self.model.reset_rule_field(rule, attr)
+        self.view.material_edit_view.set_criticality(rule, crit)
+        if changed:
+            self.view.material_edit_view.refresh_rule(rule)
+        self._update_dirty_state()
+
+    def on_criticality_changed(self, rule: Rulebook, criticality: Criticality):
+        self.model.update_rule_criticality(rule, criticality)
         self._update_dirty_state()
 
     def on_limit_changed(self, rule: Rulebook, attr: str, value: str):
         self.model.update_rule_limit(rule, attr, value)
         self._update_dirty_state()
 
-    def on_limit_reset(self, rule: Rulebook):
-        self.model.reset_rule_limit(rule)
+    def on_field_reset(self, rule: Rulebook, attr: str):
+        self.model.reset_rule_field(rule, attr)
         self.view.material_edit_view.refresh_rule(rule)
+        self._update_dirty_state()
+
+    def on_save_in_place(self):
+        """Save without closing the library (Ctrl+S)."""
+        if not self.model.is_dirty:
+            return
+        try:
+            self.model.save()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self.view, "Save Error", f"Failed to save process data: {e}"
+            )
+            return
         self._update_dirty_state()
 
     def on_save(self):
@@ -1046,6 +2054,9 @@ class ProcessLibraryController(QtCore.QObject):
 
 
 class ProcessLibrary(QtWidgets.QDialog):
+    filters_changed = QtCore.Signal(bool, bool, set)  # overridden only, on only, scopes
+    layout_mode_changed = QtCore.Signal(str)  # "list" or "grid"
+
     def __init__(self, parent=None):
         super().__init__(parent or Gui.getMainWindow())
 
@@ -1069,8 +2080,12 @@ class ProcessLibrary(QtWidgets.QDialog):
         self.tree_view = ProcessTreeView(self.form.twProcess)
         self.material_edit_view = MaterialEditView(self.form.twMaterialEdit)
 
+        self.form.hSplitter.setSizes([280, 920])
+
         self._configure_static_widgets()
         self._configure_toolbar_icons()
+        self._build_history_buttons()
+        self._build_filter_button()
 
         find_shortcut = QtGui.QShortcut(
             QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.Find), self
@@ -1087,13 +2102,10 @@ class ProcessLibrary(QtWidgets.QDialog):
         self.form.leSearchRules.setClearButtonEnabled(True)
 
     def _configure_toolbar_icons(self):
-        std = self.style()
-        self.form.tbNew.setIcon(Gui.getIcon("list-add"))
-        self.form.tbDelete.setIcon(Gui.getIcon("list-remove"))
-        self.form.tbImport.setIcon(Gui.getIcon("Std_Import"))
-        self.form.tbRestore.setIcon(
-            std.standardIcon(QtWidgets.QStyle.StandardPixmap.SP_BrowserReload)
-        )
+        apply_svg_icon(self.form.tbNew, ADD_SVG)
+        apply_svg_icon(self.form.tbDelete, REMOVE_SVG)
+        apply_svg_icon(self.form.tbImport, IMPORT_SVG)
+        apply_svg_icon(self.form.tbRestore, _RESET_SVG)
         for btn in (
             self.form.tbNew,
             self.form.tbImport,
@@ -1102,6 +2114,122 @@ class ProcessLibrary(QtWidgets.QDialog):
         ):
             btn.setIconSize(QtCore.QSize(20, 20))
             btn.setFixedSize(28, 28)
+
+    def _build_history_buttons(self) -> None:
+        """Add Undo and Redo buttons to the end of the tree toolbar."""
+        layout = self.form.fTreeHeader.layout()
+        layout.addSpacing(6)
+        for attr, svg, name in (("tbUndo", UNDO_SVG, "Undo"), ("tbRedo", REDO_SVG, "Redo")):
+            btn = QtWidgets.QToolButton(self.form.fTreeHeader)
+            btn.setAutoRaise(True)
+            btn.setFixedSize(28, 28)
+            btn.setAccessibleName(name)
+            apply_svg_icon(btn, svg, 20)
+            btn.setEnabled(False)
+            layout.addWidget(btn)
+            setattr(self, attr, btn)
+        self.set_history_state("", "")
+
+    def set_history_state(self, undo_label: str, redo_label: str) -> None:
+        native = QtGui.QKeySequence.SequenceFormat.NativeText
+        undo_key = QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.Undo).toString(native)
+        redo_key = QtGui.QKeySequence(QtGui.QKeySequence.StandardKey.Redo).toString(native)
+        self.tbUndo.setEnabled(bool(undo_label))
+        self.tbRedo.setEnabled(bool(redo_label))
+        self.tbUndo.setToolTip(
+            f"Undo {undo_label} ({undo_key})" if undo_label else f"Undo ({undo_key})"
+        )
+        self.tbRedo.setToolTip(
+            f"Redo {redo_label} ({redo_key})" if redo_label else f"Redo ({redo_key})"
+        )
+
+    _SCOPE_ACTIONS = (
+        ("M", "Material rules"),
+        ("P", "Process rules"),
+        ("S", "Setup rules"),
+    )
+
+    def _build_filter_button(self) -> None:
+        """Add a Filter menu beside the rule search box."""
+        btn = QtWidgets.QToolButton(self.form.gbMaterialEdit)
+        btn.setText("Filter")
+        btn.setToolTip("Filter the rules shown")
+        btn.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        btn.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.InstantPopup)
+        btn.setAutoRaise(True)
+        apply_svg_icon(btn, FILTER_SVG, 16)
+        self._filter_btn = btn
+
+        menu = QtWidgets.QMenu(btn)
+        self._act_overridden = menu.addAction("Overridden only")
+        self._act_overridden.setToolTip("Show only rules that differ from the Default material")
+        self._act_on = menu.addAction("On only")
+        self._act_on.setToolTip("Hide the rules that are turned off")
+        menu.addSection("Scope")
+        self._scope_actions: dict[str, QtGui.QAction] = {}
+        for key, text in self._SCOPE_ACTIONS:
+            self._scope_actions[key] = menu.addAction(text)
+        for act in (self._act_overridden, self._act_on, *self._scope_actions.values()):
+            act.setCheckable(True)
+            act.toggled.connect(self._emit_filters)
+        for act in self._scope_actions.values():
+            act.setChecked(True)
+        menu.addSeparator()
+        menu.addAction("Clear Filters").triggered.connect(self._clear_filters)
+        menu.setToolTipsVisible(True)
+        btn.setMenu(menu)
+
+        # Put the search box and the button on one row.
+        layout = self.form.gbMaterialEdit.layout()
+        search = self.form.leSearchRules
+        index = layout.indexOf(search)
+        layout.removeWidget(search)
+        row = QtWidgets.QHBoxLayout()
+        row.setSpacing(6)
+        row.addWidget(search, stretch=1)
+        row.addWidget(btn)
+        self._add_layout_toggle(row)
+        layout.insertLayout(index, row)
+
+    def _add_layout_toggle(self, row: QtWidgets.QHBoxLayout) -> None:
+        """List / Grid switch for the rule cards."""
+        group = QtWidgets.QButtonGroup(self)
+        group.setExclusive(True)
+        current = self.material_edit_view.layout_mode
+        for mode, svg, tip in (
+            ("list", LIST_VIEW_SVG, "List view: one row per rule"),
+            ("grid", GRID_VIEW_SVG, "Grid view: rule tiles with diagrams"),
+        ):
+            b = QtWidgets.QToolButton(self.form.gbMaterialEdit)
+            b.setCheckable(True)
+            b.setAutoRaise(True)
+            b.setFixedSize(28, 28)
+            b.setToolTip(tip)
+            b.setAccessibleName(tip)
+            apply_svg_icon(b, svg, 18)
+            b.setChecked(mode == current)
+            b.toggled.connect(
+                lambda on, m=mode: on and self.layout_mode_changed.emit(m)
+            )
+            group.addButton(b)
+            row.addWidget(b)
+        self._layout_group = group
+
+    def _clear_filters(self) -> None:
+        for act in (self._act_overridden, self._act_on):
+            act.setChecked(False)
+        for act in self._scope_actions.values():
+            act.setChecked(True)
+
+    def _emit_filters(self) -> None:
+        scopes = {k for k, act in self._scope_actions.items() if act.isChecked()}
+        active = (
+            int(self._act_overridden.isChecked())
+            + int(self._act_on.isChecked())
+            + (len(self._scope_actions) - len(scopes))
+        )
+        self._filter_btn.setText(f"Filter ({active})" if active else "Filter")
+        self.filters_changed.emit(self._act_overridden.isChecked(), self._act_on.isChecked(), scopes)
 
     def set_dirty_title(self, is_dirty: bool):
         self.setWindowTitle("DFM Process Library" + (" *" if is_dirty else ""))

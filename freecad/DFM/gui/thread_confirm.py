@@ -179,3 +179,44 @@ def ask(
     if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
         return {}
     return dialog.answers()
+
+
+def offer_confirmations(target_object, context) -> bool:
+    """Ask which tap-drill-sized bores are really tapped, once each.
+
+    Returns whether anything was confirmed, which is the only outcome worth
+    re-analysing for: a rejection changes no finding, because the workbench
+    was never going to assert that thread anyway.
+
+    A part whose document declares its threads is never asked about. The
+    designer has already said, and putting the same question again invites
+    a worse answer than the one already on file.
+    """
+    from ..app.prefs import dfm_params
+    from ..core.machining import thread_sources
+
+    if not dfm_params().GetBool("MachiningConfirmInferredThreads", True):
+        return False
+    if context is None or target_object is None:
+        return False
+    try:
+        evidence = thread_sources.thread_evidence_for(target_object)
+        if evidence.declarations:
+            return False
+        candidates = thread_sources.candidates_for(
+            context.recognition.features,
+            context.graph,
+            evidence,
+            unit_system=getattr(context.config, "unit_system", "both"),
+        )
+        answers = ask(candidates, target_object)
+        if not answers:
+            return False
+        confirmed = thread_sources.record_answers(
+            evidence.confirmations, candidates, answers
+        )
+        thread_sources.save_confirmations(target_object.Document, evidence.confirmations)
+        return confirmed > 0
+    except Exception as e:
+        App.Console.PrintError(f"Could not confirm tapped holes: {e}\n")
+        return False

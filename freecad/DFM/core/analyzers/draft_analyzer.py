@@ -25,7 +25,7 @@ from ...core.utils.geometry import (
     get_face_uv_normal,
     yield_face_uv_grid,
 )
-from ...core.utils.mold import MoldSide, moldside_of_face
+from ...core.utils.mold import MoldSide, SideActionValue, moldside_of_face, releasing_side_action
 
 
 @register_analyzer("DRAFT_ANALYZER")
@@ -33,7 +33,15 @@ class DraftAnalyzer(BaseAnalyzer):
     """
     Analyzes and classifies the draft angles of all faces in a shape
     relative to a specific injection molding pull direction.
+
+    With side actions (slides, lifters, pickouts), a face the main pull
+    can't release but a side action can is measured along that side
+    action's direction instead, and its value says which one
+    (SideActionValue).
     """
+
+    parallel = True
+    relative_cost = 8  # ~ms per face (see BaseAnalyzer.relative_cost)
 
     @property
     def analysis_type(self) -> str:
@@ -41,39 +49,65 @@ class DraftAnalyzer(BaseAnalyzer):
 
     @property
     def requirements(self) -> set[ProcessRequirement]:
-        return {ProcessRequirement.PULL_DIRECTION}
+        return {ProcessRequirement.PULL_DIRECTION, ProcessRequirement.SIDE_ACTIONS}
 
     @property
     def name(self) -> str:
         return "Draft Analyzer"
 
     def resolve_prefs(self, prefs: dict) -> None:
-        pass
+        self.samples = prefs.get("DraftSamples", 20)
+        self.margin = prefs.get("DraftMargin", 0.01)
+        self.classifier_tol = prefs.get("DraftClassifierTol", 1e-6)
+        self.side_samples = prefs.get("DraftSideActionSamples", 4)
 
-    def execute(
-        self,
-        shape,
-        face_index: FaceIndex,
-        edge_index: EdgeIndex,
-        progress_cb=None,
-        check_abort=None,
-        **kwargs,
-    ):
-        """Runs a full draft analysis on an inputted shape."""
+    def prepare(self, shape, face_index: FaceIndex, edge_index: EdgeIndex, **kwargs) -> None:
+        super().prepare(shape, face_index, edge_index, **kwargs)
         self.pull_direction = kwargs.get(ProcessRequirement.PULL_DIRECTION.name, gp_Dir(0, 0, 1))
-        self.samples = kwargs.get("samples", 20)
+
+        self.side_actions = [d for d in (kwargs.get(ProcessRequirement.SIDE_ACTIONS.name) or []) if d]
 
         self.face_index = face_index
-        self.core_cavity_mapping = self.classify_moldside(shape)
+        # Core or cavity side, worked out per face when it is analyzed.
+        self.core_cavity_mapping = _MoldSides(self)
+        self._intersector = IntCurvesFace_ShapeIntersector()
+        self._intersector.Load(shape, self.classifier_tol)
 
-        results = {}
-
-        for face in self.iter_faces(shape, progress_cb, check_abort):
-            result = self.get_draft_for_face(face)
+    def analyze(self, face: TopoDS_Face):
+        """The smallest draft of one face (a SideActionValue if a side action forms it)."""
+        side = 0
+        if self.side_actions:
+            side = releasing_side_action(
+                face, self._intersector, self.pull_direction, self.side_actions,
+                self.side_samples,
+            )
+        if side:
+            result = self.get_side_action_draft(face, self.side_actions[side - 1])
             if result is not None:
-                results[("Face", self.face_index.index_of(face))] = result
+                result = SideActionValue(result, side)
+            return result
+        return self.get_draft_for_face(face)
 
-        return results
+    def get_side_action_draft(self, face: TopoDS_Face, direction: gp_Dir) -> Optional[float]:
+        """The smallest draft of a face formed by a side action moving along *direction*.
+
+        The side action pulls away from the face, so draft is measured the
+        same way as for faces pulled along the main direction: 90 degrees
+        facing the direction, 0 parallel to it, negative if it leans back.
+        """
+        if BRepAdaptor_Surface(face).GetType() == GeomAbs_Plane:
+            uvs = [get_face_uv_center(face)]
+        else:
+            uvs = list(yield_face_uv_grid(face, self.samples, margin=self.margin))
+        smallest = None
+        for u, v in uvs:
+            normal = get_face_uv_normal(face, u, v)
+            if not normal:
+                continue
+            angle = math.degrees(direction.Angle(normal))
+            draft = 90.0 if math.isclose(angle, 0.0, abs_tol=1e-5) else 90.0 - angle
+            smallest = draft if smallest is None else min(smallest, draft)
+        return smallest
 
     def get_draft_for_face(self, face: TopoDS_Face) -> float:
         """Calculates the minimum draft angle in degrees."""
@@ -95,7 +129,7 @@ class DraftAnalyzer(BaseAnalyzer):
         """
         min_draft_angle = float("inf")
 
-        for u, v in yield_face_uv_grid(face, self.samples, margin=0.01):
+        for u, v in yield_face_uv_grid(face, self.samples, margin=self.margin):
             normal_dir = get_face_uv_normal(face, u, v)
             if not normal_dir:
                 FreeCAD.Console.PrintError(f"Normal returned None for face {face.__hash__()}")
@@ -146,12 +180,33 @@ class DraftAnalyzer(BaseAnalyzer):
 
         return angle_deg - 90
 
+    def moldside_of(self, face: TopoDS_Face) -> MoldSide:
+        """Core or cavity side of one face (see core.utils.mold)."""
+        return moldside_of_face(face, self._intersector, self.pull_direction)
+
     def classify_moldside(self, shape: TopoDS_Shape) -> dict[int, MoldSide]:
         """Returns a mapping of TopoDS_Face to MoldSide"""
         intersector = IntCurvesFace_ShapeIntersector()
-        intersector.Load(shape, 1e-6)
+        intersector.Load(shape, self.classifier_tol)
 
         return {
             i: moldside_of_face(face, intersector, self.pull_direction)
             for i, face in enumerate(self.face_index, start=1)
         }
+
+
+class _MoldSides(dict):
+    """Face index -> MoldSide, each worked out the first time it is asked for.
+
+    Classifying is a few rays per face; doing it per face, as faces are
+    analyzed, lets the work be shared between processes with the faces.
+    """
+
+    def __init__(self, analyzer: DraftAnalyzer):
+        super().__init__()
+        self._analyzer = analyzer
+
+    def __missing__(self, index: int) -> MoldSide:
+        side = self._analyzer.moldside_of(self._analyzer.face_index.face_at(index))
+        self[index] = side
+        return side

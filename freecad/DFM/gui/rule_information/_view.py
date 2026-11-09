@@ -1,0 +1,277 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: 2025 Ryan Kembrey <ryan.FreeCAD@gmail.com>
+# SPDX-FileNotice: Part of the DFM addon.
+
+"""Embeddable widget showing a rule's brief, diagram and target / limit legend.
+
+``RuleDiagramView`` is the building block for every place that explains a
+rule: the rule editing dialog embeds it directly, and ``RuleInfoPanel`` wraps
+it in a popup.
+"""
+
+from typing import Optional
+
+from PySide6 import QtCore, QtGui, QtWidgets
+
+from ...core.processes.process import RuleLimit
+from ...core.rules import Rulebook, SHAPE_FIELD_ATTRS
+from ._diagrams import DIAGRAMS
+from ._renderer import DEFAULT_WIDTH, render_diagram
+
+# Read-only value tiles, styled like the rule dialog's inputs. Colors are
+# neutral so the theme's text color shows through.
+_TILE_CSS = (
+    "QFrame#RuleValueTile { border: 1px solid rgba(127, 127, 127, 110); border-radius: 4px;"
+    " background: transparent; }"
+    "QFrame#RuleValueBox { border: 1px solid rgba(127, 127, 127, 150); border-radius: 3px;"
+    " background: transparent; }"
+    "QFrame#RuleValueTile QLabel { background: transparent; border: none; }"
+)
+
+# Width range for diagrams that follow the widget's width (grid tiles).
+_FIT_MIN_WIDTH = 220
+_FIT_MAX_WIDTH = 440
+
+
+def _height_for(width: int) -> int:
+    """Diagram height for *width*; every diagram's viewBox is 340 x 165."""
+    return round(width * 165 / 340)
+_BRIEF_ALPHA = 0.65
+
+
+class RuleDiagramView(QtWidgets.QWidget):
+    """Brief description, bad / good diagram and target / limit legend.
+
+    Parameters
+    ----------
+    rule:
+        The Rulebook member to illustrate.
+    limit:
+        Values to show in the legend. ``None`` shows a dash for each value.
+        Binary rules have no legend.
+    show_brief:
+        Whether to show the one-line description above the diagram.
+    show_legend:
+        Whether to show the target / limit values below the diagram. Turn it
+        off when the values are shown elsewhere, for example as inputs.
+    values_title:
+        Heading above the values, such as "Values for PLA". Omitted if empty.
+    fit_width:
+        Scale the diagram to the widget's width (up to a maximum) instead of
+        drawing it at the fixed default width. Used by grid tiles.
+    parent:
+        Parent widget.
+
+    The diagram is rendered when the widget is shown and again whenever the
+    style or palette changes, so its colors always match the theme the
+    widget is drawn in, wherever it is embedded.
+    """
+
+    def __init__(
+        self,
+        rule: Rulebook,
+        limit: Optional[RuleLimit] = None,
+        show_brief: bool = True,
+        show_legend: bool = True,
+        fit_width: bool = False,
+        values_title: str = "",
+        parent: Optional[QtWidgets.QWidget] = None,
+    ):
+        super().__init__(parent)
+        self._rule = rule
+        self._fit = fit_width
+        self._palette: Optional[QtGui.QPalette] = None
+        self._forced_colors: Optional[tuple[QtGui.QColor, QtGui.QColor]] = None
+        self._rendered_width = 0
+        self._limit = limit
+        self._brief: Optional[QtWidgets.QLabel] = None
+        self._image: Optional[QtWidgets.QLabel] = None
+        self._value_labels: dict[str, QtWidgets.QLabel] = {}
+        self._values_title = values_title
+        self._rendering = False
+
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(8)
+
+        diag = DIAGRAMS.get(rule)
+        if diag is not None and show_brief:
+            self._brief = QtWidgets.QLabel(diag.brief, self)
+            self._brief.setWordWrap(True)
+            root.addWidget(self._brief)
+
+        if diag is not None:
+            self._image = QtWidgets.QLabel(self)
+            self._image.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            if fit_width:
+                # Follow the available width; the pixmap must not hold it open.
+                self._image.setSizePolicy(
+                    QtWidgets.QSizePolicy.Policy.Ignored, QtWidgets.QSizePolicy.Policy.Fixed
+                )
+                self._image.setMinimumWidth(_FIT_MIN_WIDTH)
+                self._image.setFixedHeight(_height_for(DEFAULT_WIDTH))
+            else:
+                self._image.setFixedSize(DEFAULT_WIDTH, _height_for(DEFAULT_WIDTH))
+            root.addWidget(self._image)
+
+        if show_legend and not rule.is_binary:
+            self._build_legend(root)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def set_colors(self, background: QtGui.QColor, text: QtGui.QColor) -> None:
+        """Draw with these colors instead of reading them from the theme.
+
+        For hosts that paint their own background and text colors, such as
+        the finding annotation in the 3D view.
+        """
+        self._forced_colors = (QtGui.QColor(background), QtGui.QColor(text))
+        if self.isVisible():
+            self._apply_theme()
+
+    def set_limit(self, limit: Optional[RuleLimit]) -> None:
+        """Show the values from *limit* in the legend."""
+        self._limit = limit
+        for attr, lbl in self._value_labels.items():
+            lbl.setText(self._value_text(attr))
+
+    # ------------------------------------------------------------------
+    # Layout
+    # ------------------------------------------------------------------
+
+    def _build_legend(self, parent_layout: QtWidgets.QVBoxLayout) -> None:
+        """Read-only value tiles, matching the inputs in the rule dialog."""
+        attrs = SHAPE_FIELD_ATTRS.get(self._rule.shape, ())
+        labels = self._rule.field_labels
+        if not attrs or not labels:
+            return
+
+        if self._values_title:
+            parent_layout.addWidget(QtWidgets.QLabel(self._values_title, self))
+
+        row = QtWidgets.QHBoxLayout()
+        row.setSpacing(8)
+        unit = self._rule.unit or ""
+        for attr, label_text in zip(attrs, labels):
+            tile = QtWidgets.QFrame(self)
+            tile.setObjectName("RuleValueTile")
+            tile.setStyleSheet(_TILE_CSS)
+            tile_layout = QtWidgets.QVBoxLayout(tile)
+            tile_layout.setContentsMargins(8, 6, 8, 8)
+            tile_layout.setSpacing(4)
+            tile_layout.addWidget(QtWidgets.QLabel(label_text, tile))
+
+            box = QtWidgets.QFrame(tile)
+            box.setObjectName("RuleValueBox")
+            box_layout = QtWidgets.QHBoxLayout(box)
+            box_layout.setContentsMargins(6, 3, 6, 3)
+            box_layout.setSpacing(6)
+            value = QtWidgets.QLabel(self._value_text(attr), box)
+            value.setAlignment(
+                QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter
+            )
+            font = value.font()
+            font.setPointSizeF(font.pointSizeF() * 1.2)
+            value.setFont(font)
+            box_layout.addWidget(value, stretch=1)
+            if unit:
+                unit_lbl = QtWidgets.QLabel(unit, box)
+                unit_lbl.setStyleSheet("font-size: 10px; font-style: italic;")
+                box_layout.addWidget(unit_lbl)
+            tile_layout.addWidget(box)
+
+            row.addWidget(tile, stretch=1)
+            self._value_labels[attr] = value
+        parent_layout.addLayout(row)
+
+    def _value_text(self, attr: str) -> str:
+        value = str(getattr(self._limit, attr, "") or "") if self._limit else ""
+        return value or "\u2014"
+
+    # ------------------------------------------------------------------
+    # Theming
+    # ------------------------------------------------------------------
+
+    def showEvent(self, event: QtGui.QShowEvent) -> None:
+        self._apply_theme()
+        super().showEvent(event)
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
+        super().resizeEvent(event)
+        if self._fit and self._image is not None and self.isVisible():
+            if self._target_width() != self._rendered_width:
+                self._render_image(self._palette or self._drawn_palette())
+
+    def _target_width(self) -> int:
+        if not self._fit or self._image is None:
+            return DEFAULT_WIDTH
+        return max(_FIT_MIN_WIDTH, min(self.width(), _FIT_MAX_WIDTH))
+
+    def _render_image(self, pal: QtGui.QPalette) -> None:
+        width = self._target_width()
+        pixmap = render_diagram(self._rule, pal, width)
+        if pixmap is not None:
+            if self._fit:
+                self._image.setFixedHeight(_height_for(width))
+            self._image.setPixmap(pixmap)
+            self._rendered_width = width
+
+    def changeEvent(self, event: QtCore.QEvent) -> None:
+        if event.type() in (
+            QtCore.QEvent.Type.StyleChange,
+            QtCore.QEvent.Type.PaletteChange,
+        ) and self.isVisible():
+            self._apply_theme()
+        super().changeEvent(event)
+
+    def _apply_theme(self) -> None:
+        """Render the diagram and tint the brief for the current theme."""
+        if self._rendering:
+            return
+        self._rendering = True
+        try:
+            pal = self._drawn_palette()
+            if self._brief is not None:
+                color = QtGui.QColor(pal.color(QtGui.QPalette.ColorRole.WindowText))
+                color.setAlphaF(_BRIEF_ALPHA)
+                brief_pal = self._brief.palette()
+                brief_pal.setColor(QtGui.QPalette.ColorRole.WindowText, color)
+                self._brief.setPalette(brief_pal)
+            self._palette = pal
+            if self._image is not None:
+                self._render_image(pal)
+        finally:
+            self._rendering = False
+
+    def _drawn_palette(self) -> QtGui.QPalette:
+        """Return a palette holding the colors this widget is drawn with.
+
+        FreeCAD themes are stylesheets, and a stylesheet only reaches a
+        widget's palette once the widget is polished. Polishing first makes
+        the background and text colors match what is actually drawn. The
+        text color is read from a label, since stylesheets usually set the
+        text color on labels rather than on plain widgets.
+        """
+        role = QtGui.QPalette.ColorRole
+        if self._forced_colors is not None:
+            pal = QtGui.QPalette(self.palette())
+            pal.setColor(role.Window, self._forced_colors[0])
+            pal.setColor(role.WindowText, self._forced_colors[1])
+            return pal
+        self.ensurePolished()
+
+        # The background is drawn by the top-level window (dialog or popup).
+        window = self.window()
+        window.ensurePolished()
+        pal = QtGui.QPalette(self.palette())
+        pal.setColor(role.Window, window.palette().color(role.Window))
+
+        # Our own labels carry custom colors, so read the text color from
+        # a fresh, unstyled label instead.
+        probe = QtWidgets.QLabel(self)
+        probe.ensurePolished()
+        pal.setColor(role.WindowText, probe.palette().color(role.WindowText))
+        probe.deleteLater()
+        return pal

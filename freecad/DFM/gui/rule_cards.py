@@ -5,12 +5,15 @@
 from typing import Optional
 
 from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtSvg import QSvgRenderer
 
-from ..core.processes.process import RuleLimit
-from ..core.rules import Rulebook, RuleShape
+from ..core.processes.process import ProcessArchetype, RuleLimit
+from ..core.rules import SHAPE_FIELD_ATTRS, Criticality, RuleDependency, Rulebook, RuleShape
+from .rule_information import RuleDiagramView
 
 
 OVERRIDE_COLOR = "#e8890c"
+CONFLICT_COLOR = "#d9534f"
 
 CARD_STYLE = f"""
 QFrame#RuleCard {{
@@ -32,10 +35,10 @@ QFrame#RuleCard QLabel:disabled {{
     border: none;
 }}
 
+/* Overrides are marked by the border only; the text keeps the theme
+   color so values stay readable. */
 QComboBox[override="true"] {{
     border: 1px solid {OVERRIDE_COLOR};
-    color: {OVERRIDE_COLOR};
-    font-weight: 500;
 }}
 
 QLabel[fieldLabel="true"] {{
@@ -52,7 +55,11 @@ QWidget#UnitInput {{
     border-radius: 3px;
 }}
 QWidget#UnitInput[override="true"] {{
-    border: 0.5px solid {OVERRIDE_COLOR};
+    border: 1px solid {OVERRIDE_COLOR};
+}}
+/* A target that is less strict than its limit; wins over the override mark. */
+QWidget#UnitInput[conflict="true"] {{
+    border: 1px solid {CONFLICT_COLOR};
 }}
 
 QWidget#UnitInput QLineEdit,
@@ -62,10 +69,6 @@ QWidget#UnitInput QLineEdit:hover {{
     background-color: transparent;
     border: none;
     padding: 2px 4px;
-}}
-QWidget#UnitInput[override="true"] QLineEdit {{
-    color: {OVERRIDE_COLOR};
-    font-weight: 500;
 }}
 
 QLabel[unitBadge="true"] {{
@@ -77,11 +80,458 @@ QWidget#UnitInput QLabel[unitBadge="true"]:enabled {{
     background-color: transparent;
     border: none;
 }}
-QWidget#UnitInput[override="true"] QLabel[unitBadge="true"] {{
-    color: {OVERRIDE_COLOR};
-    font-weight: 500;
-}}
 """
+
+
+# -- Scope badge styles (M / P / S) ------------------------------------------
+
+BADGE_STYLES = {
+    "M": {
+        "tooltip": "Material: threshold varies per material",
+        "style": (
+            "color: #c89b2b; background: rgba(200,155,43,0.12);"
+            " border: 1px solid rgba(200,155,43,0.35);"
+        ),
+    },
+    "P": {
+        "tooltip": "Process: same threshold for all materials",
+        "style": (
+            "color: #5b9bd5; background: rgba(91,155,213,0.12);"
+            " border: 1px solid rgba(91,155,213,0.35);"
+        ),
+    },
+    "S": {
+        "tooltip": "Setup: derived from analysis task configuration",
+        "style": (
+            "color: #8a8a8a; background: rgba(138,138,138,0.12);"
+            " border: 1px solid rgba(138,138,138,0.35);"
+        ),
+    },
+}
+
+
+# =============================================================================
+
+
+def _resolve_badge(
+    rule: Rulebook,
+    archetype: Optional[ProcessArchetype],
+) -> str:
+    """Determine the M/P/S badge letter for a rule card."""
+    if archetype is not None and rule in archetype.derived_rules:
+        return "S"
+    if not rule.per_material:
+        return "P"
+    return "M"
+
+
+def _make_scope_badge(badge_type: str) -> QtWidgets.QLabel:
+    """Create a small coloured scope badge (M, P or S)."""
+    info = BADGE_STYLES.get(badge_type, BADGE_STYLES["M"])
+    lbl = QtWidgets.QLabel(badge_type)
+    lbl.setFixedSize(18, 18)
+    lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+    lbl.setStyleSheet(f"font-size: 11px; font-weight: bold; border-radius: 3px; {info['style']}")
+    lbl.setToolTip(info["tooltip"])
+    return lbl
+
+
+# -- Feedback icon (SVG that follows the palette text colour) ----------------
+
+_FEEDBACK_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    b'<path d="M4,4 C2.9,4 2,4.9 2,6 V16 C2,17.1 2.9,18 4,18 H10 L12,22'
+    b' L14,18 H20 C21.1,18 22,17.1 22,16 V6 C22,4.9 21.1,4 20,4 Z"'
+    b' fill="none" stroke="COLOR" stroke-width="2" stroke-linejoin="round"/>'
+    b'<rect x="5.5" y="6" width="5" height="2" fill="COLOR"/>'
+    b'<rect x="5.5" y="10" width="5" height="2" fill="COLOR"/>'
+    b'<rect x="5.5" y="14" width="6.5" height="2" fill="COLOR"/>'
+    b'<polygon points="13,15 14,11 18,7 21,10 17,14"'
+    b' fill="none" stroke="COLOR" stroke-width="2" stroke-linejoin="round"/>'
+    b'</svg>'
+)
+
+_RESET_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    b'<polyline points="1 4 1 10 7 10"'
+    b' fill="none" stroke="COLOR" stroke-width="2"'
+    b' stroke-linecap="round" stroke-linejoin="round"/>'
+    b'<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"'
+    b' fill="none" stroke="COLOR" stroke-width="2"'
+    b' stroke-linecap="round" stroke-linejoin="round"/>'
+    b'</svg>'
+)
+
+# Same arrow drawn bolder, for the small reset button inside overridden
+# fields; at 14 px the regular stroke is too thin to read.
+_FIELD_RESET_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 26 26">'
+    b'<polyline points="1 4 1 10 7 10"'
+    b' fill="none" stroke="COLOR" stroke-width="3.5"'
+    b' stroke-linecap="round" stroke-linejoin="round"/>'
+    b'<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"'
+    b' fill="none" stroke="COLOR" stroke-width="3.5"'
+    b' stroke-linecap="round" stroke-linejoin="round"/>'
+    b'</svg>'
+)
+
+
+# -- Toolbar icons (same stroke style) ----------------------------------------
+
+UNDO_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    b'<polyline points="9 14 4 9 9 4"'
+    b' fill="none" stroke="COLOR" stroke-width="2"'
+    b' stroke-linecap="round" stroke-linejoin="round"/>'
+    b'<path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"'
+    b' fill="none" stroke="COLOR" stroke-width="2"'
+    b' stroke-linecap="round" stroke-linejoin="round"/>'
+    b'</svg>'
+)
+
+REDO_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    b'<polyline points="15 14 20 9 15 4"'
+    b' fill="none" stroke="COLOR" stroke-width="2"'
+    b' stroke-linecap="round" stroke-linejoin="round"/>'
+    b'<path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"'
+    b' fill="none" stroke="COLOR" stroke-width="2"'
+    b' stroke-linecap="round" stroke-linejoin="round"/>'
+    b'</svg>'
+)
+
+LIST_VIEW_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    b'<rect x="3" y="4" width="18" height="4" rx="1" fill="none" stroke="COLOR" stroke-width="2"/>'
+    b'<rect x="3" y="10" width="18" height="4" rx="1" fill="none" stroke="COLOR" stroke-width="2"/>'
+    b'<rect x="3" y="16" width="18" height="4" rx="1" fill="none" stroke="COLOR" stroke-width="2"/>'
+    b'</svg>'
+)
+
+GRID_VIEW_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    b'<rect x="3" y="3" width="7.5" height="7.5" rx="1" fill="none" stroke="COLOR" stroke-width="2"/>'
+    b'<rect x="13.5" y="3" width="7.5" height="7.5" rx="1" fill="none" stroke="COLOR" stroke-width="2"/>'
+    b'<rect x="3" y="13.5" width="7.5" height="7.5" rx="1" fill="none" stroke="COLOR" stroke-width="2"/>'
+    b'<rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1" fill="none" stroke="COLOR" stroke-width="2"/>'
+    b'</svg>'
+)
+
+INFO_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="COLOR" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    b'<circle cx="12" cy="12" r="9.5"/>'
+    b'<line x1="12" y1="16.5" x2="12" y2="11"/>'
+    b'<circle cx="12" cy="7.5" r="0.6" fill="COLOR"/>'
+    b'</svg>'
+)
+
+GROUP_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="COLOR" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    b'<rect x="3" y="3" width="8" height="5" rx="1"/>'
+    b'<path d="M7 8v11h5M7 13.5h5"/>'
+    b'<rect x="12" y="11" width="9" height="5" rx="1"/>'
+    b'<rect x="12" y="16.5" width="9" height="5" rx="1"/>'
+    b'</svg>'
+)
+
+SORT_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="COLOR" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    b'<line x1="4" y1="6" x2="20" y2="6"/>'
+    b'<line x1="4" y1="12" x2="15" y2="12"/>'
+    b'<line x1="4" y1="18" x2="10" y2="18"/>'
+    b'</svg>'
+)
+
+EXPAND_ALL_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="COLOR" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    b'<polyline points="7 5 12 10 17 5"/>'
+    b'<polyline points="7 13 12 18 17 13"/>'
+    b'</svg>'
+)
+
+COLLAPSE_ALL_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="COLOR" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    b'<polyline points="7 11 12 6 17 11"/>'
+    b'<polyline points="7 19 12 14 17 19"/>'
+    b'</svg>'
+)
+
+MARKERS_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="COLOR" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    b'<path d="M12 21.5s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/>'
+    b'<circle cx="12" cy="10.5" r="2.2"/>'
+    b'</svg>'
+)
+
+DIAGRAM_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="COLOR" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    b'<rect x="2.5" y="5" width="19" height="14" rx="1.5"/>'
+    b'<line x1="12" y1="5" x2="12" y2="19"/>'
+    b'<path d="M5 16l2.5-6 2.5 6M14 16h5v-5"/>'
+    b'</svg>'
+)
+
+SWAP_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="COLOR"'
+    b' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    b'<path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>'
+    b'</svg>'
+)
+
+DOWNLOAD_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="COLOR"'
+    b' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    b'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>'
+    b'</svg>'
+)
+
+FILTER_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    b'<polygon points="3 4 21 4 14 12.5 14 19 10 21 10 12.5"'
+    b' fill="none" stroke="COLOR" stroke-width="2"'
+    b' stroke-linecap="round" stroke-linejoin="round"/>'
+    b'</svg>'
+)
+
+
+ADD_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    b'<line x1="12" y1="5" x2="12" y2="19"'
+    b' stroke="COLOR" stroke-width="2" stroke-linecap="round"/>'
+    b'<line x1="5" y1="12" x2="19" y2="12"'
+    b' stroke="COLOR" stroke-width="2" stroke-linecap="round"/>'
+    b'</svg>'
+)
+
+REMOVE_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    b'<line x1="5" y1="12" x2="19" y2="12"'
+    b' stroke="COLOR" stroke-width="2" stroke-linecap="round"/>'
+    b'</svg>'
+)
+
+IMPORT_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    b'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"'
+    b' fill="none" stroke="COLOR" stroke-width="2"'
+    b' stroke-linecap="round" stroke-linejoin="round"/>'
+    b'<polyline points="14 2 14 8 20 8"'
+    b' fill="none" stroke="COLOR" stroke-width="2"'
+    b' stroke-linecap="round" stroke-linejoin="round"/>'
+    b'<line x1="12" y1="18" x2="12" y2="12"'
+    b' stroke="COLOR" stroke-width="2" stroke-linecap="round"/>'
+    b'<polyline points="9 15 12 18 15 15"'
+    b' fill="none" stroke="COLOR" stroke-width="2"'
+    b' stroke-linecap="round" stroke-linejoin="round"/>'
+    b'</svg>'
+)
+
+
+# -- Monochrome, theme-aware icons -------------------------------------------
+#
+# Icons are drawn in the theme's text color, like FreeCAD's own toolbar icons,
+# so they read in light and dark themes alike. The state is shown by opacity:
+# full on hover, slightly softened at rest, and faded when disabled.
+
+_ICON_OPACITY = {
+    QtGui.QIcon.Mode.Normal: 0.85,
+    QtGui.QIcon.Mode.Active: 1.0,     # hover on auto-raise tool buttons
+    QtGui.QIcon.Mode.Selected: 1.0,
+    QtGui.QIcon.Mode.Disabled: 0.28,
+}
+
+
+def render_svg_icon(
+    svg_template: bytes,
+    color: QtGui.QColor,
+    size: int = 20,
+    device_ratio: float = 1.0,
+    opacities: Optional[dict] = None,
+) -> QtGui.QIcon:
+    """Render an SVG template (with ``COLOR`` placeholders) into a QIcon.
+
+    The icon holds a pixmap for each mode (normal, hover, selected and
+    disabled), drawn in *color* at the opacity for that mode and at
+    *device_ratio* so it stays sharp on high-DPI screens.
+    """
+    data = svg_template.replace(b"COLOR", color.name().encode())
+    renderer = QSvgRenderer(QtCore.QByteArray(data))
+    icon = QtGui.QIcon()
+    for mode, opacity in (opacities or _ICON_OPACITY).items():
+        px = QtGui.QPixmap(round(size * device_ratio), round(size * device_ratio))
+        px.setDevicePixelRatio(device_ratio)
+        px.fill(QtCore.Qt.GlobalColor.transparent)
+        painter = QtGui.QPainter(px)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        painter.setOpacity(opacity)
+        renderer.render(painter, QtCore.QRectF(0, 0, size, size))
+        painter.end()
+        icon.addPixmap(px, mode)
+    return icon
+
+
+class _ThemedSvgIcon(QtCore.QObject):
+    """Keeps a button's SVG icon in the button's current text color.
+
+    FreeCAD themes are stylesheets, which only reach a widget's palette once
+    it is polished, so the color is read when the button is shown and again
+    whenever its style or palette changes.
+    """
+
+    def __init__(
+        self,
+        button: QtWidgets.QAbstractButton,
+        svg_template: bytes,
+        size: int,
+        color: Optional[QtGui.QColor] = None,
+        opacities: Optional[dict] = None,
+    ):
+        super().__init__(button)
+        self._opacities = opacities
+        self._button = button
+        self._svg = svg_template
+        self._size = size
+        self._color = color
+        self._key: Optional[tuple] = None
+        button.installEventFilter(self)
+        self.refresh()
+
+    def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        if event.type() in (
+            QtCore.QEvent.Type.Show,
+            QtCore.QEvent.Type.StyleChange,
+            QtCore.QEvent.Type.PaletteChange,
+            QtCore.QEvent.Type.ScreenChangeInternal,
+        ):
+            self.refresh()
+        return False
+
+    def refresh(self) -> None:
+        btn = self._button
+        color = self._color or self._text_color()
+        ratio = btn.devicePixelRatioF()
+        key = (color.rgb(), ratio)
+        if key == self._key:
+            return
+        self._key = key
+        btn.setIcon(render_svg_icon(self._svg, color, self._size, ratio, self._opacities))
+
+    def _text_color(self) -> QtGui.QColor:
+        """Return the color the theme uses for ordinary text next to the button.
+
+        A button's own ``ButtonText`` color is not reliable: themes often set
+        it for filled push buttons (for example white text on a colored
+        button), which would make icons on a light background white. Instead,
+        read the color a plain label gets in the same place, which is the
+        text color the user sees around the icon.
+        """
+        host = self._button.parentWidget() or self._button
+        # Parented so it inherits the same stylesheets, but never shown: this
+        # can run while the host is being shown, which would otherwise show
+        # the probe on top of the icons.
+        probe = QtWidgets.QLabel(host)
+        probe.setAttribute(QtCore.Qt.WidgetAttribute.WA_DontShowOnScreen)
+        probe.hide()
+        probe.ensurePolished()
+        color = probe.palette().color(QtGui.QPalette.ColorRole.WindowText)
+        probe.setParent(None)
+        probe.deleteLater()
+        return color
+
+
+def apply_svg_icon(
+    button: QtWidgets.QAbstractButton,
+    svg_template: bytes,
+    size: int = 20,
+    color: Optional[QtGui.QColor] = None,
+    opacities: Optional[dict] = None,
+) -> None:
+    """Give *button* a monochrome SVG icon.
+
+    The icon follows the theme's text color, unless a fixed *color* is given.
+    """
+    button.setIconSize(QtCore.QSize(size, size))
+    _ThemedSvgIcon(button, svg_template, size, color, opacities)
+
+
+#: Width of a value field (and of a severity combo, so the columns line up).
+_FIELD_WIDTH = 110
+
+
+class _FieldResetButton(QtWidgets.QAbstractButton):
+    """Small orange reset button shown next to a value that overrides Default.
+
+    It paints only its icon, never a background, so theme styles for tool
+    buttons cannot give it a panel that differs from the field behind it.
+    The icon is brighter on hover and faded when disabled.
+
+    It keeps its space while hidden, so fields line up whether or not they
+    are overridden.
+    """
+
+    _SIZE = 16
+    _ICON = 14
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self.setFixedSize(self._SIZE, self._SIZE)
+        self.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.setToolTip("Reset to the Default material's value")
+        self.setAccessibleName("Reset to the Default material's value")
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_Hover)
+        # Full strength at rest: the softened default would wash out the orange.
+        full = {**_ICON_OPACITY, QtGui.QIcon.Mode.Normal: 1.0}
+        apply_svg_icon(self, _FIELD_RESET_SVG, self._ICON, QtGui.QColor(OVERRIDE_COLOR), full)
+        policy = self.sizePolicy()
+        policy.setRetainSizeWhenHidden(True)
+        self.setSizePolicy(policy)
+        self.hide()
+
+    def sizeHint(self) -> QtCore.QSize:
+        return QtCore.QSize(self._SIZE, self._SIZE)
+
+    def enterEvent(self, event) -> None:
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event: QtGui.QPaintEvent) -> None:
+        if not self.isEnabled():
+            mode = QtGui.QIcon.Mode.Disabled
+        elif self.underMouse() or self.isDown():
+            mode = QtGui.QIcon.Mode.Active
+        else:
+            mode = QtGui.QIcon.Mode.Normal
+        painter = QtGui.QPainter(self)
+        offset = (self._SIZE - self._ICON) / 2
+        self.icon().paint(
+            painter,
+            QtCore.QRect(round(offset), round(offset), self._ICON, self._ICON),
+            QtCore.Qt.AlignmentFlag.AlignCenter,
+            mode,
+        )
+        painter.end()
+
+
+class _SvgToolButton(QtWidgets.QToolButton):
+    """Auto-raise tool button with a monochrome, theme-aware SVG icon."""
+
+    def __init__(
+        self,
+        svg_template: bytes,
+        tooltip: str,
+        parent: Optional[QtWidgets.QWidget] = None,
+    ):
+        super().__init__(parent)
+        self.setAutoRaise(True)
+        self.setFixedSize(30, 30)
+        self.setToolTip(tooltip)
+        self.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        apply_svg_icon(self, svg_template)
 
 
 # =============================================================================
@@ -117,17 +567,23 @@ class UnitInput(QtWidgets.QWidget):
     """A numeric input paired with a right-aligned unit label, styled as one field."""
 
     editing_finished = QtCore.Signal()
+    reset_clicked = QtCore.Signal()
 
     def __init__(self, unit: str, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
         self.setObjectName("UnitInput")
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
 
+        self._unit = unit
+        self._default_text = ""
+        self._conflict = ""
+
         layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(2, 2, 6, 2)
+        layout.setContentsMargins(2, 2, 3, 2)
         layout.setSpacing(6)
 
         self._edit = _NumericLineEdit()
+        self._edit.setPlaceholderText("Not set")
         self._edit.setValidator(
             QtGui.QRegularExpressionValidator(
                 QtCore.QRegularExpression(r"^-?\d*\.?\d*$"), self._edit
@@ -143,6 +599,11 @@ class UnitInput(QtWidgets.QWidget):
             unit_lbl.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
             layout.addWidget(unit_lbl)
 
+        # Shown only while the value overrides the Default material.
+        self._reset_btn = _FieldResetButton(self)
+        self._reset_btn.clicked.connect(self.reset_clicked.emit)
+        layout.addWidget(self._reset_btn)
+
     def text(self) -> str:
         return self._edit.text()
 
@@ -152,17 +613,79 @@ class UnitInput(QtWidgets.QWidget):
     def line_edit(self) -> QtWidgets.QLineEdit:
         return self._edit
 
-    def set_override(self, is_override: bool) -> None:
+    def set_override(self, is_override: bool, default_value: str = "") -> None:
+        """Mark the value as differing from *default_value* (the Default material's)."""
+        self._default_text = default_value
+        self._reset_btn.setVisible(is_override)
         self.setProperty("override", "true" if is_override else "false")
+        self._repolish()
+        self._update_tooltips()
+
+    def is_override(self) -> bool:
+        return self.property("override") == "true"
+
+    def set_conflict(self, message: str) -> None:
+        """Show a red border and *message* as the tool tip; "" clears it."""
+        if message == self._conflict:
+            return
+        self._conflict = message
+        self.setProperty("conflict", "true" if message else "false")
+        self._repolish()
+        self._update_tooltips()
+
+    def _repolish(self) -> None:
         self.style().unpolish(self)
         self.style().polish(self)
-
         for child in self.findChildren(QtWidgets.QWidget):
             child.style().unpolish(child)
             child.style().polish(child)
 
-    def is_override(self) -> bool:
-        return self.property("override") == "true"
+    def _update_tooltips(self) -> None:
+        default = f"{self._default_text} {self._unit}".strip() if self._default_text else "Not set"
+        lines = []
+        if self._conflict:
+            lines.append(self._conflict)
+        if self.is_override():
+            lines.append(f"Default: {default}")
+        self.setToolTip("\n".join(lines))
+        self._reset_btn.setToolTip(f"Reset to the Default material's value ({default})")
+
+
+# =============================================================================
+
+
+def limit_conflict_message(rule: Rulebook, first: str, second: str) -> str:
+    """Explain why *first* and *second* contradict each other, or return "".
+
+    For target-and-limit rules the target must be at least as strict as the
+    limit: no higher for "max" rules, no lower for "min" rules. For range
+    rules the lower bound must not exceed the upper bound. Empty or
+    non-numeric values are not checked.
+    """
+    try:
+        a, b = float(first), float(second)
+    except (TypeError, ValueError):
+        return ""
+    labels = rule.field_labels
+    unit = rule.unit or ""
+
+    def show(text: str) -> str:
+        return f"{text} {unit}".strip()
+
+    if rule.shape is RuleShape.MIN_AND_MAX and a > b:
+        return f"{labels[0]} {show(first)} is greater than {labels[1]} {show(second)}."
+    if rule.shape is RuleShape.TARGET_AND_LIMIT:
+        if rule.comparison == "max" and a > b:
+            return (
+                f"{labels[0]} {show(first)} is above {labels[1]} {show(second)}. "
+                "The target should not be less strict than the limit."
+            )
+        if rule.comparison == "min" and a < b:
+            return (
+                f"{labels[0]} {show(first)} is below {labels[1]} {show(second)}. "
+                "The target should not be less strict than the limit."
+            )
+    return ""
 
 
 # =============================================================================
@@ -170,9 +693,11 @@ class UnitInput(QtWidgets.QWidget):
 
 class BaseRuleCard(QtWidgets.QFrame):
     value_changed = QtCore.Signal(str, str)
-    reset_requested = QtCore.Signal()
+    field_reset_requested = QtCore.Signal(str)  # field attribute, e.g. "limit"
     active_toggled = QtCore.Signal(bool)
     feedback_requested = QtCore.Signal()
+    dep_link_clicked = QtCore.Signal(object)  # emits the target Rulebook member
+    criticality_changed = QtCore.Signal(object)  # emits the chosen Criticality
 
     def __init__(
         self,
@@ -181,23 +706,35 @@ class BaseRuleCard(QtWidgets.QFrame):
         default_limit: Optional[RuleLimit],
         is_default_material: bool,
         is_active: bool,
+        badge_type: str = "M",
         parent: Optional[QtWidgets.QWidget] = None,
+        *,
+        layout_mode: str = "list",
     ):
         super().__init__(parent)
         self.setObjectName("RuleCard")
         self.rule = rule
+        # "list": one wide row per rule. "grid": a tile with the rule diagram.
+        self._layout_mode = layout_mode
         self._material_limit = material_limit
         self._default_limit = default_limit
         self._is_default = is_default_material
         self._is_active = is_active
+        self._badge_type = badge_type
         self._loading = False
         self._opacity_effect: Optional[QtWidgets.QGraphicsOpacityEffect] = None
+
+        # Dependency display state
+        self._dep_info: Optional[RuleDependency] = rule.dependency
+        self._dep_value: str = ""
+
+        self._desc_lbl: Optional[QtWidgets.QLabel] = None
 
         self._build_layout()
         self._build_fields()
         self._load_values()
+        self._refresh_conflicts()
         self._refresh_active_style()
-        self._refresh_reset_state()
 
     def refresh(
         self,
@@ -217,67 +754,164 @@ class BaseRuleCard(QtWidgets.QFrame):
         self._loading = False
 
         self._load_values()
+        self._refresh_conflicts()
         self._refresh_active_style()
-        self._refresh_reset_state()
+
+    @property
+    def badge_type(self) -> str:
+        """Scope of the rule: "M" (material), "P" (process) or "S" (setup)."""
+        return self._badge_type
+
+    @property
+    def is_active(self) -> bool:
+        return self._is_active
+
+    def has_overrides(self) -> bool:
+        """Whether any value on the card differs from the Default material."""
+        for field in self.findChildren(UnitInput):
+            if field.is_override():
+                return True
+        for combo in self.findChildren(QtWidgets.QComboBox):
+            if combo.property("override") == "true":
+                return True
+        return False
+
+    def set_criticality(self, criticality: Optional[Criticality]) -> None:
+        """Show *criticality* as a small chip after the rule name."""
+        self._criticality = criticality
+        if criticality is None:
+            self._crit_lbl.hide()
+            return
+        # Critical is red; other levels keep the theme's text color.
+        critical = criticality is Criticality.CRITICAL
+        color = f"color: {CONFLICT_COLOR};" if critical else ""
+        border = CONFLICT_COLOR if critical else "rgba(127, 127, 127, 140)"
+        self._crit_lbl.setText(criticality.label)
+        self._crit_lbl.setToolTip(
+            f"Criticality: {criticality.label}. Click to change."
+            if self._crit_editable else f"Criticality: {criticality.label}"
+        )
+        self._crit_lbl.setStyleSheet(
+            f"QLabel {{ {color} border: 1px solid {border}; border-radius: 3px;"
+            " padding: 0px 4px; font-size: 10px; background: transparent; }"
+        )
+        self._crit_lbl.show()
+
+    def _refresh_conflicts(self) -> None:
+        """Mark both fields red when the target contradicts the limit."""
+        attrs = SHAPE_FIELD_ATTRS.get(self.rule.shape, ())
+        if len(attrs) != 2:
+            return
+        fields = [self.get_field_widget(a) for a in attrs]
+        if any(f is None for f in fields):
+            return
+        message = limit_conflict_message(self.rule, fields[0].text(), fields[1].text())
+        for field in fields:
+            field.set_conflict(message)
 
     def _build_layout(self) -> None:
-        outer = QtWidgets.QHBoxLayout(self)
-        outer.setContentsMargins(12, 8, 10, 8)
-        outer.setSpacing(12)
+        self._build_parts()
+        if self._layout_mode == "grid":
+            self._arrange_grid()
+        else:
+            self._arrange_list()
 
+    def _build_parts(self) -> None:
+        """Create the widgets shared by both layouts."""
         self._check = QtWidgets.QCheckBox()
         self._check.setChecked(self._is_active)
         self._check.toggled.connect(self._on_check_toggled)
-        outer.addWidget(self._check)
 
-        name_col = QtWidgets.QVBoxLayout()
-        name_col.setSpacing(2)
+        # Title row: scope badge, rule name, criticality chip
+        self._title_row = QtWidgets.QHBoxLayout()
+        self._title_row.setSpacing(6)
+        self._badge_lbl = _make_scope_badge(self._badge_type)
+        self._title_row.addWidget(self._badge_lbl)
         self._name_lbl = QtWidgets.QLabel(self.rule.label)
         self._name_lbl.setStyleSheet("font-weight: 500;")
-        name_col.addWidget(self._name_lbl)
+        self._title_row.addWidget(self._name_lbl)
+        # Criticality chip; clicking it opens a menu to change the level.
+        self._criticality: Optional[Criticality] = None
+        self._crit_editable = True
+        self._crit_lbl = QtWidgets.QLabel()
+        # Keep the chip at its natural height when the row is taller.
+        self._crit_lbl.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed
+        )
+        self._crit_lbl.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self._crit_lbl.installEventFilter(self)
+        self._crit_lbl.hide()
+        self._title_row.addWidget(self._crit_lbl)
+        self._title_row.addStretch()
 
-        if self.rule.description:
-            self._desc_lbl = QtWidgets.QLabel(self.rule.description)
-            self._desc_lbl.setStyleSheet("font-size: 11px;")
-            self._desc_lbl.setWordWrap(True)
-            name_col.addWidget(self._desc_lbl)
-        outer.addLayout(name_col, stretch=1)
+        # Description (with optional inline dependency link)
+        self._desc_lbl = QtWidgets.QLabel()
+        self._desc_lbl.setStyleSheet("font-size: 11px;")
+        self._desc_lbl.setWordWrap(True)
+        if self._dep_info:
+            self._desc_lbl.setTextFormat(QtCore.Qt.TextFormat.RichText)
+            self._desc_lbl.setTextInteractionFlags(
+                QtCore.Qt.TextInteractionFlag.LinksAccessibleByMouse
+            )
+            self._desc_lbl.linkActivated.connect(self._on_dep_link_activated)
+            self._desc_lbl.linkHovered.connect(self._on_dep_link_hovered)
+            self._refresh_dep_description()
+        else:
+            self._desc_lbl.setText(self.rule.description or "")
 
         self._fields_host = QtWidgets.QWidget()
         self._fields_row = QtWidgets.QHBoxLayout(self._fields_host)
         self._fields_row.setContentsMargins(0, 0, 0, 0)
         self._fields_row.setSpacing(10)
-        outer.addWidget(self._fields_host)
 
-        self._feedback_btn = self._make_icon_button(
-            QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView,
-            "Edit feedback messages and criticality",
-            self.feedback_requested.emit,
+        self._feedback_btn = _SvgToolButton(
+            _FEEDBACK_SVG,
+            "Rule details, criticality and feedback messages",
+            self,
         )
+        self._feedback_btn.clicked.connect(self.feedback_requested.emit)
+
+    def _arrange_list(self) -> None:
+        """One wide row: checkbox | title and description | inputs | button."""
+        outer = QtWidgets.QHBoxLayout(self)
+        outer.setContentsMargins(12, 8, 10, 8)
+        outer.setSpacing(12)
+        outer.addWidget(self._check)
+
+        name_col = QtWidgets.QVBoxLayout()
+        name_col.setSpacing(2)
+        name_col.addLayout(self._title_row)
+        name_col.addWidget(self._desc_lbl)
+        outer.addLayout(name_col, stretch=1)
+
+        outer.addWidget(self._fields_host)
         outer.addWidget(self._feedback_btn)
 
-        self._reset = self._make_icon_button(
-            QtWidgets.QStyle.StandardPixmap.SP_BrowserReload,
-            "Reset to Default material's values",
-            self.reset_requested.emit,
-        )
-        outer.addWidget(self._reset)
+    def _arrange_grid(self) -> None:
+        """A tile: title row, description, diagram, then the inputs."""
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(12, 8, 8, 10)
+        outer.setSpacing(6)
 
-    def _make_icon_button(
-        self,
-        pixmap: QtWidgets.QStyle.StandardPixmap,
-        tooltip: str,
-        slot,
-    ) -> QtWidgets.QToolButton:
-        btn = QtWidgets.QToolButton()
-        btn.setAutoRaise(True)
-        btn.setIcon(self.style().standardIcon(pixmap))
-        btn.setIconSize(QtCore.QSize(18, 18))
-        btn.setFixedSize(28, 28)
-        btn.setToolTip(tooltip)
-        btn.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
-        btn.clicked.connect(slot)
-        return btn
+        top = QtWidgets.QHBoxLayout()
+        top.setSpacing(8)
+        top.addWidget(self._check)
+        top.addLayout(self._title_row, stretch=1)
+        top.addWidget(self._feedback_btn)
+        outer.addLayout(top)
+
+        outer.addWidget(self._desc_lbl)
+
+        self._diagram = RuleDiagramView(
+            self.rule, show_brief=False, show_legend=False, fit_width=True, parent=self
+        )
+        outer.addWidget(self._diagram)
+        outer.addStretch(1)
+
+        fields_row = QtWidgets.QHBoxLayout()
+        fields_row.addWidget(self._fields_host)
+        fields_row.addStretch(1)
+        outer.addLayout(fields_row)
 
     def _on_check_toggled(self, checked: bool) -> None:
         if self._loading:
@@ -294,7 +928,7 @@ class BaseRuleCard(QtWidgets.QFrame):
         col.addWidget(lbl)
 
         field = UnitInput(self.rule.unit or "")
-        field.setFixedWidth(110)
+        field.setFixedWidth(_FIELD_WIDTH)
         col.addWidget(field)
 
         if self.rule.unit_suffix:
@@ -306,6 +940,7 @@ class BaseRuleCard(QtWidgets.QFrame):
 
     def _wire_field(self, field: UnitInput, attr: str) -> None:
         field.editing_finished.connect(lambda f=field, a=attr: self._on_field_changed(f, a))
+        field.reset_clicked.connect(lambda a=attr: self.field_reset_requested.emit(a))
 
     def _on_field_changed(self, field: UnitInput, attr: str) -> None:
         if self._loading:
@@ -313,12 +948,12 @@ class BaseRuleCard(QtWidgets.QFrame):
         value = field.text().strip()
         self.value_changed.emit(attr, value)
         self._refresh_override_state(field, attr, value)
-        self._refresh_reset_state()
+        self._refresh_conflicts()
 
     def _refresh_override_state(self, field: UnitInput, attr: str, value: str) -> None:
         def_val = getattr(self._default_limit, attr, "") if self._default_limit else ""
         is_override = bool(value and value != str(def_val) and not self._is_default)
-        field.set_override(is_override)
+        field.set_override(is_override, str(def_val or ""))
 
     def _load_field(self, field: UnitInput, attr: str) -> None:
         val = getattr(self._material_limit, attr, "") if self._material_limit else ""
@@ -330,47 +965,135 @@ class BaseRuleCard(QtWidgets.QFrame):
         self._loading = False
         self._refresh_override_state(field, attr, str(display))
 
-    def _has_overrides(self) -> bool:
-        for field in self.findChildren(UnitInput):
-            if field.is_override():
-                return True
-        for combo in self.findChildren(QtWidgets.QComboBox):
-            if combo.property("override") == "true":
-                return True
-        return False
-
-    def _refresh_reset_state(self) -> None:
-        self._reset.setEnabled(self._is_active and self._has_overrides())
-
     def _refresh_active_style(self) -> None:
         self.setProperty("active", "true" if self._is_active else "false")
         self._name_lbl.setEnabled(self._is_active)
         if self._desc_lbl is not None:
             self._desc_lbl.setEnabled(self._is_active)
         self._fields_host.setEnabled(self._is_active)
-        self._feedback_btn.setEnabled(self._is_active)
+        # The rule details button stays enabled while the rule is off, so its
+        # diagram and feedback messages can still be viewed.
         self.style().unpolish(self)
         self.style().polish(self)
+        if self._dep_info:
+            self._refresh_dep_description()
+
+    def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        if (
+            obj is self._crit_lbl
+            and event.type() == QtCore.QEvent.Type.MouseButtonRelease
+            and event.button() == QtCore.Qt.MouseButton.LeftButton
+            and self._crit_editable
+        ):
+            self._show_criticality_menu()
+            return True
+        return super().eventFilter(obj, event)
+
+    def _show_criticality_menu(self) -> None:
+        menu = QtWidgets.QMenu(self)
+        group = QtGui.QActionGroup(menu)
+        for level in Criticality:
+            action = menu.addAction(level.label)
+            action.setCheckable(True)
+            action.setChecked(level is self._criticality)
+            action.triggered.connect(lambda _=False, lv=level: self._choose_criticality(lv))
+            group.addAction(action)
+        menu.exec(self._crit_lbl.mapToGlobal(QtCore.QPoint(0, self._crit_lbl.height())))
+
+    def _choose_criticality(self, level: Criticality) -> None:
+        if level is not self._criticality:
+            self.set_criticality(level)
+            self.criticality_changed.emit(level)
 
     def set_editable(self, editable: bool) -> None:
         """Disable inputs; the theme's disabled palette provides the dimming."""
+        self._crit_editable = editable
+        self._crit_lbl.setCursor(
+            QtCore.Qt.CursorShape.PointingHandCursor if editable
+            else QtCore.Qt.CursorShape.ArrowCursor
+        )
+        if self._criticality is not None:
+            self.set_criticality(self._criticality)  # refresh the tool tip
         self._check.setEnabled(editable)
         self._feedback_btn.setEnabled(editable)
         if editable:
             self._refresh_active_style()
-            self._refresh_reset_state()
         else:
             self._name_lbl.setEnabled(False)
             if self._desc_lbl is not None:
                 self._desc_lbl.setEnabled(False)
             self._fields_host.setEnabled(False)
-            self._reset.setEnabled(False)
 
     def _apply_opacity(self, opacity: float) -> None:
         if self._opacity_effect is None:
             self._opacity_effect = QtWidgets.QGraphicsOpacityEffect(self)
             self.setGraphicsEffect(self._opacity_effect)
         self._opacity_effect.setOpacity(opacity)
+
+    # -- Inline dependency display --------------------------------------------
+
+    def _refresh_dep_description(self) -> None:
+        """Rebuild the description HTML with the current dependency value."""
+        if not self._dep_info or self._desc_lbl is None:
+            return
+
+        val = self._dep_value
+        unit = self._dep_info.unit
+        display = f"{val}{unit}" if val else "—"
+
+        before = self._dep_info.desc_before
+        after = self._dep_info.desc_after
+        source_name = self._dep_info.source_rule
+
+        link_html = (
+            f'<a href="dep:{source_name}" '
+            f'style="color:#5b9bd5; font-weight:bold; font-style:italic; '
+            f'text-decoration:none">{display}</a>'
+        )
+        self._desc_lbl.setText(f"{before}{link_html}{after}")
+
+    def _on_dep_link_activated(self, url: str) -> None:
+        if url.startswith("dep:"):
+            rule_name = url[4:]
+            try:
+                target_rule = Rulebook[rule_name]
+                self.dep_link_clicked.emit(target_rule)
+            except KeyError:
+                pass
+
+    def _on_dep_link_hovered(self, url: str) -> None:
+        if self._desc_lbl is None:
+            return
+        if url and self._dep_info:
+            try:
+                source = Rulebook[self._dep_info.source_rule]
+                field_label = source.field_label_for(self._dep_info.source_field)
+                self._desc_lbl.setToolTip(f"{source.label} → {field_label}")
+            except KeyError:
+                self._desc_lbl.setToolTip("")
+        else:
+            self._desc_lbl.setToolTip("")
+
+    def update_dep_value(self, value: str) -> None:
+        """Update the inline dependency value in the description."""
+        self._dep_value = value
+        self._refresh_dep_description()
+
+    # -- Field value access (for dependency wiring) ---------------------------
+
+    def get_field_value(self, attr: str) -> str:
+        """Return the current display value of a field by attribute name.
+
+        Overridden by subclasses that have editable inputs.
+        """
+        return ""
+
+    def get_field_widget(self, attr: str) -> Optional["UnitInput"]:
+        """Return the UnitInput widget for a field by attribute name.
+
+        Overridden by subclasses that have editable inputs.
+        """
+        return None
 
     def _build_fields(self) -> None:
         raise NotImplementedError
@@ -396,6 +1119,20 @@ class TargetAndLimitCard(BaseRuleCard):
         self._load_field(self._target_field, "target")
         self._load_field(self._limit_field, "limit")
 
+    def get_field_value(self, attr: str) -> str:
+        if attr == "target":
+            return self._target_field.text()
+        if attr == "limit":
+            return self._limit_field.text()
+        return ""
+
+    def get_field_widget(self, attr: str) -> Optional[UnitInput]:
+        if attr == "target":
+            return self._target_field
+        if attr == "limit":
+            return self._limit_field
+        return None
+
 
 # =============================================================================
 
@@ -409,6 +1146,16 @@ class TargetOnlyCard(BaseRuleCard):
     def _load_values(self) -> None:
         self._load_field(self._target_field, "target")
 
+    def get_field_value(self, attr: str) -> str:
+        if attr == "target":
+            return self._target_field.text()
+        return ""
+
+    def get_field_widget(self, attr: str) -> Optional[UnitInput]:
+        if attr == "target":
+            return self._target_field
+        return None
+
 
 # =============================================================================
 
@@ -421,6 +1168,16 @@ class LimitOnlyCard(BaseRuleCard):
 
     def _load_values(self) -> None:
         self._load_field(self._limit_field, "limit")
+
+    def get_field_value(self, attr: str) -> str:
+        if attr == "limit":
+            return self._limit_field.text()
+        return ""
+
+    def get_field_widget(self, attr: str) -> Optional[UnitInput]:
+        if attr == "limit":
+            return self._limit_field
+        return None
 
 
 # =============================================================================
@@ -440,29 +1197,56 @@ class MinAndMaxCard(BaseRuleCard):
         self._load_field(self._min_field, "min_value")
         self._load_field(self._max_field, "max_value")
 
+    def get_field_value(self, attr: str) -> str:
+        if attr == "min_value":
+            return self._min_field.text()
+        if attr == "max_value":
+            return self._max_field.text()
+        return ""
+
+    def get_field_widget(self, attr: str) -> Optional[UnitInput]:
+        if attr == "min_value":
+            return self._min_field
+        if attr == "max_value":
+            return self._max_field
+        return None
+
 
 # =============================================================================
 
 
 class BinaryCard(BaseRuleCard):
     def _build_fields(self) -> None:
-        col = QtWidgets.QVBoxLayout()
-        col.setSpacing(3)
-        col.setContentsMargins(0, 0, 0, 0)
+        # Label over the combo; the reset button left of the combo, just
+        # outside it (a value field has room for it inside).
+        grid = QtWidgets.QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(3)
+        grid.setVerticalSpacing(3)
 
         lbl = QtWidgets.QLabel(self.rule.field_labels[0])
         lbl.setProperty("fieldLabel", True)
-        col.addWidget(lbl)
+        grid.addWidget(lbl, 0, 1)
 
         self._combo = QtWidgets.QComboBox()
-        self._combo.addItems(["ERROR", "WARNING"])
-        self._combo.setFixedWidth(110)
+        # Labels follow FreeCAD's sentence case; the stored value stays uppercase.
+        self._combo.addItem("Error", "ERROR")
+        self._combo.addItem("Warning", "WARNING")
+        # Exactly a value field's width, so both its edges line up with the
+        # "At most" fields of the cards around it.
+        self._combo.setFixedWidth(max(_FIELD_WIDTH, self._combo.sizeHint().width()))
         self._combo.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
-        col.addWidget(self._combo)
+        grid.addWidget(self._combo, 1, 1)
+
+        self._combo_reset = _FieldResetButton(self)
+        self._combo_reset.clicked.connect(
+            lambda: self.field_reset_requested.emit("binary_severity")
+        )
+        grid.addWidget(self._combo_reset, 1, 0, QtCore.Qt.AlignmentFlag.AlignVCenter)
 
         self._fields_row.addStretch()
-        self._fields_row.addLayout(col)
-        self._combo.currentTextChanged.connect(self._on_severity_changed)
+        self._fields_row.addLayout(grid)
+        self._combo.currentIndexChanged.connect(self._on_severity_changed)
 
     def _load_values(self) -> None:
         def_val = self._severity_default()
@@ -472,7 +1256,7 @@ class BinaryCard(BaseRuleCard):
         display = def_val if self._is_default else (override_val or def_val)
 
         self._loading = True
-        idx = self._combo.findText(display)
+        idx = self._combo.findData(display)
         if idx >= 0:
             self._combo.setCurrentIndex(idx)
         self._loading = False
@@ -486,16 +1270,72 @@ class BinaryCard(BaseRuleCard):
     def _refresh_combo_override(self, value: str) -> None:
         def_val = self._severity_default()
         is_override = bool(value and value != def_val and not self._is_default)
+        self._combo_reset.setVisible(is_override)
+        default_label = self._combo.itemText(max(0, self._combo.findData(def_val)))
+        self._combo.setToolTip(f"Default: {default_label}" if is_override else "")
+        self._combo_reset.setToolTip(f"Reset to the Default material's value ({default_label})")
         self._combo.setProperty("override", "true" if is_override else "false")
         self._combo.style().unpolish(self._combo)
         self._combo.style().polish(self._combo)
 
-    def _on_severity_changed(self, text: str) -> None:
+    def _on_severity_changed(self, _index: int) -> None:
         if self._loading:
             return
-        self.value_changed.emit("binary_severity", text)
-        self._refresh_combo_override(text)
-        self._refresh_reset_state()
+        value = self._combo.currentData()
+        self.value_changed.emit("binary_severity", value)
+        self._refresh_combo_override(value)
+
+    def get_field_value(self, attr: str) -> str:
+        if attr == "binary_severity":
+            return self._combo.currentData() or ""
+        return ""
+
+
+# =============================================================================
+
+
+class DerivedRuleCard(BaseRuleCard):
+    """Card for rules whose thresholds are computed by the archetype at runtime.
+
+    Shows an italic hint instead of editable input fields.
+    """
+
+    def __init__(
+        self,
+        rule: Rulebook,
+        material_limit: Optional[RuleLimit],
+        default_limit: Optional[RuleLimit],
+        is_default_material: bool,
+        is_active: bool,
+        hint: str = "",
+        badge_type: str = "S",
+        parent: Optional[QtWidgets.QWidget] = None,
+        *,
+        layout_mode: str = "list",
+    ):
+        self._hint = hint
+        super().__init__(
+            rule,
+            material_limit,
+            default_limit,
+            is_default_material,
+            is_active,
+            badge_type,
+            parent,
+            layout_mode=layout_mode,
+        )
+
+    def _build_fields(self) -> None:
+        lbl = QtWidgets.QLabel(self._hint)
+        # Italic marks it as a note; it keeps the theme's text color to stay readable.
+        lbl.setStyleSheet("font-style: italic; font-size: 11px;")
+        lbl.setWordWrap(True)
+        lbl.setMinimumWidth(180)
+        self._fields_row.addWidget(lbl)
+
+    def _load_values(self) -> None:
+        # No editable fields to load
+        pass
 
 
 # =============================================================================
@@ -517,6 +1357,35 @@ def build_card(
     is_default_material: bool,
     is_active: bool,
     parent: Optional[QtWidgets.QWidget] = None,
+    archetype: Optional[ProcessArchetype] = None,
+    layout_mode: str = "list",
 ) -> BaseRuleCard:
+    badge_type = _resolve_badge(rule, archetype)
+
+    # If the archetype derives this rule at runtime, show a hint instead of inputs
+    if archetype is not None:
+        derived = archetype.derived_rules
+        if rule in derived:
+            return DerivedRuleCard(
+                rule,
+                material_limit,
+                default_limit,
+                is_default_material,
+                is_active,
+                hint=derived[rule],
+                badge_type=badge_type,
+                parent=parent,
+                layout_mode=layout_mode,
+            )
+
     card_cls = _CARD_CLASSES[rule.shape]
-    return card_cls(rule, material_limit, default_limit, is_default_material, is_active, parent)
+    return card_cls(
+        rule,
+        material_limit,
+        default_limit,
+        is_default_material,
+        is_active,
+        badge_type,
+        parent,
+        layout_mode=layout_mode,
+    )

@@ -15,3 +15,7 @@ tests/freecad/*.out
 tests/freecad/*.out
 tests/freecad/*.png
 .resync/
+
+# Approved feature recognition cases keep a STEP copy beside their BREP,
+# so they open in any CAD system.
+!tests/recognition/corpus/*.step

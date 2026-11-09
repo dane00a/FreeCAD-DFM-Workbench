@@ -271,6 +271,54 @@ UNPAIRED_OURS: dict[str, str] = {
 }
 
 
+# The moulding and 3D-printing rules of the feature-recognition engine
+# (core/recognition). They run only under the moulding, FDM, resin and
+# powder-bed processes, none of which the reference has.
+UNPAIRED_OURS.update({
+    "BED_EDGE_CHAMFER": "FDM rule; the reference has no such process",
+    "BOSS_HOLE_LEAD_IN": "moulding rule; the reference has no such process",
+    "HORIZONTAL_HOLE_TEARDROP": "FDM rule; the reference has no such process",
+    "MAX_BED_CONTACT_AREA": "FDM rule; the reference has no such process",
+    "MAX_BOSS_HEIGHT_RATIO": "moulding rule; the reference has no such process",
+    "MAX_BOSS_WALL_RATIO": "moulding rule; the reference has no such process",
+    "MAX_CUP_AREA": "resin rule; the reference has no such process",
+    "MAX_CUSP_HEIGHT": "FDM rule; the reference has no such process",
+    "MAX_FLAT_FACE_AREA": "powder-bed / resin rule; the reference has no such process",
+    "MAX_HOLE_DEPTH_RATIO": "moulding rule; the reference has no such process",
+    "MAX_LIVING_HINGE_WEB": "moulding rule; the reference has no such process",
+    "MAX_PART_ASPECT_RATIO": "powder-bed rule; the reference has no such process",
+    "MAX_PIN_SLENDERNESS": "FDM / powder-bed / resin rule; the reference has no such process",
+    "MAX_PRINTED_HOLE_DEPTH": "powder-bed / resin rule; the reference has no such process",
+    "MAX_RIB_HEIGHT_RATIO": "moulding rule; the reference has no such process",
+    "MAX_RIB_THICKNESS_RATIO": "moulding rule; the reference has no such process",
+    "MAX_SNAP_FIT_STRAIN": "moulding rule; the reference has no such process",
+    "MAX_SUPPORT_MATERIAL": "FDM rule; the reference has no such process",
+    "MAX_WALL_THICKNESS_VARIATION": "moulding / powder-bed rule; the reference has no such process",
+    "MIN_BOSS_CORE_DEPTH": "moulding rule; the reference has no such process",
+    "MIN_BOSS_DRAFT": "moulding rule; the reference has no such process",
+    "MIN_BOSS_HOLE_BASE_RADIUS": "moulding rule; the reference has no such process",
+    "MIN_BOSS_OD_RATIO": "moulding rule; the reference has no such process",
+    "MIN_BOSS_ROOT_RADIUS": "moulding rule; the reference has no such process",
+    "MIN_BOSS_SPACING": "moulding rule; the reference has no such process",
+    "MIN_ESCAPE_HOLE_DIAMETER": "powder-bed / resin rule; the reference has no such process",
+    "MIN_HOLE_EDGE_DISTANCE": "moulding rule; the reference has no such process",
+    "MIN_INTERNAL_CORNER_RADIUS": "moulding rule; the reference has no such process",
+    "MIN_MOLD_STEEL_THICKNESS": "moulding rule; the reference has no such process",
+    "MIN_PIN_DIAMETER": "FDM / powder-bed / resin rule; the reference has no such process",
+    "MIN_PRINTED_HOLE_DIAMETER": "FDM / powder-bed / resin rule; the reference has no such process",
+    "MIN_PRINTED_TEXT_DEPTH": "FDM / powder-bed / resin rule; the reference has no such process",
+    "MIN_PRINTED_TEXT_STROKE": "FDM / powder-bed / resin rule; the reference has no such process",
+    "MIN_PRINT_GAP": "FDM / powder-bed / resin rule; the reference has no such process",
+    "MIN_RIB_DRAFT": "moulding rule; the reference has no such process",
+    "MIN_RIB_ROOT_RADIUS": "moulding rule; the reference has no such process",
+    "MIN_RIB_SPACING": "moulding rule; the reference has no such process",
+    "MIN_TEXT_STROKE": "moulding rule; the reference has no such process",
+    "PIN_ROOT_FILLET": "FDM / powder-bed / resin rule; the reference has no such process",
+    "SEALED_CAVITY": "powder-bed / resin rule; the reference has no such process",
+    "STANDALONE_BOSS": "moulding rule; the reference has no such process",
+})
+
+
 @dataclass(frozen=True)
 class AliasMap:
     """Reference rule identifiers translated into ours, and back.

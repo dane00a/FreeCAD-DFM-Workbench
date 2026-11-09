@@ -102,9 +102,19 @@ def _as_the_reference_reads_it(shape: TopoDS_Shape, face_index: FaceIndex):
 class MachiningAnalyzer(BaseAnalyzer):
     """Builds the adjacency graph and classifies the manufacturing process."""
 
+    # Recognition reads the whole part at once, so this never runs in the
+    # worker processes: execute() does everything and analyze() is unused.
+    # Progress is reported in faces (the default iteration_count).
+    parallel = False
+    relative_cost = 20
+
     @property
     def analysis_type(self) -> str:
         return "MACHINING_ANALYZER"
+
+    def analyze(self, item: Any) -> None:
+        """Not used: execute() recognises the whole shape at once."""
+        return None
 
     @property
     def name(self) -> str:

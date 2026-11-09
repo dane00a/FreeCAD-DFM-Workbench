@@ -24,6 +24,7 @@ from ...core.utils.geometry import (
     get_face_uv_center,
     get_face_uv_normal,
     is_flat,
+    is_on_bed,
     project_onto,
 )
 
@@ -59,34 +60,29 @@ class BridgeSpanAnalyzer(BaseAnalyzer):
     def resolve_prefs(self, prefs: dict) -> None:
         self.horizontal_tolerance_deg = prefs.get("BridgeHorizontalTolerance", 1.0)
         self.bed_tolerance = prefs.get("BridgeBedTolerance", 0.5)
-        self.probe_depth = 0.01  # mm
+        self.probe_depth = prefs.get("BridgeProbeDepth", 0.01)  # mm
         self.classifier_tol = prefs.get("BridgeClassifierTol", 1e-6)
 
-    def execute(
+    def prepare(
         self,
         shape: TopoDS_Shape,
         face_index: FaceIndex,
         edge_index: EdgeIndex,
-        progress_cb: Optional[Callable[[int], None]] = None,
-        check_abort: Optional[Callable[[], bool]] = None,
         **kwargs: Any,
-    ) -> dict[tuple[str, int], float]:
-        """Returns the bridge span (mm) for each bridging face in a shape."""
-        self.resolve_prefs(kwargs.get("prefs", {}))
-
+    ) -> None:
+        """Set up for a shape (the bridge tests call this the same way)."""
+        super().prepare(shape, face_index, edge_index, **kwargs)
         self.print_orientation = kwargs.get(
             ProcessRequirement.PRINT_ORIENTATION.name, gp_Dir(0, 0, 1)
         )
+        self.face_index = face_index
         self.bed_height = calculate_bed_height(shape, self.print_orientation)
         self.solid_classifier = BRepClass3d_SolidClassifier(shape)
 
-        results: dict[tuple[str, int], float] = {}
-        for face in self.iter_faces(shape, progress_cb, check_abort):
-            span = self._get_bridge_span_for_face(face)
-            if span is not None and span > 0.0:
-                results[face_index.key_of(face)] = span
-
-        return results
+    def analyze(self, face: TopoDS_Face) -> Optional[float]:
+        """The bridge span (mm) of one bridging face, or None."""
+        span = self._get_bridge_span_for_face(face)
+        return span if span is not None and span > 0.0 else None
 
     def _get_bridge_span_for_face(self, face: TopoDS_Face) -> Optional[float]:
         if not self._is_bridge_candidate(face):
@@ -110,8 +106,8 @@ class BridgeSpanAnalyzer(BaseAnalyzer):
             return False
 
         surface = BRepAdaptor_Surface(face)
-        height = self._height_of(surface.Value(u_mid, v_mid))
-        return not math.isclose(height, self.bed_height, abs_tol=self.bed_tolerance)
+        pnt = surface.Value(u_mid, v_mid)
+        return not is_on_bed(pnt, self.bed_height, self.print_orientation, self.bed_tolerance)
 
     def _bridge_directions(self, face: TopoDS_Face) -> list[gp_Dir]:
         directions: list[gp_Dir] = []

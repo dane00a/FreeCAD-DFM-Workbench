@@ -1,0 +1,360 @@
+name: FDM
+category: Additive Manufacturing
+archetype: FDM
+description: >-
+    Fused Deposition Modelling (FDM) builds parts layer-by-layer by extruding
+    thermoplastic filament through a heated nozzle. Wall thickness limits are
+    derived from nozzle diameter at analysis time. Overhang and bridge thresholds
+    depend on material cooling behaviour.
+
+active_rules:
+- MAX_OVERHANG_ANGLE
+- MAX_BRIDGE_SPAN
+- MIN_WALL_THICKNESS
+- MAX_BED_CONTACT_AREA
+- MAX_CUSP_HEIGHT
+- MAX_SUPPORT_MATERIAL
+- MIN_PRINTED_HOLE_DIAMETER
+- HORIZONTAL_HOLE_TEARDROP
+- MIN_PIN_DIAMETER
+- MAX_PIN_SLENDERNESS
+- PIN_ROOT_FILLET
+- MIN_PRINTED_TEXT_DEPTH
+- MIN_PRINTED_TEXT_STROKE
+- MIN_PRINT_GAP
+- BED_EDGE_CHAMFER
+
+rule_feedback:
+    MIN_WALL_THICKNESS:
+        warning_msg: >-
+            Wall thickness {measured} is below the recommended {target}
+            (2x nozzle diameter). Too narrow to fit two extrusion widths,
+            so perimeters will not fuse properly. Expect poor layer bonding
+            and a rough surface.
+        error_msg: >-
+            Wall thickness {measured} is below the {limit} minimum
+            (1x nozzle diameter). The slicer cannot lay down a single
+            extrusion line in this gap and will either skip it or force an
+            under-extruded pass. Widen to at least one nozzle width.
+    MAX_OVERHANG_ANGLE:
+        warning_msg: >-
+            Overhang angle {measured} exceeds the recommended {target}.
+            Each layer overhangs further than the material can self-support.
+            Expect drooping and rough texture on the underside.
+        error_msg: >-
+            Overhang angle {measured} exceeds the {limit} limit. Extruded
+            filament has nothing to rest on and will sag or curl. Add
+            supports, chamfer the edge, or reorient the part.
+    MAX_BRIDGE_SPAN:
+        warning_msg: >-
+            Bridge span {measured} exceeds the recommended {target}.
+            Unsupported strands will sag in the middle, leaving a rough
+            underside that later layers cannot fully recover.
+        error_msg: >-
+            Bridge span {measured} exceeds the {limit} limit. Filament
+            will droop and may detach from one anchor, leaving a failed
+            region. Add a support pillar or redesign to shorten the gap.
+    MAX_BED_CONTACT_AREA:
+        warning_msg: >-
+            Bed contact area {measured} exceeds the recommended {target}.
+            Large flat surfaces cool unevenly and can pull away from the
+            bed at the corners. Consider adding mouse ears or splitting
+            the face with a relief groove.
+        error_msg: >-
+            Bed contact area {measured} exceeds the {limit} limit. A flat
+            footprint this large will almost certainly warp as the part
+            cools. Add a brim, use relief slots, or redesign to reduce
+            unbroken bed contact.
+    MAX_CUSP_HEIGHT:
+        warning_msg: >-
+            Cusp height {measured} exceeds the recommended {target}. At
+            this surface angle each printed layer creates a visible step.
+            Expect a rough surface finish on this face.
+        error_msg: >-
+            Cusp height {measured} exceeds the {limit} limit. Layer steps
+            are clearly visible and the surface will feel rough to the
+            touch. Steepen the surface, reduce the layer height, or plan
+            to sand after printing.
+    MAX_SUPPORT_MATERIAL:
+        warning_msg: >-
+            Support coverage {measured} exceeds the recommended {target}.
+            A large supported region adds print time, uses extra filament,
+            and leaves surface marks where supports are removed.
+        error_msg: >-
+            Support coverage {measured} exceeds the {limit} limit.
+            Extensive support material increases the risk of failed
+            supports, difficult removal, and scarred surfaces. Reorient
+            the part or redesign overhanging features to reduce
+            dependence on supports.
+    MIN_PRINTED_HOLE_DIAMETER:
+        warning_msg: >-
+            Small hole ({measured}): {feature} is {size}, under the recommended
+            {target}. Small printed holes come out undersized and rough. Enlarge
+            it, or drill or ream it to size after printing.
+        error_msg: >-
+            Hole too small to print ({measured}): {feature} is {size}, under
+            {limit}. It may close up entirely. Enlarge it, or print it solid and
+            drill it afterwards.
+    HORIZONTAL_HOLE_TEARDROP:
+        warning_msg: >-
+            Sagging hole top: {feature} ({size}) is a round hole lying across the
+            print direction. Its top has to bridge, so it sags and the hole comes
+            out oval. Give it a teardrop or diamond top (a 45° point) so it prints
+            without support.
+        error_msg: >-
+            Sagging hole top: {feature} ({size}) is a round hole lying across the
+            print direction. Its top has to bridge, so it sags and the hole comes
+            out oval. Give it a teardrop or diamond top (a 45° point) so it prints
+            without support.
+    MIN_PIN_DIAMETER:
+        warning_msg: >-
+            Slender pin ({measured}): {feature} is {size}, thinner than the
+            recommended {target}. Thin printed pins are weak between layers and
+            wobble as they print. Thicken it, or print it lying down.
+        error_msg: >-
+            Pin too thin ({measured}): {feature} is {size}, under {limit}. It will
+            likely snap at a layer line or fail to print cleanly. Thicken it, add
+            a fillet at its base, or press in a metal pin instead.
+    MIN_PRINTED_TEXT_DEPTH:
+        warning_msg: >-
+            Shallow printed text ({measured}): {feature} is {size}, under the
+            recommended {target}. Letters this shallow are only a layer or two and
+            read poorly.
+        error_msg: >-
+            Printed text too shallow ({measured}): {feature} is {size}, under
+            {limit}. The lettering may not show at all at normal layer heights.
+            Raise it or cut it in by at least {target}.
+    MIN_PRINTED_TEXT_STROKE:
+        warning_msg: >-
+            Thin letter strokes ({measured}): {feature} has {size}, under the
+            recommended {target} (two extrusion widths). Strokes this thin print as
+            a single wobbly line. Use a bolder font or larger text.
+        error_msg: >-
+            Letter strokes too thin to print ({measured}): {feature} has {size},
+            under {limit} (one extrusion width). The slicer drops strokes this
+            thin, so the lettering {fault}. Use a bold font or enlarge the text.
+    MAX_PIN_SLENDERNESS:
+        warning_msg: >-
+            Tall thin pin ({measured} its diameter): {feature} is {size}, taller
+            than the recommended {target} its diameter. The nozzle pushes a thin
+            pin about as it prints, so it comes out wavy and weak. Thicken or
+            shorten it, or print it lying down.
+        error_msg: >-
+            Pin too slender ({measured} its diameter): {feature} is {size}, past
+            {limit} its diameter. It will likely break off while printing or snap
+            in use. Thicken it, print it lying down, or press in a metal pin.
+    PIN_ROOT_FILLET:
+        warning_msg: >-
+            Pin with a sharp base: {feature} ({size}) meets the part at a sharp
+            corner. Printed pins snap at their base, where stress gathers on a
+            layer line. Add a small fillet where it meets the part.
+        error_msg: >-
+            Pin with a sharp base: {feature} ({size}) meets the part at a sharp
+            corner. Printed pins snap at their base, where stress gathers on a
+            layer line. Add a small fillet where it meets the part.
+    MIN_PRINT_GAP:
+        warning_msg: >-
+            Narrow gap ({measured}): the gap between {faces} is {size}, under the
+            recommended {target}. Extruded lines bulge into a gap this narrow, so
+            its sides may touch and stick. Widen it to at least {target}.
+        error_msg: >-
+            Gap may fuse shut ({measured}): the gap between {faces} is {size},
+            under {limit}. The two sides will likely print as one. Widen it to at
+            least {target}, or print the parts separately.
+    BED_EDGE_CHAMFER:
+        warning_msg: >-
+            Sharp edges on the bed: {feature} sits on the bed with {size}. The
+            first layer is squashed and spreads sideways (elephant's foot), so the
+            base comes out wider than drawn and holes there narrower, which spoils
+            fits. Add a 0.5 to 1 mm, 45° chamfer along these edges.
+        error_msg: >-
+            Sharp edges on the bed: {feature} sits on the bed with {size}. The
+            first layer is squashed and spreads sideways (elephant's foot), so the
+            base comes out wider than drawn and holes there narrower, which spoils
+            fits. Add a 0.5 to 1 mm, 45° chamfer along these edges.
+
+rule_criticality:
+    MAX_OVERHANG_ANGLE: HIGH
+    MAX_BRIDGE_SPAN: HIGH
+    MIN_WALL_THICKNESS: CRITICAL
+    MAX_BED_CONTACT_AREA: MEDIUM
+    MAX_CUSP_HEIGHT: LOW
+    MAX_SUPPORT_MATERIAL: MEDIUM
+    MIN_PRINTED_HOLE_DIAMETER: MEDIUM
+    HORIZONTAL_HOLE_TEARDROP: LOW
+    MIN_PIN_DIAMETER: MEDIUM
+    MAX_PIN_SLENDERNESS: MEDIUM
+    PIN_ROOT_FILLET: LOW
+    MIN_PRINTED_TEXT_DEPTH: LOW
+    MIN_PRINTED_TEXT_STROKE: LOW
+    MIN_PRINT_GAP: HIGH
+    BED_EDGE_CHAMFER: LOW
+
+materials:
+    Default:
+        category: Default
+        is_active: true
+        rule_limits:
+            MAX_OVERHANG_ANGLE:
+                target: '45'
+                limit: '55'
+            MAX_BRIDGE_SPAN:
+                target: '15'
+                limit: '40'
+            MIN_WALL_THICKNESS:
+                target: '1.2'
+                limit: '0.8'
+            MAX_BED_CONTACT_AREA:
+                target: '5000'
+                limit: '10000'
+            MAX_CUSP_HEIGHT:
+                target: '0.10'
+                limit: '0.15'
+            MAX_SUPPORT_MATERIAL:
+                target: '15'
+                limit: '30'
+            MIN_PRINTED_HOLE_DIAMETER:
+                target: '2.0'
+                limit: '1.0'
+            HORIZONTAL_HOLE_TEARDROP:
+                binary_severity: WARNING
+            MIN_PIN_DIAMETER:
+                target: '3.0'
+                limit: '2.0'
+            MIN_PRINTED_TEXT_DEPTH:
+                target: '0.5'
+                limit: '0.3'
+            # Derived from the nozzle at run time (2 and 1 extrusion widths);
+            # these apply only without a nozzle diameter.
+            MIN_PRINTED_TEXT_STROKE:
+                target: '0.8'
+                limit: '0.4'
+            # Ours: no source gives an FDM figure (resin: Formlabs, about 20).
+            MAX_PIN_SLENDERNESS:
+                target: '10'
+                limit: '20'
+            # Hubs / FacFox: pins under 5 mm need a small fillet at the base.
+            PIN_ROOT_FILLET:
+                binary_severity: WARNING
+            # AMF (UZH) and HLH: 0.5 mm clearance; 0.3 mm (ours) is about the
+            # tightest print-in-place gap (0.2 to 0.3 mm a side, Sovol).
+            MIN_PRINT_GAP:
+                target: '0.5'
+                limit: '0.3'
+            # Ultimaker, Hubs: chamfer edges on the bed for elephant's foot.
+            BED_EDGE_CHAMFER:
+                binary_severity: WARNING
+
+    PLA:
+        category: Standard Thermoplastic
+        is_active: true
+        rule_limits:
+            MAX_OVERHANG_ANGLE:
+                target: '50'
+                limit: '60'
+            MAX_BRIDGE_SPAN:
+                target: '20'
+                limit: '50'
+
+    PLA-CF (Carbon Fiber):
+        category: Composite Filament
+        is_active: true
+        rule_limits:
+            MAX_OVERHANG_ANGLE:
+                target: '48'
+                limit: '55'
+            MAX_BRIDGE_SPAN:
+                target: '18'
+                limit: '45'
+
+    PETG:
+        category: Standard Thermoplastic
+        is_active: true
+        rule_limits:
+            MAX_OVERHANG_ANGLE:
+                target: '42'
+                limit: '50'
+            MAX_BRIDGE_SPAN:
+                target: '12'
+                limit: '35'
+
+    ABS:
+        category: Engineering Thermoplastic
+        is_active: true
+        rule_limits:
+            MAX_OVERHANG_ANGLE:
+                target: '40'
+                limit: '45'
+            MAX_BRIDGE_SPAN:
+                target: '10'
+                limit: '30'
+            MAX_BED_CONTACT_AREA:
+                target: '2500'
+                limit: '5000'
+
+    ASA:
+        category: Engineering Thermoplastic
+        is_active: true
+        rule_limits:
+            MAX_OVERHANG_ANGLE:
+                target: '40'
+                limit: '45'
+            MAX_BRIDGE_SPAN:
+                target: '10'
+                limit: '30'
+            MAX_BED_CONTACT_AREA:
+                target: '2500'
+                limit: '5000'
+
+    TPU (Flexible):
+        category: Flexible Filament
+        is_active: true
+        rule_limits:
+            MAX_OVERHANG_ANGLE:
+                target: '35'
+                limit: '40'
+            MAX_BRIDGE_SPAN:
+                target: '8'
+                limit: '20'
+            MIN_WALL_THICKNESS:
+                target: '1.6'
+                limit: '1.2'
+
+    PA:
+        category: Engineering Thermoplastic
+        is_active: true
+        rule_limits:
+            MAX_OVERHANG_ANGLE:
+                target: '38'
+                limit: '45'
+            MAX_BRIDGE_SPAN:
+                target: '10'
+                limit: '30'
+            MAX_BED_CONTACT_AREA:
+                target: '2000'
+                limit: '4000'
+
+    PA-CF (Carbon Fiber):
+        category: Composite Filament
+        is_active: true
+        rule_limits:
+            MAX_OVERHANG_ANGLE:
+                target: '42'
+                limit: '50'
+            MAX_BRIDGE_SPAN:
+                target: '15'
+                limit: '40'
+
+    PC:
+        category: Engineering Thermoplastic
+        is_active: true
+        rule_limits:
+            MAX_OVERHANG_ANGLE:
+                target: '38'
+                limit: '45'
+            MAX_BRIDGE_SPAN:
+                target: '10'
+                limit: '30'
+            MAX_BED_CONTACT_AREA:
+                target: '2000'
+                limit: '4000'

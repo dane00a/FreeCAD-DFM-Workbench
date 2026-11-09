@@ -20,6 +20,11 @@ class SharpInternalCornerCheck(BaseCheck):
         return "Sharp Internal Corners Check"
 
     @property
+    def progress_text(self) -> str:
+        """What the progress bar shows while this runs."""
+        return "Checking for sharp inside corners"
+
+    @property
     def required_analyzer_id(self) -> str:
         return "SHARP_CORNER_ANALYZER"
 
@@ -36,7 +41,8 @@ class SharpInternalCornerCheck(BaseCheck):
 
         unit = rule.unit
         fb = feedback or RuleFeedback()
-        threshold = 1  # degree
+        prefs = kwargs.get("prefs", {})
+        threshold = prefs.get("SharpInternalMinAngle", 1)  # degree
 
         for edge, (angle_deg, is_concave) in analysis_data_map.items():
             if not is_concave or angle_deg < threshold:

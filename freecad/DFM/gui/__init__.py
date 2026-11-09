@@ -11,6 +11,7 @@ _PAGES = {
     "MachiningTooling": "tool_library",
     "DFMPreferencesGeneral": "preferences",
     "DFMPreferencesAnalyzers": "preferences",
+    "DFMPreferencesContour": "preferences",
 }
 
 __all__ = tuple(_PAGES)

@@ -4,12 +4,60 @@
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from ..rule_cards import INFO_SVG, render_svg_icon
+
+# Rule rows carry their Rulebook member in this role; it enables the info icon.
+RULE_ROLE = QtCore.Qt.ItemDataRole.UserRole + 9
+
+_INFO_SIZE = 14
+_INFO_GAP = 6
+
 
 class DFMTreeDelegate(QtWidgets.QStyledItemDelegate):
-    """Custom delegate that renders rule rows and finding rows with distinct visual styles."""
+    """Custom delegate that renders rule rows and finding rows with distinct visual styles.
+
+    Rule rows that carry a rule (``RULE_ROLE``) get a small info icon after
+    the name; hovering it shows the rule's diagram. ``info_rect`` returns
+    where that icon is drawn, so the view can detect the hover.
+    """
 
     _LABEL_COLOR = QtGui.QColor("#aaaaaa")
     _IGNORE_COLOR = QtGui.QColor("#666666")
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._info_icons: dict[tuple, QtGui.QIcon] = {}
+        self.hovered_info: QtCore.QPersistentModelIndex = QtCore.QPersistentModelIndex()
+        # The row showing the camera buttons, and the room they need at its
+        # right end; set by the view.
+        self.actions_index: QtCore.QPersistentModelIndex = QtCore.QPersistentModelIndex()
+        self.actions_width: int = 0
+
+    @staticmethod
+    def _label_font(option_font: QtGui.QFont) -> QtGui.QFont:
+        font = QtGui.QFont(option_font)
+        font.setWeight(QtGui.QFont.Weight.Medium)
+        return font
+
+    def info_rect(self, view: QtWidgets.QAbstractItemView, index: QtCore.QModelIndex) -> QtCore.QRect:
+        """Viewport rectangle of the info icon on *index*, or an empty rect."""
+        if not index.isValid() or index.data(RULE_ROLE) is None:
+            return QtCore.QRect()
+        return self._info_rect_for(view.visualRect(index), index, view.font())
+
+    def _info_rect_for(self, rect: QtCore.QRect, index, font: QtGui.QFont) -> QtCore.QRect:
+        text_left = rect.left() + 4 + 16 + 6
+        label = index.data(QtCore.Qt.ItemDataRole.UserRole + 2) or ""
+        width = QtGui.QFontMetrics(self._label_font(font)).horizontalAdvance(label)
+        x = text_left + width + _INFO_GAP
+        y = rect.top() + (rect.height() - _INFO_SIZE) // 2
+        return QtCore.QRect(x, y, _INFO_SIZE, _INFO_SIZE)
+
+    def _info_icon(self, color: QtGui.QColor, ratio: float) -> QtGui.QIcon:
+        key = (color.rgba(), ratio)
+        if key not in self._info_icons:
+            self._info_icons[key] = render_svg_icon(INFO_SVG, color, _INFO_SIZE, ratio)
+        return self._info_icons[key]
 
     def paint(self, painter, option, index):
         painter.save()
@@ -33,6 +81,8 @@ class DFMTreeDelegate(QtWidgets.QStyledItemDelegate):
 
         text_left = icon_rect.right() + 6
         rect = option.rect
+        if self.actions_width and QtCore.QPersistentModelIndex(index) == self.actions_index:
+            rect = rect.adjusted(0, 0, -self.actions_width, 0)  # room for the camera buttons
         accent = QtGui.QColor(color_hex)
 
         base_text = (
@@ -53,20 +103,24 @@ class DFMTreeDelegate(QtWidgets.QStyledItemDelegate):
 
             badge_font = QtGui.QFont(option.font)
             badge_font.setPointSizeF(option.font.pointSizeF() * 0.85)
-            fm_badge = QtGui.QFontMetrics(badge_font)
+
+            ignored_count = index.data(QtCore.Qt.ItemDataRole.UserRole + 8) or 0
+
+            # Fixed-width badges packed right-to-left (no empty gaps).
+            # Ordered: error (rightmost), warning, ignored (leftmost).
+            BADGE_W = 28
+            badge_spacing = 4
 
             badges = []
-            if not error_count and not warning_count:
-                badges.append((secondary, QtGui.QColor("#639922")))
-            else:
-                if warning_count:
-                    badges.append((str(warning_count), QtGui.QColor("#D4900A")))
-                if error_count:
-                    badges.append((str(error_count), QtGui.QColor("#E24B4A")))
+            if ignored_count:
+                badges.append((str(ignored_count), QtGui.QColor("#666666")))
+            if warning_count:
+                badges.append((str(warning_count), QtGui.QColor("#D4900A")))
+            if error_count:
+                badges.append((str(error_count), QtGui.QColor("#E24B4A")))
 
-            badge_spacing = 4
-            badge_widths = [fm_badge.horizontalAdvance(f"  {t}  ") + 8 for t, _ in badges]
-            total_badge_w = sum(badge_widths) + badge_spacing * (len(badges) - 1)
+            n = len(badges)
+            total_badge_w = n * BADGE_W + max(0, n - 1) * badge_spacing if n else 0
 
             label_rect = QtCore.QRect(
                 text_left, rect.top(), rect.right() - total_badge_w - 14 - text_left, rect.height()
@@ -77,8 +131,22 @@ class DFMTreeDelegate(QtWidgets.QStyledItemDelegate):
             painter.setPen(base_text)
             painter.drawText(label_rect, QtCore.Qt.AlignmentFlag.AlignVCenter, primary)
 
-            def draw_badge(text, color, x, w):
-                badge_rect = QtCore.QRect(x, rect.top() + 5, w, rect.height() - 10)
+            # Info icon after the rule name: faded at rest, full on hover.
+            if index.data(RULE_ROLE) is not None:
+                info = self._info_rect_for(rect, index, option.font)
+                if info.right() < rect.right() - total_badge_w - 8:
+                    color = QtGui.QColor(base_text)
+                    hovered = QtCore.QPersistentModelIndex(index) == self.hovered_info
+                    mode = QtGui.QIcon.Mode.Active if hovered else QtGui.QIcon.Mode.Normal
+                    painter.setOpacity(1.0 if hovered else 0.6)
+                    ratio = painter.device().devicePixelRatioF() if painter.device() else 1.0
+                    self._info_icon(color, ratio).paint(
+                        painter, info, QtCore.Qt.AlignmentFlag.AlignCenter, mode
+                    )
+                    painter.setOpacity(1.0)
+
+            def draw_badge(text, color, x):
+                badge_rect = QtCore.QRect(x, rect.top() + 5, BADGE_W, rect.height() - 10)
                 bg = QtGui.QColor(color)
                 bg.setAlpha(180)
                 painter.setPen(QtCore.Qt.PenStyle.NoPen)
@@ -88,10 +156,11 @@ class DFMTreeDelegate(QtWidgets.QStyledItemDelegate):
                 painter.setPen(QtGui.QColor("white"))
                 painter.drawText(badge_rect, QtCore.Qt.AlignmentFlag.AlignCenter, text)
 
+            # Draw right-to-left: last in list → rightmost on screen.
             x = rect.right() - 6
-            for (text, color), w in zip(reversed(badges), reversed(badge_widths)):
-                x -= w
-                draw_badge(text, color, x, w)
+            for text, color in reversed(badges):
+                x -= BADGE_W
+                draw_badge(text, color, x)
                 x -= badge_spacing
 
         elif item_type == "finding":
@@ -125,7 +194,9 @@ class DFMTreeDelegate(QtWidgets.QStyledItemDelegate):
             overview_rect = QtCore.QRect(
                 dot_x + 14, rect.top(), rect.right() - dot_x - 14, rect.height()
             )
-            painter.drawText(overview_rect, QtCore.Qt.AlignmentFlag.AlignVCenter, secondary)
+            shown = fm.elidedText(secondary, QtCore.Qt.TextElideMode.ElideRight,
+                                  max(overview_rect.width(), 0))
+            painter.drawText(overview_rect, QtCore.Qt.AlignmentFlag.AlignVCenter, shown)
 
         painter.restore()
 

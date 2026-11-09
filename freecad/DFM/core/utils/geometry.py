@@ -19,7 +19,7 @@ from OCP.TopAbs import TopAbs_REVERSED, TopAbs_IN, TopAbs_ON
 from OCP.TopoDS import TopoDS_Shape, TopoDS_Face, TopoDS, TopoDS_Edge
 from OCP.TopAbs import TopAbs_FACE, TopAbs_EDGE
 from OCP.TopTools import TopTools_IndexedMapOfShape
-from OCP.TopExp import TopExp
+from OCP.TopExp import TopExp, TopExp_Explorer
 
 from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
 
@@ -80,16 +80,15 @@ def get_face_uv_center(face: TopoDS_Face) -> tuple[float, float]:
 def get_face_uv_normal(face: TopoDS_Face, u: float, v: float) -> Optional[gp_Dir]:
     """Returns the normal of a TopoDS_Face at UV"""
 
+    # The one-argument BRep_Tool.Surface already returns the surface moved to
+    # the face's location (a FreeCAD Placement), so the normal is in model
+    # space as it is. Transforming it by the location again rotated it twice
+    # on placed parts, which sent thickness rays the wrong way (#112).
     surface = BRep_Tool.Surface_s(face)
     props = GeomLProp_SLProps(surface, u, v, 1, 1e-6)
 
     if props.IsNormalDefined():
-        pnt = props.Value()
         norm = props.Normal()
-
-        if not face.Location().IsIdentity():
-            pnt.Transform(face.Location().Transformation())
-            norm.Transform(face.Location().Transformation())
 
         if face.Orientation() == TopAbs_REVERSED:
             norm.Reverse()
@@ -115,7 +114,8 @@ def get_adaptive_sample_count(face: TopoDS_Face, min_samples: int, max_samples: 
     """
     props = GProp_GProps()
     BRepGProp.SurfaceProperties_s(face, props)
-    return int(max(min_samples, min(max_samples, 2 + (props.Mass() ** 0.5) / 10)))
+    # abs(): OCCT gives some faces a negative area, whose square root is complex.
+    return int(max(min_samples, min(max_samples, 2 + (abs(props.Mass()) ** 0.5) / 10)))
 
 
 def yield_face_uv_grid(
@@ -231,6 +231,7 @@ def optimize_face_uv_search(
     classifier: BRepTopAdaptor_FClass2d,
     max_iterations: int = 50,
     max_step_mm: float = 5.0,
+    check_abort: Optional[Callable[[], bool]] = None,
 ) -> tuple[tuple[float, float], float, list[float]]:
     """
     A generic Hill-Climbing algorithm that searches a face's UV space to find the
@@ -267,6 +268,9 @@ def optimize_face_uv_search(
     diagonals = [(1, 1), (-1, 1), (1, -1), (-1, -1)]
 
     for _ in range(max_iterations):
+        if check_abort and check_abort():
+            break
+
         improved = False
         prev_val = current_max_val
 
@@ -325,6 +329,63 @@ def optimize_face_uv_search(
     return current_best_uv, current_max_val, improvements
 
 
+# Recent get_extent_along results: several FDM analyzers ask for the same
+# shape's bed height in one run. Each entry is (shape, direction, result).
+_EXTENT_CACHE: list = []
+_EXTENT_CACHE_SIZE = 8
+
+
+def _z_range(shape: TopoDS_Shape, exact: bool) -> tuple[float, float]:
+    """(zmin, zmax) of *shape*'s bounding box; exact is tight but slow on curved faces."""
+    bbox = Bnd_Box()
+    if exact:
+        BRepBndLib.AddOptimal_s(shape, bbox, False, False)
+    else:
+        BRepBndLib.Add_s(shape, bbox, False)
+    corner_min, corner_max = bbox.CornerMin(), bbox.CornerMax()
+    return corner_min.Z(), corner_max.Z()
+
+
+def _exact_z_range(shape: TopoDS_Shape) -> tuple[float, float]:
+    """The exact Z extent of a shape, measuring only the faces that can set it.
+
+    An exact box (AddOptimal) is slow on B-spline faces: seconds for a
+    whole cast part. A loose box (Add) is instant and always encloses its
+    face, so a face can only hold the lowest point if its loose box reaches
+    below the lowest exact point found so far. Walking the faces lowest
+    loose box first, the exact box is needed for only a few of them, and
+    the answer is the same as measuring everything exactly (#111).
+    """
+    faces = []
+    explorer = TopExp_Explorer(shape, TopAbs_FACE)
+    while explorer.More():
+        face = explorer.Current()
+        faces.append((face, _z_range(face, exact=False)))
+        explorer.Next()
+    if not faces:
+        return _z_range(shape, exact=True)
+
+    exact: dict[int, tuple[float, float]] = {}
+
+    def exact_of(i: int) -> tuple[float, float]:
+        if i not in exact:
+            exact[i] = _z_range(faces[i][0], exact=True)
+        return exact[i]
+
+    lowest = float("inf")
+    for i in sorted(range(len(faces)), key=lambda k: faces[k][1][0]):
+        if faces[i][1][0] >= lowest:
+            break  # no face left can reach lower
+        lowest = min(lowest, exact_of(i)[0])
+
+    highest = float("-inf")
+    for i in sorted(range(len(faces)), key=lambda k: -faces[k][1][1]):
+        if faces[i][1][1] <= highest:
+            break
+        highest = max(highest, exact_of(i)[1])
+    return lowest, highest
+
+
 def get_extent_along(shape: TopoDS_Shape, direction: gp_Dir) -> tuple[float, float]:
     """Returns (min, max) of a shape's extent along an arbitrary direction.
 
@@ -332,6 +393,11 @@ def get_extent_along(shape: TopoDS_Shape, direction: gp_Dir) -> tuple[float, flo
     bounding box. Handles curved geometry correctly, unlike projecting vertices,
     which misses the extremes of an arc.
     """
+    for cached_shape, cached_dir, result in _EXTENT_CACHE:
+        if cached_shape.IsSame(shape) and cached_shape.Location().IsEqual(shape.Location()) \
+                and cached_dir.IsEqual(direction, 1e-9):
+            return result
+
     if direction.IsEqual(gp_Dir(0, 0, 1), 1e-4):
         moved = shape
     else:
@@ -342,10 +408,14 @@ def get_extent_along(shape: TopoDS_Shape, direction: gp_Dir) -> tuple[float, flo
         )
         moved = BRepBuilderAPI_Transform(shape, trsf, True).Shape()
 
-    bbox = Bnd_Box()
-    BRepBndLib.AddOptimal_s(moved, bbox)
-    _, _, zmin, _, _, zmax = bbox.Get()
-    return zmin, zmax
+    if moved.ShapeType() == TopAbs_FACE:
+        result = _z_range(moved, exact=True)  # a single face: nothing to prune
+    else:
+        result = _exact_z_range(moved)
+
+    _EXTENT_CACHE.insert(0, (shape, direction, result))
+    del _EXTENT_CACHE[_EXTENT_CACHE_SIZE:]
+    return result
 
 
 def project_onto(pnt: gp_Pnt, direction: gp_Dir) -> float:
@@ -355,3 +425,21 @@ def project_onto(pnt: gp_Pnt, direction: gp_Dir) -> float:
 
 def calculate_bed_height(shape, print_orientation: gp_Dir) -> float:
     return get_extent_along(shape, print_orientation)[0]
+
+
+def is_on_bed(pnt: gp_Pnt, bed_height: float, print_orientation: gp_Dir, tolerance: float = 0.5) -> bool:
+    """Check whether a 3D point sits on the print bed.
+
+    Projects *pnt* onto the *print_orientation* axis and compares the
+    result to *bed_height* within *tolerance*.
+    """
+    import math
+    height = project_onto(pnt, print_orientation)
+    return math.isclose(height, bed_height, abs_tol=tolerance)
+
+
+def face_area(face: TopoDS_Face) -> float:
+    """Return the surface area of a face in model units squared."""
+    props = GProp_GProps()
+    BRepGProp.SurfaceProperties_s(face, props)
+    return props.Mass()

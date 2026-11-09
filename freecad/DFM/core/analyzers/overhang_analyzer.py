@@ -9,7 +9,7 @@ import FreeCAD as App  # type: ignore
 
 from OCP.TopoDS import TopoDS_Shape, TopoDS_Face
 from OCP.BRepAdaptor import BRepAdaptor_Surface
-from OCP.gp import gp_Dir, gp_Vec
+from OCP.gp import gp_Dir
 from OCP.GeomAbs import GeomAbs_Plane
 
 from ...core.base.base_analyzer import BaseAnalyzer
@@ -21,6 +21,7 @@ from ...core.utils.geometry import (
     calculate_bed_height,
     get_face_uv_center,
     get_face_uv_normal,
+    is_on_bed,
     yield_face_uv_grid,
 )
 
@@ -44,41 +45,32 @@ class OverhangAnalyzer(BaseAnalyzer):
         return "Overhang Analyzer"
 
     def resolve_prefs(self, prefs: dict) -> None:
-        return super().resolve_prefs(prefs)
+        self.samples = prefs.get("OverhangSamples", 15)
+        self.margin = prefs.get("OverhangMargin", 0.01)
+        self.bed_tolerance = prefs.get("OverhangBedTolerance", 0.5)
 
-    def execute(
+    def prepare(
         self,
         shape: TopoDS_Shape,
         face_index: FaceIndex,
         edge_index: EdgeIndex,
-        progress_cb: Optional[Callable[[int], None]] = None,
-        check_abort: Optional[Callable[[], bool]] = None,
         **kwargs: Any,
-    ) -> dict[tuple[str, int], float]:
+    ) -> None:
+        super().prepare(shape, face_index, edge_index, **kwargs)
         self.print_orientation = kwargs.get(
             ProcessRequirement.PRINT_ORIENTATION.name, gp_Dir(0, 0, 1)
         )
-        self.samples = kwargs.get("samples", 15)
         self.face_index = face_index
-
         self.bed_height = calculate_bed_height(shape, self.print_orientation)
 
-        results = {}
-        for face in self.iter_faces(shape, progress_cb, check_abort):
-            overhang = self._get_overhang_for_face(face)
-            if overhang is not None and overhang > 0.0:
-                results[self.face_index.key_of(face)] = overhang
-
-        return results
+    def analyze(self, face: TopoDS_Face) -> Optional[float]:
+        overhang = self._get_overhang_for_face(face)
+        return overhang if overhang is not None and overhang > 0.0 else None
 
     def _is_on_bed(self, surface: BRepAdaptor_Surface, u: float, v: float) -> bool:
         """Checks if a specific UV point on a face is touching the print bed."""
         pnt = surface.Value(u, v)
-
-        height = gp_Vec(pnt.XYZ()).Dot(gp_Vec(self.print_orientation))
-
-        # TODO: Investigate tolerance here
-        return math.isclose(height, self.bed_height, abs_tol=0.5)
+        return is_on_bed(pnt, self.bed_height, self.print_orientation, self.bed_tolerance)
 
     def _get_overhang_for_face(self, face: TopoDS_Face) -> Optional[float]:
         """Calculates the maximum overhang angle in degrees for the given face."""
@@ -94,7 +86,7 @@ class OverhangAnalyzer(BaseAnalyzer):
             return self._calculate_overhang_angle(normal_dir) if normal_dir else None
 
         max_overhang = 0.0
-        for u, v in yield_face_uv_grid(face, self.samples, margin=0.01):
+        for u, v in yield_face_uv_grid(face, self.samples, margin=self.margin):
             if self._is_on_bed(surface, u, v):
                 continue
 

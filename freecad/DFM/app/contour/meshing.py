@@ -4,11 +4,14 @@
 
 
 from dataclasses import dataclass
+from typing import Optional
 import math
 import os
 import tempfile
 
 import FreeCAD as App  # type: ignore
+
+from ..prefs import dfm_params
 
 
 RESOLUTION_DIVISORS = {
@@ -17,12 +20,27 @@ RESOLUTION_DIVISORS = {
     "Fine": 70.0,
     "Ultra Fine": 140.0,
 }
-DEFAULT_RESOLUTION = "Coarse"
 
-TRIANGLE_WARN = 300_000
-TRIANGLE_HARD_CAP = 1_500_000
+_DEFAULT_RESOLUTION = "Fine"
+_TRIANGLE_WARN = 300_000
+_TRIANGLE_HARD_CAP = 1_500_000
+_MIN_ELEMENT_SIZE = 1e-3
 
-MIN_ELEMENT_SIZE = 1e-3
+
+def get_default_resolution() -> str:
+    return dfm_params().GetString("ContourDefaultResolution", _DEFAULT_RESOLUTION)
+
+
+def get_triangle_warn() -> int:
+    return dfm_params().GetInt("ContourTriangleWarn", _TRIANGLE_WARN)
+
+
+def get_triangle_hard_cap() -> int:
+    return dfm_params().GetInt("ContourTriangleHardCap", _TRIANGLE_HARD_CAP)
+
+
+def get_min_element_size() -> float:
+    return dfm_params().GetFloat("ContourMinElementSize", _MIN_ELEMENT_SIZE)
 
 
 @dataclass
@@ -30,11 +48,14 @@ class UniformMesh:
     vertices: list
     triangles: list
     cad_normals: list
+    # Signed tightest curvature (1/mm) per triangle, positive = convex against
+    # the triangle's winding normal; None when not asked for or not known.
+    curvatures: Optional[list] = None
 
 
 def element_size_for(shape, resolution: str) -> float:
     diag = shape.BoundBox.DiagonalLength
-    divisor = RESOLUTION_DIVISORS.get(resolution, RESOLUTION_DIVISORS[DEFAULT_RESOLUTION])
+    divisor = RESOLUTION_DIVISORS.get(resolution, RESOLUTION_DIVISORS[get_default_resolution()])
     return diag / divisor
 
 
@@ -60,23 +81,76 @@ def _normalize3(x, y, z):
     return (x / length, y / length, z / length)
 
 
-def generate_uniform_mesh(shape, element_size: float) -> UniformMesh:
-    """Mesh `shape` with gmsh at a uniform element size (mm).
+def _candidate_gmsh_lib_dirs():
+    dirs = []
+    env = os.environ.get("GMSH_LIB_DIR")
+    if env:
+        dirs.append(env)
+    try:
+        import gmsh as _gmsh_probe
 
-    Raises RuntimeError if gmsh is unavailable, the size is unsafe, or no
-    triangles were produced.
-    """
-    if element_size is None or element_size < MIN_ELEMENT_SIZE:
-        raise RuntimeError(
-            f"Element size {element_size} mm is too small; minimum is {MIN_ELEMENT_SIZE} mm."
-        )
-    estimate = estimate_triangle_count(shape, element_size)
-    if estimate is None or estimate > TRIANGLE_HARD_CAP:
-        raise RuntimeError(
-            f"That element size would create about {estimate:,} triangles, over "
-            f"the {TRIANGLE_HARD_CAP:,} safety limit. Choose a coarser resolution."
-        )
+        mod_dir = os.path.dirname(os.path.abspath(_gmsh_probe.__file__))
+        dirs.append(mod_dir)
+        dirs.append(os.path.join(mod_dir, "lib"))
+        dirs.append(os.path.join(os.path.dirname(mod_dir), "lib"))
+        for entry in os.listdir(mod_dir):
+            full = os.path.join(mod_dir, entry)
+            if os.path.isdir(full) and entry.lower().startswith("gmsh"):
+                dirs.append(full)
+                dirs.append(os.path.join(full, "lib"))
+    except Exception:
+        pass
+    for base in list(getattr(__import__("site"), "getsitepackages", lambda: [])() or []):
+        dirs.append(base)
+        dirs.append(os.path.join(base, "gmsh"))
+        dirs.append(os.path.join(base, "lib"))
+    dirs.extend(
+        [
+            "/usr/lib/x86_64-linux-gnu",
+            "/usr/lib64",
+            "/usr/lib",
+            "/usr/local/lib",
+        ]
+    )
+    seen = set()
+    out = []
+    for d in dirs:
+        if d and d not in seen and os.path.isdir(d):
+            seen.add(d)
+            out.append(d)
+    return out
 
+
+def _find_libgmsh(dirs):
+    import re
+
+    pattern = re.compile(r"^libgmsh\.so(\.\d+)*$")
+    exact = []
+    for d in dirs:
+        try:
+            entries = os.listdir(d)
+        except Exception:
+            continue
+        for name in entries:
+            if pattern.match(name) or name == "gmsh.dll" or name.startswith("libgmsh"):
+                exact.append(os.path.join(d, name))
+    exact.sort(key=len, reverse=True)
+    return exact
+
+
+def _preload_libgmsh():
+    import ctypes
+
+    for path in _find_libgmsh(_candidate_gmsh_lib_dirs()):
+        try:
+            ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
+            return path
+        except Exception:
+            continue
+    return None
+
+
+def _import_gmsh():
     try:
         import gmsh
     except ImportError as exc:
@@ -86,13 +160,67 @@ def generate_uniform_mesh(shape, element_size: float) -> UniformMesh:
             "'pip install gmsh' into the same environment FreeCAD uses."
         ) from exc
 
+    try:
+        gmsh.initialize()
+        return gmsh
+    except Exception:
+        pass
+
+    preloaded = _preload_libgmsh()
+    try:
+        gmsh.initialize()
+        return gmsh
+    except Exception as exc:
+        detail = str(exc)
+        hint = (
+            "The 'gmsh' Python wrapper is installed, but its native library "
+            "(libgmsh.so) could not be loaded, so meshing can't run. This is a "
+            "packaging problem,  it is common in sandboxed "
+            "FreeCAD installs (e.g. Flatpak/Snap) where the pip 'gmsh' wheel's "
+            "shared library isn't found.\n"
+            "Fixes:\n"
+            "  - Install a gmsh build that bundles its library, e.g. reinstall "
+            "with 'pip install --force-reinstall gmsh' into FreeCAD's Python.\n"
+            "  - Or download the Gmsh SDK from gmsh.info and point the "
+            "GMSH_LIB_DIR environment variable at its 'lib' folder before "
+            "starting FreeCAD.\n"
+            f"Underlying error: {detail}"
+        )
+        if preloaded:
+            hint += f"\n(Tried preloading {preloaded}.)"
+        raise RuntimeError(hint) from exc
+
+
+def generate_uniform_mesh(shape, element_size: float, with_curvature: bool = False) -> UniformMesh:
+    """Mesh `shape` with gmsh at a uniform element size (mm).
+
+    With `with_curvature`, also work out each triangle's curvature from the
+    exact CAD surfaces while gmsh still has them (see curvature.py).
+
+    Raises RuntimeError if gmsh is unavailable, the size is unsafe, or no
+    triangles were produced.
+    """
+    min_size = get_min_element_size()
+    if element_size is None or element_size < min_size:
+        raise RuntimeError(
+            f"Element size {element_size} mm is too small; minimum is {min_size} mm."
+        )
+    hard_cap = get_triangle_hard_cap()
+    estimate = estimate_triangle_count(shape, element_size)
+    if estimate is None or estimate > hard_cap:
+        raise RuntimeError(
+            f"That element size would create about {estimate:,} triangles, over "
+            f"the {hard_cap:,} safety limit. Choose a coarser resolution."
+        )
+
+    gmsh = _import_gmsh()
+
     tmp = tempfile.NamedTemporaryFile(suffix=".brep", delete=False)
     tmp.close()
     brep_path = tmp.name
 
     try:
         shape.exportBrep(brep_path)
-        gmsh.initialize()
         try:
             gmsh.option.setNumber("General.Terminal", 0)
             gmsh.option.setNumber("General.NumThreads", 0)
@@ -124,6 +252,7 @@ def generate_uniform_mesh(shape, element_size: float) -> UniformMesh:
 
             triangles = []
             cad_normals = []
+            curvatures = [] if with_curvature else None
             for _dim, surf_tag in gmsh.model.getEntities(2):
                 s_tags, _s_coords, s_params = gmsh.model.mesh.getNodes(
                     2, surf_tag, includeBoundary=True, returnParametricCoord=True
@@ -144,12 +273,15 @@ def generate_uniform_mesh(shape, element_size: float) -> UniformMesh:
                             float(normals_flat[3 * k + 2]),
                         )
 
+                surf_tris = []
                 e_types, _e_tags, e_node_tags = gmsh.model.mesh.getElements(2, surf_tag)
                 for etype, enodes in zip(e_types, e_node_tags):
                     if int(etype) != 2:
                         continue
                     for j in range(0, len(enodes), 3):
                         t0, t1, t2 = int(enodes[j]), int(enodes[j + 1]), int(enodes[j + 2])
+                        if curvatures is not None:
+                            surf_tris.append((t0, t1, t2))
                         triangles.append((tag_to_index[t0], tag_to_index[t1], tag_to_index[t2]))
                         n0 = node_normal.get(t0)
                         n1 = node_normal.get(t1)
@@ -164,6 +296,13 @@ def generate_uniform_mesh(shape, element_size: float) -> UniformMesh:
                             )
                         else:
                             cad_normals.append(None)
+                if curvatures is not None and surf_tris:
+                    curvatures.extend(
+                        _surface_curvatures(
+                            gmsh, surf_tag, s_tags, s_params, node_normal, surf_tris,
+                            lambda t: vertices[tag_to_index[t]],
+                        )
+                    )
         finally:
             gmsh.finalize()
     finally:
@@ -178,7 +317,20 @@ def generate_uniform_mesh(shape, element_size: float) -> UniformMesh:
         )
 
     App.Console.PrintMessage(
-        f"DFM contour: meshed at {element_size:.3f} mm -> "
+        f"DFM: meshed at {element_size:.3f} mm -> "
         f"{len(vertices)} nodes, {len(triangles)} triangles.\n"
     )
-    return UniformMesh(vertices=vertices, triangles=triangles, cad_normals=cad_normals)
+    return UniformMesh(
+        vertices=vertices, triangles=triangles, cad_normals=cad_normals, curvatures=curvatures
+    )
+
+
+def _surface_curvatures(gmsh, surf_tag, s_tags, s_params, node_normal, tris, coords_of):
+    """Curvature for one surface's triangles; Nones if it can't be done."""
+    try:
+        from .curvature import surface_curvatures
+
+        return surface_curvatures(gmsh, surf_tag, s_tags, s_params, node_normal, tris, coords_of)
+    except Exception as exc:
+        App.Console.PrintWarning(f"DFM contour: curvature failed on surface {surf_tag}. {exc}\n")
+        return [None] * len(tris)

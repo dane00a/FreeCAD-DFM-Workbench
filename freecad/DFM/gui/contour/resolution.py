@@ -7,9 +7,9 @@ from PySide6 import QtCore, QtWidgets
 
 from ...app.contour.meshing import (
     RESOLUTION_DIVISORS,
-    DEFAULT_RESOLUTION,
-    MIN_ELEMENT_SIZE,
-    TRIANGLE_HARD_CAP,
+    get_default_resolution,
+    get_min_element_size,
+    get_triangle_hard_cap,
     element_size_for,
     estimate_triangle_count,
 )
@@ -25,37 +25,45 @@ class ResolutionField(QtWidgets.QWidget):
         self._shape = None
         self._safe = False
 
-        layout = QtWidgets.QVBoxLayout(self)
+        # Preset and size side by side, like the panel's other paired fields.
+        layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
         self.combo = QtWidgets.QComboBox()
         self.combo.addItems(list(RESOLUTION_DIVISORS.keys()) + [_CUSTOM])
-        self.combo.setCurrentText(DEFAULT_RESOLUTION)
+        self.combo.setCurrentText(get_default_resolution())
         self.combo.setToolTip("Element size preset, scaled to the part. Custom lets you type mm.")
         self.combo.currentIndexChanged.connect(self._on_combo)
-        layout.addWidget(self.combo)
+        self.combo.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding,
+                                 QtWidgets.QSizePolicy.Policy.Fixed)
+        self.combo.setMinimumContentsLength(4)
+        layout.addWidget(self.combo, 1)
 
         self.spin = QtWidgets.QDoubleSpinBox()
-        self.spin.setRange(MIN_ELEMENT_SIZE, 100000.0)
+        self.spin.setRange(get_min_element_size(), 100000.0)
         self.spin.setDecimals(3)
         self.spin.setSingleStep(0.5)
         self.spin.setSuffix(" mm")
-        self.spin.setToolTip("Explicit element size. Smaller is finer and slower.")
+        self.spin.setToolTip("Explicit element size. Smaller is finer and slower. Editing switches to Custom.")
         self.spin.valueChanged.connect(self._on_spin)
-        self.spin.hide()
-        layout.addWidget(self.spin)
+        self.spin.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding,
+                                QtWidgets.QSizePolicy.Policy.Fixed)
+        layout.addWidget(self.spin, 1)
+
+        self._sync_spin_to_combo()
+
+    def _sync_spin_to_combo(self):
+        if self.combo.currentText() == _CUSTOM or self._shape is None:
+            return
+        size = element_size_for(self._shape, self.combo.currentText())
+        self.spin.blockSignals(True)
+        self.spin.setValue(size)
+        self.spin.blockSignals(False)
 
     def set_shape(self, shape):
         self._shape = shape
-        if (
-            self.combo.currentText() == _CUSTOM
-            and self._shape is not None
-            and self.spin.value() <= MIN_ELEMENT_SIZE
-        ):
-            self.spin.blockSignals(True)
-            self.spin.setValue(element_size_for(shape, DEFAULT_RESOLUTION))
-            self.spin.blockSignals(False)
+        self._sync_spin_to_combo()
         self._refresh_safe()
 
     def element_size(self):
@@ -78,24 +86,27 @@ class ResolutionField(QtWidgets.QWidget):
             self.combo.setCurrentText(resolution)
         self.combo.blockSignals(False)
         custom = self.combo.currentText() == _CUSTOM
-        self.spin.setVisible(custom)
         if custom and element_size:
             self.spin.blockSignals(True)
             self.spin.setValue(element_size)
             self.spin.blockSignals(False)
+        else:
+            self._sync_spin_to_combo()
         self._refresh_safe()
 
     def _on_combo(self):
-        custom = self.combo.currentText() == _CUSTOM
-        self.spin.setVisible(custom)
-        if custom and self._shape is not None:
-            self.spin.blockSignals(True)
-            self.spin.setValue(element_size_for(self._shape, DEFAULT_RESOLUTION))
-            self.spin.blockSignals(False)
+        # Switching to a preset drives the spin box to that preset's size;
+        # Custom leaves the current spin value in place for the user to edit.
+        self._sync_spin_to_combo()
         self._refresh_safe()
         self.changed.emit()
 
     def _on_spin(self):
+        # A manual edit means the value is no longer a preset: flip to Custom.
+        if self.combo.currentText() != _CUSTOM:
+            self.combo.blockSignals(True)
+            self.combo.setCurrentText(_CUSTOM)
+            self.combo.blockSignals(False)
         self._refresh_safe()
         self.changed.emit()
 
@@ -105,4 +116,4 @@ class ResolutionField(QtWidgets.QWidget):
             self._safe = False
             return
         count = estimate_triangle_count(self._shape, size)
-        self._safe = count is not None and count <= TRIANGLE_HARD_CAP
+        self._safe = count is not None and count <= get_triangle_hard_cap()

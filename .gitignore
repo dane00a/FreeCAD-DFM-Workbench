@@ -14,3 +14,4 @@ tests/freecad/*.out
 # run, not part of the addon.
 tests/freecad/*.out
 tests/freecad/*.png
+.resync/

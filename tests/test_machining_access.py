@@ -163,19 +163,53 @@ class TestAccessRules(unittest.TestCase):
     def test_open_geometry_is_clean(self):
         self.assertEqual(rule_check(make_open_pocket(), Rulebook.UNDERCUT_PRESENT), [])
 
-    def test_five_axis_has_no_undercuts(self):
-        # The tool can tilt, so most of these stop being undercuts at all.
+    def test_undercuts_are_reported_whatever_the_machine(self):
+        # This used to stand down on a five-axis machine. The reference
+        # reports every UNDERCUT the recognizer hands it in any machine mode
+        # (only tool_access_blocked and tool_access_special_setup are gated
+        # to 3-axis), so the rule now does the same.
         self.assertEqual(
-            rule_check(
-                make_closed_chamber(),
-                Rulebook.UNDERCUT_PRESENT,
-                prefs={"MachiningMachineMode": "5axis"},
+            len(
+                rule_check(
+                    make_closed_chamber(),
+                    Rulebook.UNDERCUT_PRESENT,
+                    prefs={"MachiningMachineMode": "5axis"},
+                )
             ),
-            [],
+            len(rule_check(make_closed_chamber(), Rulebook.UNDERCUT_PRESENT)),
         )
 
     def test_reachable_part_is_never_blocked(self):
         self.assertEqual(rule_check(make_open_pocket(), Rulebook.TOOL_ACCESS_BLOCKED), [])
+
+
+def make_t_slots(slots: int) -> TopoDS_Shape:
+    """A block with closed-ended T-slots: an 8 wide neck down to Z=18 and a
+    20 wide head from Z=18 to Z=10, each stopping 10 mm short of the ends so
+    neither runs out of the block and is reachable from its open end."""
+    part = BRepPrimAPI_MakeBox(gp_Pnt(0, 0, 0), gp_Pnt(100, 60, 30)).Shape()
+    for k in range(slots):
+        yc = 15.0 + k * 30.0
+        part = _cut(part, BRepPrimAPI_MakeBox(gp_Pnt(10, yc - 4, 18), gp_Pnt(90, yc + 4, 31)).Shape())
+        part = _cut(part, BRepPrimAPI_MakeBox(gp_Pnt(10, yc - 10, 10), gp_Pnt(90, yc + 10, 18)).Shape())
+    return part
+
+
+class TestUndercutGrouping(unittest.TestCase):
+    def test_two_t_slots_are_two_undercuts_each_keeping_both_shoulders(self):
+        # Planar undercut faces used to be grouped only by the direction
+        # they are blocked from, so every same-facing undercut on a part
+        # became one feature. A T-slot's two shoulders still stay one: they
+        # do not touch, but both border the slot's walls.
+        shoulder_groups = 0
+        for feature in undercuts_in(make_t_slots(2)):
+            if feature.param("surface_type") != "PLANAR":
+                continue
+            normal = feature.param("face_normal")
+            if normal and abs(abs(normal[2]) - 1.0) < 1e-6:
+                shoulder_groups += 1
+                self.assertEqual(len(feature.faces), 2)
+        self.assertEqual(shoulder_groups, 2)
 
 
 if __name__ == "__main__":

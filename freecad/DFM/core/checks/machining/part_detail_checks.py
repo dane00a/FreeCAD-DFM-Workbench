@@ -23,12 +23,13 @@ after the suppressions is the corner nobody else is speaking for.
 from __future__ import annotations
 
 import math
+from typing import Optional
 
 from ...machining.aag import Concavity, SurfaceType
 from .corner_access import (
     ShapeProbe,
+    escape_vote,
     is_cutter_formed,
-    is_reachable,
     second_smallest_extent,
 )
 from ...machining.features import BORE_TYPES, FeatureType
@@ -38,15 +39,20 @@ from ...rules import Rulebook
 from .base import MachiningCheck
 
 
-# Dimensions that describe how big a feature is. Height is deliberately
+# Dimensions that constrain the size of the tool. Height is deliberately
 # absent: a plateau a tenth of a millimetre tall is trivially machinable by
 # facing the surround down. What is not machinable is forming its base
 # corners at that scale, and the sharp-edge rule reports those.
+#
+# Depth is absent for the same reason. This rule is about dimensions that
+# need a tool of that size to exist -- a 0.3 mm slot needs a 0.3 mm cutter.
+# Depth constrains reach, not size, and a shallow cut is the easy direction:
+# a 0.9 mm wide ring groove 0.4 mm deep is routine work for a grooving insert.
+# The aspect-ratio rules own reach with real context.
 _SIZE_PARAMETERS = (
     "diameter_mm",
     "width_mm",
     "min_width_mm",
-    "depth_mm",
     "radius_mm",
 )
 
@@ -65,25 +71,21 @@ _SIZE_EXEMPT = frozenset(
     }
 )
 
-# Features whose own rules already speak for the corners inside them.
+# Features whose own rules already speak for the corners inside them. An edge
+# with both faces in one of these is the feature's own geometry, and the rule
+# that owns the feature reports it with the context to say something useful.
 #
-# The slit family and V-grooves belong here even though their corners really
-# are square: those corners are the *shape of the process* -- a broach
-# profile, a saw kerf, a dressing wheel -- and the rule that reports the
-# process speaks for them. Without this a part with forty-eight broached
-# dovetails reports ninety-six square corners, every one of them correct and
-# every one of them useless.
+# The list is the reference's, exactly, and it is narrower than it looks like
+# it should be. A channel, a through cavity, a V-groove, a flexure slit and a
+# broached slot are not on it: a corner inside one of those is reported here
+# as well as by the feature's own rule. A step is on it, but only for its own
+# edges -- see `_RIM_CARRIERS`.
 _OWNS_ITS_CORNERS = frozenset(
     {
         FeatureType.POCKET,
         FeatureType.SLOT,
-        FeatureType.CHANNEL,
-        FeatureType.THROUGH_CAVITY,
-        FeatureType.UNDERCUT,
         FeatureType.SPHERICAL_POCKET,
-        FeatureType.FLEXURE_SLIT,
-        FeatureType.BROACHED_SLOT,
-        FeatureType.V_GROOVE,
+        FeatureType.UNDERCUT,
         FeatureType.STEP,
         FeatureType.RIB,
         FeatureType.BOSS,
@@ -91,31 +93,36 @@ _OWNS_ITS_CORNERS = frozenset(
         FeatureType.THREAD_RELIEF_GROOVE,
         FeatureType.O_RING_GLAND,
         FeatureType.RETAINING_RING_GROOVE,
-        FeatureType.EXTERNAL_THREAD,
         FeatureType.MARKING_TEXT,
+        # A knurl is one forming operation whose faces are the whole texture,
+        # so every edge inside it is its own. A crest corner is what the
+        # wheel leaves, not a deburring hazard. The host face is not part of
+        # the knurl, so sharp edges elsewhere on it keep firing.
+        FeatureType.KNURL,
     }
     | BORE_TYPES
 )
 
-# A step is an external terrace, not a cavity. Its edge down into whatever
-# lies below is that thing's opening rim rather than the step's own corner,
-# so a step counts as bulk material for the rim test even though its own
-# rule speaks for its corners.
-_CARRIES_ITS_RIM = _OWNS_ITS_CORNERS - {FeatureType.STEP}
+# Features whose rim -- the edge where the feature meets the bulk around it --
+# is reported by the feature's own rule. Every cavity has one by
+# construction, and so does every boss and rib at its base. A step is an
+# external terrace rather than a cavity, so its edge down into whatever lies
+# below is that thing's rim, not the step's.
+_RIM_CARRIERS = _OWNS_ITS_CORNERS - {FeatureType.STEP}
 
-# Cavities whose walls the recognizer may not have fully absorbed. One hop
-# out along a concave edge finds the walls it missed.
+# Cavities whose walls the recognizer may not have fully absorbed. One hop out
+# along a concave edge finds the walls it missed. The slit family is here
+# although it is not a rim carrier itself: its corners are the shape of its
+# process -- a saw kerf, a broach profile -- and the walls one hop out from
+# a dovetail floor are the broach's too.
 _POCKET_LIKE = frozenset(
     {
         FeatureType.POCKET,
         FeatureType.SLOT,
-        FeatureType.CHANNEL,
-        FeatureType.THROUGH_CAVITY,
         FeatureType.UNDERCUT,
         FeatureType.SPHERICAL_POCKET,
         FeatureType.FLEXURE_SLIT,
         FeatureType.BROACHED_SLOT,
-        FeatureType.V_GROOVE,
     }
 )
 
@@ -202,7 +209,10 @@ class SharpInternalEdgeCheck(MachiningCheck):
     on the part meets its host face at a sharp concave corner, every bore
     meets the surface it enters, every boss meets its base. Those are already
     reported by the rules that own the features, and repeating them per edge
-    would bury the corner that nobody else is speaking for.
+    would bury the corner that nobody else is speaking for. What survives the
+    bookkeeping is then asked two physical questions: did the cutter that
+    made the cavity form this corner in passing, and can a fillet cutter get
+    to it at all.
     """
 
     @property
@@ -219,18 +229,23 @@ class SharpInternalEdgeCheck(MachiningCheck):
 
         graph = context.graph
         blends = self._faces_of(context, FeatureType.FILLET, FeatureType.CHAMFER)
-        owners = self._face_owners(context, minimum_size)
+        owners, cavity = self._memberships(context, graph, minimum_size)
         step_only = self._step_only_faces(context, owners)
-        covered = self._covered_faces(context, graph, minimum_size)
         axis = self._rotation_axis(context)
-        diagonal = self._part_diagonal(context)
+        main = self._main_component(graph)
         # Ray casting needs the solid itself. Built once and reused, because
         # the face walk it does at construction would otherwise happen for
         # every edge on the part.
         probe = ShapeProbe(context.shape, graph)
+        diagonal = probe.diagonal
 
         results: list[CheckResult] = []
         for edge in graph.edges:
+            # A machinable part is one connected solid. A face off the main
+            # body is an import artefact -- a floating zero-thickness sheet
+            # whose fold reads as a sharp concave corner on no part at all.
+            if main is not None and not main.get(edge.face_id_a, False):
+                continue
             if edge.concavity is not Concavity.CONCAVE:
                 continue
             deviation = abs(edge.dihedral_angle - math.pi)
@@ -258,13 +273,12 @@ class SharpInternalEdgeCheck(MachiningCheck):
             if self._curved_opening(first, second, owners):
                 continue
 
-            # The rim where a feature meets the bulk material around it.
-            # Every cavity has one by construction, and so does every boss
-            # and rib at its base -- it is the outline of the feature, not a
-            # corner anyone chose to leave square, and the rule that owns
-            # the feature is the one that should speak about it.
-            a_rim = edge.face_id_a in covered
-            b_rim = edge.face_id_b in covered
+            # The rim where a feature meets the bulk material around it --
+            # either truly unclaimed, or claimed only by a step, which is a
+            # terrace rather than a cavity. It is the outline of the
+            # feature, not a corner anyone chose to leave square.
+            a_rim = edge.face_id_a in cavity
+            b_rim = edge.face_id_b in cavity
             a_bulk = edge.face_id_a not in owners or edge.face_id_a in step_only
             b_bulk = edge.face_id_b not in owners or edge.face_id_b in step_only
             if (a_rim and b_bulk) or (b_rim and a_bulk):
@@ -274,60 +288,106 @@ class SharpInternalEdgeCheck(MachiningCheck):
             if a_rim and b_rim:
                 continue
 
-            # Everything above is bookkeeping: whose feature is this, and
-            # has something else already spoken for it. What is left is a
-            # corner nobody owns, and the question becomes a physical one --
-            # can a tool get to it, and did one already make it in passing.
-            # Both cast rays, so they are asked last, of the few edges that
+            # Everything above is bookkeeping. What is left is a corner
+            # nobody owns, and the question becomes a physical one. Both
+            # tests cast rays, so they are asked last, of the few edges that
             # get this far.
             if is_cutter_formed(probe, edge, first, second, deviation, minimum_size):
                 continue
-
-            # A corner at a scale no cutter can work is reported whatever the
-            # access, and reported generically: an array of micro-features
-            # produces one finding per edge otherwise, all saying the same
-            # thing about a part that needs EDM rather than a smaller mill.
-            sub_pitch = (
-                second_smallest_extent(first) < minimum_size
-                or second_smallest_extent(second) < minimum_size
-            )
-            if not sub_pitch and is_reachable(probe, edge, first, second):
+            vote = escape_vote(probe, edge, first, second)
+            if vote is not None and not vote.is_confined:
                 continue
 
-            angle = math.degrees(edge.dihedral_angle)
-            # Reported as information rather than a warning, deliberately.
-            # These corners are real -- square, unclaimed by any feature --
-            # but the rule fires on the residue every recognizer left, so its
-            # count is a reading of recognition coverage as much as of the
-            # part. Until that coverage closes it should not be outranking
-            # findings that name a specific feature and a specific fix.
-            results.append(
-                self.finding(
-                    rule,
-                    Severity.INFO,
-                    f"{angle:.0f} deg corner",
-                    self.render(
-                        feedback,
-                        Severity.INFO,
-                        0.0,
-                        limit,
-                        limit,
-                        "mm",
-                        "This inside corner is square. A rotating cutter "
-                        "leaves its own radius in every corner it clears, so "
-                        "a sharp one has to come from somewhere else -- a "
-                        "corner radius on the drawing, a relief cut, or "
-                        "sinker EDM if the sharp corner is functional. It is "
-                        "also where the part will crack first in service.",
-                    ),
-                    faces=[edge.face_id_a, edge.face_id_b],
-                    value=0.0,
-                    limit=limit,
-                    comparison="<",
-                    unit="mm",
-                )
-            )
+            # A corner at a scale no cutter can work is reported generically,
+            # so the identical findings an array of micro-features produces
+            # collapse into one: the part needs etching or EDM, and saying so
+            # forty times says nothing more.
+            if (
+                second_smallest_extent(first) < minimum_size
+                or second_smallest_extent(second) < minimum_size
+            ):
+                results.append(self._sub_tool_pitch(rule, feedback, limit, edge))
+                continue
+
+            results.append(self._corner(rule, feedback, limit, edge, vote))
         return results
+
+    # -- findings -----------------------------------------------------------
+
+    def _sub_tool_pitch(self, rule, feedback, limit, edge) -> CheckResult:
+        # Nothing edge-specific in the wording: that is what lets the
+        # aggregation pass fold the whole array into one finding.
+        return self.finding(
+            rule,
+            Severity.WARNING,
+            "sub-tool-scale corner",
+            self.render(
+                feedback,
+                Severity.WARNING,
+                0.0,
+                limit,
+                limit,
+                "mm",
+                "Sharp concave corner at sub-tool-scale feature pitch: the "
+                "faces either side are narrower than the minimum machinable "
+                "feature size, so no milling cutter can form this corner at "
+                "all. It needs etching, EDM, grinding, or a design change.",
+            ),
+            faces=[edge.face_id_a, edge.face_id_b],
+            value=0.0,
+            limit=limit,
+            comparison="<",
+            unit="mm",
+        )
+
+    def _corner(self, rule, feedback, limit, edge, vote) -> CheckResult:
+        angle = math.degrees(edge.dihedral_angle)
+        # "Concave corner", not "internal edge": these junctions often sit
+        # at the base of a rib or boss, where "internal" reads as inside a
+        # cavity. The concern is the zero-radius inside corner itself.
+        #
+        # The edge is named by its faces and its midpoint, as the reference
+        # names it in its details. Two different corners must never read as
+        # the same sentence, or the aggregation pass merges them.
+        where = ""
+        if edge.midpoint is not None:
+            where = (
+                f" at ({edge.midpoint.X():.3f}, {edge.midpoint.Y():.3f}, "
+                f"{edge.midpoint.Z():.3f}) mm"
+            )
+        message = (
+            "Sharp concave corner along the edge between faces "
+            f"{edge.face_id_a} and {edge.face_id_b}{where}, "
+            f"{edge.shared_edge_length:.3f} mm long, with no fillet or chamfer. "
+            "A zero-radius inside corner concentrates stress, is hard to "
+            "deburr, and a rotating cutter cannot form it dead sharp in some "
+            "orientations -- give it a corner radius, a relief cut, or plan "
+            "on sinker EDM if the sharp corner is functional."
+        )
+        if vote is not None:
+            # The vote ran and this corner lost it. The asymmetry a reviewer
+            # sees -- why this base corner and not the identical-looking one
+            # over there -- is confinement, not shape, so say so.
+            message += (
+                " Flagged for ACCESSIBILITY: neighbouring geometry (beyond the "
+                "corner's own two faces) blocks cutter approach at "
+                f"{vote.confined} of {vote.samples} points sampled along the "
+                f"edge (worst point: only {vote.worst_escape} of 6 probe "
+                "directions escape cleanly), so a cutter must work that "
+                "stretch inside a restricted space. Similar corners on this "
+                "part that open onto clear space pass this check."
+            )
+        return self.finding(
+            rule,
+            Severity.WARNING,
+            f"{angle:.0f} deg corner",
+            self.render(feedback, Severity.WARNING, 0.0, limit, limit, "mm", message),
+            faces=[edge.face_id_a, edge.face_id_b],
+            value=0.0,
+            limit=limit,
+            comparison="<",
+            unit="mm",
+        )
 
     # -- suppression --------------------------------------------------------
 
@@ -339,87 +399,47 @@ class SharpInternalEdgeCheck(MachiningCheck):
         return faces
 
     @staticmethod
-    def _unspoken_for(feature, minimum_size: float) -> bool:
-        """Whether the feature's own rule declines to speak about its corners.
+    def _sub_minimum_protrusion(feature, minimum_size: float) -> bool:
+        """A boss or rib too small for any boss or rib rule to speak for.
 
-        This rule stands down on a recognized feature because the rule that
-        owns the feature is expected to report its corners instead. Where
-        that expectation is false the corner is reported by nobody at all,
-        which is worse than reporting it twice -- and it is silent, so it
-        looks like a clean part.
-
-        Two cases, and both are the owning rule explicitly declining:
-
-        A boss or rib below the tool floor gets no boss or rib finding,
-        because its height is trivially machinable -- face the surround
-        down. What cannot be made is its base corners at that scale.
-
-        A slot open at both ends gets no corner finding, because the corner
-        rule is right that a cutter entering one end and leaving the other
-        never has to round anything. But when the recognizer reads a closed
-        pocket as a pair of overlapping open slots -- which it does where a
-        bore crosses the cavity -- the corners are real and nothing is left
-        to say so.
+        Membership suppression exists because a feature's own rule carries
+        the concern. Nothing reports a mesa a tenth of a millimetre tall --
+        its height is trivially machinable by facing the surround down -- but
+        its base corners at that scale cannot be formed by any cutter, so
+        they have to keep firing here.
         """
-        if feature.type in (FeatureType.BOSS, FeatureType.RIB):
-            height = feature.number("height_mm")
-            width = feature.number("width_mm")
-            return (height is not None and height < minimum_size) or (
-                width is not None and width < minimum_size
-            )
-        if feature.type == FeatureType.SLOT:
-            return bool(feature.param("is_open"))
-        return False
+        if feature.type not in (FeatureType.BOSS, FeatureType.RIB):
+            return False
+        height = feature.number("height_mm")
+        width = feature.number("width_mm")
+        return (height is not None and height < minimum_size) or (
+            width is not None and width < minimum_size
+        )
 
-    def _face_owners(self, context, minimum_size: float) -> dict[int, set[str]]:
-        """Which features each face belongs to, for the same-feature test."""
-        owners: dict[int, set[str]] = {}
-        for feature in context.recognition.features:
-            if feature.type not in _OWNS_ITS_CORNERS:
-                continue
-            if self._unspoken_for(feature, minimum_size):
-                continue
-            for face_id in feature.faces:
-                owners.setdefault(face_id, set()).add(feature.instance_id)
-        return owners
+    def _memberships(self, context, graph, minimum_size: float):
+        """Which features own each face, and which faces carry a rim.
 
-    def _covered_faces(self, context, graph, minimum_size: float) -> set[int]:
-        """Faces belonging to a feature whose own rule reports its corners.
-
-        Extended one hop out from cavities along concave edges. When the
-        pocket recognizer fails to absorb a wall -- which happens when
-        something on the host face interrupts the cavity rim -- that wall
-        falls outside the feature and its corners fire redundantly against
-        the pocket rule. A planar face sharing a concave edge with a pocket
-        floor is a wall of it whether or not the recognizer noticed.
-
-        One hop only. Two would reach unrelated features across the part and
-        silence corners that genuinely need reporting.
+        The rim set is extended one hop out from pocket-like cavities along
+        concave edges. When the pocket recognizer fails to absorb a wall --
+        which happens when something on the host face interrupts the cavity
+        rim -- that wall falls outside the feature and its corners fire
+        redundantly against the pocket rule. A face sharing a concave edge
+        with a pocket face is a wall of it whether or not the recognizer
+        noticed. One hop only: two reach unrelated features across the part.
         """
-        # A bore keeps its claim on every face it takes, including a planar
-        # one. An off-cardinal hole leaves a small flat lip that is
-        # genuinely part of the hole, and the curved-opening test cannot
-        # see it because that test gates on surface type. Letting a bore
-        # stand down wherever a cavity also claims the face was tried and
-        # measured: it recovers four corners on one fixture and loses
-        # sixteen to a manifold full of cross-drilled channels.
-        covered: set[int] = set()
-        for feature in context.recognition.features:
-            if feature.type not in _CARRIES_ITS_RIM:
-                continue
-            if self._unspoken_for(feature, minimum_size):
-                continue
-            covered.update(feature.faces)
-
-        # The expansion reaches walls the recognizer missed, so it has to
-        # obey the same rule as the direct set: a cavity whose own rule
-        # declines to speak about it cannot lend that silence to a
-        # neighbouring face either.
+        owners: dict[int, list[str]] = {}
+        cavity: set[int] = set()
         pocket_like: set[int] = set()
-        for feature in context.recognition.of_type(*sorted(_POCKET_LIKE)):
-            if self._unspoken_for(feature, minimum_size):
+        for feature in context.recognition.features:
+            if feature.type in _POCKET_LIKE:
+                pocket_like.update(feature.faces)
+            if self._sub_minimum_protrusion(feature, minimum_size):
                 continue
-            pocket_like.update(feature.faces)
+            if feature.type in _OWNS_ITS_CORNERS:
+                for face_id in feature.faces:
+                    owners.setdefault(face_id, []).append(feature.instance_id)
+            if feature.type in _RIM_CARRIERS:
+                cavity.update(feature.faces)
 
         neighbours: set[int] = set()
         for face_id in sorted(pocket_like):
@@ -427,29 +447,57 @@ class SharpInternalEdgeCheck(MachiningCheck):
                 if edge.concavity is not Concavity.CONCAVE:
                     continue
                 other = edge.other_face(face_id)
-                if other not in covered:
+                if other not in cavity:
                     neighbours.add(other)
-        return covered | neighbours
+        return owners, cavity | neighbours
 
     @staticmethod
     def _step_only_faces(context, owners) -> set[int]:
-        """Faces whose only claim on them is a step.
+        """Faces whose every owning feature is a step.
 
         A step recognizer routinely absorbs the top of a box that has a
         cavity cut into it. Counting that face as "in a feature" would stop
         the cavity's own opening rim from being recognized as a rim, and the
-        pocket's corners would be reported twice over.
+        pocket's corners would be reported twice over. Only the features in
+        the ownership map count: a fillet sharing the face does not make it
+        any less a terrace.
         """
-        steps: set[int] = set()
-        others: set[int] = set()
-        for feature in context.recognition.features:
-            target = steps if feature.type == FeatureType.STEP else others
-            target.update(feature.faces)
-        return (steps - others) & set(owners)
+        kinds = {
+            feature.instance_id: feature.type for feature in context.recognition.features
+        }
+        return {
+            face_id
+            for face_id, instances in owners.items()
+            if all(kinds.get(instance) == FeatureType.STEP for instance in instances)
+        }
+
+    @staticmethod
+    def _main_component(graph) -> Optional[dict[int, bool]]:
+        """Which faces belong to the largest connected piece of the part."""
+        parent: dict[int, int] = {node.face_id: node.face_id for node in graph.nodes}
+        if not parent:
+            return None
+
+        def find(item: int) -> int:
+            root = item
+            while parent.setdefault(root, root) != root:
+                root = parent[root]
+            while parent[item] != root:
+                parent[item], item = root, parent[item]
+            return root
+
+        for edge in graph.edges:
+            parent[find(edge.face_id_a)] = find(edge.face_id_b)
+        sizes: dict[int, int] = {}
+        for face_id in list(parent):
+            root = find(face_id)
+            sizes[root] = sizes.get(root, 0) + 1
+        biggest = max(sizes, key=lambda root: (sizes[root], -root))
+        return {face_id: find(face_id) == biggest for face_id in list(parent)}
 
     @staticmethod
     def _same_feature(owners, first_id: int, second_id: int) -> bool:
-        return bool(owners.get(first_id, set()) & owners.get(second_id, set()))
+        return bool(set(owners.get(first_id, ())) & set(owners.get(second_id, ())))
 
     @staticmethod
     def _curved_opening(first, second, owners) -> bool:
@@ -520,13 +568,6 @@ class SharpInternalEdgeCheck(MachiningCheck):
 
         return turned(first) and turned(second)
 
-    @staticmethod
-    def _part_diagonal(context) -> float:
-        dims = context.bbox_dims()
-        if not dims:
-            return 0.0
-        return math.sqrt(sum(value * value for value in dims))
-
 
 @register_check(Rulebook.PART_MARKING)
 class PartMarkingCheck(MachiningCheck):
@@ -544,7 +585,7 @@ class PartMarkingCheck(MachiningCheck):
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
         markings = context.recognition.of_type(FeatureType.MARKING_TEXT)
         if not markings:
-            return []
+            return self._note_only(context, rule, feedback)
 
         results: list[CheckResult] = []
         for marking in markings:
@@ -557,6 +598,26 @@ class PartMarkingCheck(MachiningCheck):
             detail = f"{described}, {depth:.2f} mm deep"
             if stroke > 0.0:
                 detail += f" on a {stroke:.2f} mm stroke"
+            # The TIER decides what the finding asks of the reader. Severity
+            # stays INFO either way: only staff resolve a marking question.
+            tier = marking.param("tier") or "B"
+            if tier == "A":
+                decoded = marking.param("decoded_text") or ""
+                verification = marking.param("verification") or "none"
+                tier_note = " VERIFIED"
+                if decoded:
+                    tier_note += f' as "{decoded}"'
+                tier_note += (
+                    f" ({verification}) -- safe to quote the marking operation "
+                    "without review."
+                )
+            else:
+                tier_note = (
+                    " STAFF CONFIRMATION NEEDED: this was identified from its "
+                    "geometry alone and has not been read back, so it could be a "
+                    "decorative or functional relief rather than a marking. "
+                    "Confirm that a marking operation belongs on the quote."
+                )
 
             results.append(
                 self.finding(
@@ -576,7 +637,7 @@ class PartMarkingCheck(MachiningCheck):
                         "laser-etched or dot-peened, and it is easy to leave "
                         "out of a quote because it does not look like "
                         "machining. Confirm the method and who supplies the "
-                        "artwork.",
+                        "artwork." + tier_note,
                     ),
                     faces=marking.faces,
                     value=depth,
@@ -586,6 +647,45 @@ class PartMarkingCheck(MachiningCheck):
                 )
             )
         return results
+
+    def _note_only(self, context, rule, feedback) -> list[CheckResult]:
+        """Marking specified in a note with no geometry modelled at all.
+
+        A part marked per MIL-STD-130 carries a note rather than a modelled Data
+        Matrix, because the mark is applied downstream -- an operation that would
+        otherwise be quoted at zero. One finding per part, and only when the
+        geometry found nothing.
+        """
+        from ...machining.annotations import annotations_for
+        from ...machining.recognizers.marking.priors import marking_keyword_in
+
+        try:
+            notes = annotations_for(context).sorted_notes()
+        except Exception:
+            return []
+        for note in notes:
+            keyword = marking_keyword_in(getattr(note, "text", "") or "")
+            if not keyword:
+                continue
+            message = (
+                "A drawing note specifies a marking / identification operation "
+                f'(matched "{keyword}") but no marking geometry is modelled on the '
+                f'part: "{note.text}". Marking specified in a note rather than '
+                "drawn is normal practice -- the mark is applied downstream by "
+                "laser, dot-peen or stamp -- so this is a real operation to quote "
+                "even though there is nothing to see in the model. STAFF "
+                "CONFIRMATION NEEDED."
+            )
+            return [
+                self.finding(
+                    rule,
+                    Severity.INFO,
+                    "marking (note only)",
+                    self.render(feedback, Severity.INFO, 0.0, 0.0, 0.0, "", message),
+                    faces=list(getattr(note, "face_ids", []) or []),
+                )
+            ]
+        return []
 
 
 @register_check(Rulebook.RAISED_TEXT_MACHINED_FACE)
@@ -727,9 +827,10 @@ class FeatureComplexityCheck(MachiningCheck):
         The operation estimate is deliberately crude, because a precise one
         would need the toolpath. A hole is a drilling pass -- more than one
         when it crosses a void wide enough that the drill loses its guidance.
-        A pocket is two, roughing and finishing. A slot and a blend are one
-        each: a chamfer is its own tool and its own contour pass, however
-        trivial it looks on the model.
+        A pocket is two, roughing and finishing. A slot is one. A blend is
+        one per tool path: a chamfer is its own tool and its own contour
+        pass, however trivial it looks on the model, but a continuous run of
+        one size is one pass however many features it was split into.
 
         Members of a pattern are counted as features but not as operations.
         Twelve holes on one bolt circle are one drilling cycle, and pricing
@@ -743,6 +844,7 @@ class FeatureComplexityCheck(MachiningCheck):
         counts = {"hole": 0, "pocket": 0, "slot": 0, "blend": 0,
                   "pattern": 0, "other": 0}
         operations = 0
+        blend_paths: set[str] = set()
         for feature in context.recognition.features:
             own_operation = feature.instance_id not in patterned
             if feature.type in BORE_TYPES:
@@ -760,13 +862,34 @@ class FeatureComplexityCheck(MachiningCheck):
                     operations += 1
             elif feature.type in (FeatureType.FILLET, FeatureType.CHAMFER):
                 counts["blend"] += 1
-                operations += 1
+                # One tool path, not one feature. A blend running round a
+                # pocket is one pass of one cutter however many features the
+                # merge keeps apart. Keyed on the network and the size, so a
+                # run that changes radius mid-path still pays for its tool
+                # change; a blend with no network stamped counts alone.
+                # A bore's lead-in rides with its hole: the hole already
+                # carries the operation that cuts it.
+                if feature.param("bore_lead_in"):
+                    continue
+                network = feature.parameters.get("blend_network")
+                if isinstance(network, int) and not isinstance(network, bool) and network >= 0:
+                    dim = -1.0
+                    for key in ("radius_mm", "distance_mm", "width_mm"):
+                        value = feature.number(key)
+                        if value is not None:
+                            dim = value
+                            break
+                    blend_paths.add(f"{network}@{int(dim * 1000.0)}")
+                else:
+                    blend_paths.add(f"id:{feature.instance_id}")
             elif feature.type == FeatureType.PATTERN:
                 counts["pattern"] += 1
                 operations += 1
             else:
                 counts["other"] += 1
                 operations += 1
+
+        operations += len(blend_paths)
 
         spoken = [
             f"{number} {name}{'' if number == 1 else 's'}"

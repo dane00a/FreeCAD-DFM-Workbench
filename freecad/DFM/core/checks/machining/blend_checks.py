@@ -151,15 +151,12 @@ def _cavities_with_corners(context):
     said the same thing once per corner, and stopped working entirely the
     moment the pocket started owning its corners.
 
-    An open slot has no closed corner to round, so it is skipped -- the
-    cutter enters one end and leaves the other without turning anything.
+    Pockets and slots only, open or not, as the reference's two cutter
+    radius rules apply: a through cavity's corner radius is a profile's,
+    cut by whatever goes through it, and the reference does not judge it
+    against the end mill library.
     """
-    for cavity in context.recognition.of_type(
-        FeatureType.POCKET, FeatureType.SLOT, FeatureType.THROUGH_CAVITY
-    ):
-        if cavity.type == FeatureType.SLOT and cavity.param("is_open"):
-            continue
-        yield cavity
+    yield from context.recognition.of_type(FeatureType.POCKET, FeatureType.SLOT)
 
 
 def _corner_phrase(cavity) -> str:

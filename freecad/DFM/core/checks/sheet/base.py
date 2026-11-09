@@ -163,10 +163,6 @@ _MIN_GAUGE_MM = 1e-6
 _COPLANAR_MIN_DOT = 0.999
 _COPLANAR_OFFSET_MM = 0.1
 
-# A face whose second-smallest bounding-box extent is about one gauge is a
-# sheared edge strip rather than a panel.
-_GAUGE_THIN_FACTOR = 1.3
-
 
 def threshold(context, name: str, default: float) -> float:
     """A configured sheet threshold, or the family default.
@@ -236,9 +232,38 @@ class BendGeom:
         )
 
 
-def bend_geom(feature: FeatureInstance) -> Optional[BendGeom]:
-    """The fold line of a bend feature, or None when it carries no axis."""
+def is_press_brake_bend(feature: FeatureInstance) -> bool:
+    """A BEND of the cylindrical family: a fold a press brake made.
+
+    BEND covers four fold families, and they do not carry the same
+    parameters. A conical fold has no single radius, a rolled one has no
+    planar panel, and a sharp one has no fold surface at all, so a rule that
+    measures a radius, an angle against brake tooling or a bend line asks it
+    of the press-brake family only. A missing family reads as cylindrical.
+    """
     if feature.type != FeatureType.BEND:
+        return False
+    return str(feature.param("bend_family") or "cylindrical") == "cylindrical"
+
+
+def features_with_sharp_folds(context) -> list[FeatureInstance]:
+    """The recognized features with every zero-radius fold present as a BEND.
+
+    The analyzer already appends them; this keeps a rule right about the fold
+    census whatever assembled the feature list it was handed. Idempotent, so
+    nothing is counted twice.
+    """
+    from ...machining.recognizers.bend_recognizer import append_sharp_fold_bends
+
+    features = list(context.recognition.features)
+    gauge = float(getattr(context.part_process, "sheet_thickness_mm", 0.0) or 0.0)
+    append_sharp_fold_bends(features, context.graph, gauge, "sfx")
+    return features
+
+
+def bend_geom(feature: FeatureInstance) -> Optional[BendGeom]:
+    """The fold line of a press-brake bend, or None when it carries no axis."""
+    if not is_press_brake_bend(feature):
         return None
     axis = feature.direction("axis")
     if axis is None:
@@ -396,15 +421,9 @@ def panels_coplanar(context, first: Optional[int], second: Optional[int]) -> boo
     return abs(gp_Vec(a.centroid, b.centroid).Dot(gp_Vec(a_normal))) <= _COPLANAR_OFFSET_MM
 
 
-def gauge_thin_face(node: AagNode, gauge: float) -> bool:
-    """Whether a face is a sheared edge strip rather than a panel.
-
-    A strip is one gauge across its second-smallest dimension, which is what
-    the cut edge of a blank always is. Panels are many gauges across, and folds
-    join panels.
-    """
-    dims = sorted(node.bbox_dims())
-    return dims[1] <= gauge * _GAUGE_THIN_FACTOR
+# The gauge-thin strip test that used to live here is
+# ``sheet_folds.gauge_thin_bbox``, the one copy the sharp-fold walk, the bend
+# census and the fold topology all share. Do not add a local copy back.
 
 
 # =============================================================================

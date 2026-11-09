@@ -37,10 +37,12 @@ from __future__ import annotations
 import math
 from typing import Optional, Sequence
 
+from OCP.Bnd import Bnd_Box
 from OCP.gp import gp_Vec
 
 from .aag import AttributedAdjacencyGraph, SurfaceType
-from .features import FeatureInstance, FeatureType, RecognitionResult
+from .features import GROOVE_TYPES, FeatureInstance, FeatureType, RecognitionResult
+from .marking_field import absorb_marking_field
 
 
 # How authoritative each reading is. Higher wins when two features describe
@@ -74,6 +76,9 @@ _PRIORITY: dict[str, int] = {
     FeatureType.COUNTERBORE: 100,
     FeatureType.COUNTERSINK: 100,
     FeatureType.BLIND_HOLE: 80,
+    # The same bore as a blind hole, differing only in what its far end
+    # runs into.
+    FeatureType.BREAKTHROUGH_HOLE: 80,
     FeatureType.THROUGH_HOLE: 80,
     FeatureType.PARTIAL_BORE: 80,
     # A cavity that passes right through says more than a pocket, and the
@@ -132,8 +137,20 @@ def resolve(
     dropped = [False] * len(survivors)
     result = RecognitionResult()
 
-    _resolve_overlaps(survivors, dropped, result)
-    _merge_split_bores(survivors, dropped, graph)
+    # Everything inside a MARKING_TEXT's own relief envelope is that mark's
+    # cut seen a second time, whether or not the clustering claimed those
+    # exact faces. Before the pairwise pass, so the survivors are resolved
+    # among themselves without the marking noise in the way.
+    absorb_marking_field(survivors, graph, dropped)
+    # Who beat whom in the containment dedup, so a feature dropped as a
+    # duplicate of X does not vanish when X is itself dropped later; and
+    # which drops were on merit (something else explained the geometry
+    # better), which are final.
+    beaten_by = [-1] * len(survivors)
+    on_merit = [False] * len(survivors)
+    _resolve_overlaps(survivors, dropped, result, beaten_by, on_merit)
+    _merge_split_bores(survivors, dropped, graph, on_merit)
+    _revive_orphaned_duplicates(survivors, dropped, beaten_by, on_merit)
 
     result.features = [
         feature for index, feature in enumerate(survivors) if not dropped[index]
@@ -146,7 +163,9 @@ def resolve(
 # =============================================================================
 
 
-def _resolve_overlaps(features, dropped, result: RecognitionResult) -> None:
+def _resolve_overlaps(
+    features, dropped, result: RecognitionResult, beaten_by, on_merit
+) -> None:
     count = len(features)
     for i in range(count):
         if dropped[i]:
@@ -170,8 +189,20 @@ def _resolve_overlaps(features, dropped, result: RecognitionResult) -> None:
             if recess is not None:
                 loser = i if recess is first else j
                 dropped[loser] = True
+                on_merit[loser] = True
                 if loser == i:
                     break
+                continue
+
+            # A counterbore whose "seat" is a groove is not a counterbore.
+            # The counterbore test reads any larger coaxial band joined by a
+            # shoulder as one, including a thread relief or gland part-way
+            # down a bore. Grooves used to claim their flank bores as well,
+            # which made the groove a superset of that false counterbore and
+            # containment dropped it; now the bore owns its flanks, so the
+            # counterbore is demoted instead -- band and shoulder stripped,
+            # and kept as the bore it really is.
+            if _demote_groove_seated_counterbore(first, second):
                 continue
 
             ratio_first = len(shared) / len(first.faces)
@@ -195,6 +226,7 @@ def _resolve_overlaps(features, dropped, result: RecognitionResult) -> None:
             step_index = _step_beside_rib(first, second, i, j)
             if step_index is not None:
                 dropped[step_index] = True
+                on_merit[step_index] = True
                 if step_index == i:
                     break
                 continue
@@ -220,28 +252,154 @@ def _resolve_overlaps(features, dropped, result: RecognitionResult) -> None:
             if FeatureType.DRAFT_FACE in (first.type, second.type):
                 continue
 
+            # A hole drilled through a boss and the boss both exist. The boss
+            # keeps those bores in its face set on purpose, so each is wholly
+            # contained in it, and by priority the boss lost -- a pad
+            # vanished behind its own holes. Coexist only when it is the hole
+            # that is contained and the boss is not mostly the hole; a "boss"
+            # whose faces are the hole's is a phantom and still loses.
+            if _hole_through_boss(first, second, ratio_first, ratio_second):
+                continue
+
+            # The same argument one level out: a pad standing on the floor of
+            # a slot or pocket, or inside a through cavity, is material added
+            # and the cavity is material removed; neither makes the other
+            # redundant. Load-bearing since the boss stopped padding its face
+            # set with the bores cut into it: a raised pad inside a slot
+            # shares four of its five faces with the slot (0.80) and lost.
+            # Guarded like the hole rule: the boss must be the contained one
+            # and the cavity must not be mostly the boss.
+            if _boss_in_cavity(first, second, ratio_first, ratio_second):
+                continue
+
             slot_index = _slot_over_pocket(
                 first, second, i, j, ratio_first, ratio_second
             )
             if slot_index is not None:
                 dropped[slot_index] = True
+                on_merit[slot_index] = True
                 if slot_index == i:
                     break
                 continue
 
+            # A widening of a cut is not a bore. A profile that swells into an
+            # arc leaves a cylindrical wall and the hole family seeds on it,
+            # and a hole outranks a through cavity, which is right when a bore
+            # pierces a cavity: it runs across the cavity and its wall is its
+            # own face. A "bore" made entirely of the cavity's own walls and
+            # swept along the cavity's own axis is part of one profile, and
+            # those two conditions together cannot describe a cross-drilling.
+            widening = _cavity_widening(first, second, i, j)
+            if widening is not None:
+                dropped[widening] = True
+                on_merit[widening] = True
+                if widening == i:
+                    break
+                continue
+
             loser = _pick_loser(first, second, i, j)
+            # Only a loss to a bigger instance of the same type is
+            # absorption, undone if the absorber goes away. A loss to a
+            # different type is on merit -- the other type explained those
+            # faces better -- and the winner being dropped later for its own
+            # reasons does not make the loser right again.
+            winner = j if loser == i else i
+            if features[loser].type == features[winner].type:
+                beaten_by[loser] = winner
             dropped[loser] = True
             if loser == i:
                 break
 
 
+def _revive_orphaned_duplicates(features, dropped, beaten_by, on_merit) -> None:
+    """Bring back a duplicate whose winner did not survive.
+
+    The dedup is pairwise, so a chain is possible: a one-face chamfer loses
+    to a bigger merged chamfer, and that one then loses wholesale to a step
+    it overlaps. The first was dropped for duplicating something that is now
+    gone, and its faces are left owned by nobody. Revived only when the
+    winner was not itself rejected on merit and nothing that survived claims
+    the faces, so a real duplicate never comes back. Repeated, because the
+    chain can be longer than two.
+    """
+    count = len(features)
+    changed = True
+    while changed:
+        changed = False
+        for k in range(count):
+            winner = beaten_by[k]
+            if not dropped[k] or winner < 0:
+                continue
+            if not dropped[winner] or on_merit[winner]:
+                continue
+            faces = features[k].faces
+            if not faces:
+                continue
+            claimed = 0
+            for face_id in faces:
+                for m in range(count):
+                    if dropped[m] or m == k:
+                        continue
+                    if face_id in features[m].faces:
+                        claimed += 1
+                        break
+            if claimed / len(faces) >= _CONTAINMENT_RATIO:
+                continue
+            dropped[k] = False
+            changed = True
+
+
+def _demote_groove_seated_counterbore(
+    first: FeatureInstance, second: FeatureInstance
+) -> bool:
+    """Retype a counterbore seated on a groove's band as the bore it is.
+
+    True when the counterbore was demoted, after which the two no longer
+    overlap and the pair needs nothing more.
+    """
+    if first.type in GROOVE_TYPES and second.type == FeatureType.COUNTERBORE:
+        groove, counterbore = first, second
+    elif second.type in GROOVE_TYPES and first.type == FeatureType.COUNTERBORE:
+        groove, counterbore = second, first
+    else:
+        return False
+    if not groove.faces:
+        return False
+    band = groove.faces[0]  # the groove's floor cylinder
+    if band not in counterbore.faces:
+        return False
+    groove_faces = set(groove.faces)
+    kept = [face_id for face_id in counterbore.faces if face_id not in groove_faces]
+    if not kept:
+        return False
+    counterbore.faces = kept
+    through = bool(counterbore.parameters.get("is_through", False))
+    counterbore.type = FeatureType.THROUGH_HOLE if through else FeatureType.BLIND_HOLE
+    counterbore.parameters["hole_type"] = counterbore.type
+    for key in (
+        "outer_diameter_mm",
+        "counterbore_depth_mm",
+        "outer2_diameter_mm",
+        "counterbore2_depth_mm",
+        "counterbore_double_ended",
+    ):
+        counterbore.parameters.pop(key, None)
+    counterbore.parameters["seat_is_groove"] = groove.instance_id
+    return True
+
+
 def _counterbore_recess(
     first: FeatureInstance, second: FeatureInstance
 ) -> Optional[FeatureInstance]:
-    """The blind hole that is really a counterbore's own recess."""
-    if first.type == FeatureType.BLIND_HOLE and second.type == FeatureType.COUNTERBORE:
+    """The blind hole that is really a counterbore's own recess.
+
+    A seat can sit above a bore that breaks into a cavity just as readily as
+    above one with a floor, so both count as the recess.
+    """
+    bore_like = (FeatureType.BLIND_HOLE, FeatureType.BREAKTHROUGH_HOLE)
+    if first.type in bore_like and second.type == FeatureType.COUNTERBORE:
         blind, counterbore = first, second
-    elif second.type == FeatureType.BLIND_HOLE and first.type == FeatureType.COUNTERBORE:
+    elif second.type in bore_like and first.type == FeatureType.COUNTERBORE:
         blind, counterbore = second, first
     else:
         return None
@@ -252,6 +410,96 @@ def _counterbore_recess(
     if not _axes_parallel(blind, counterbore):
         return None
     return blind
+
+
+_BORE_FAMILY = (
+    FeatureType.THROUGH_HOLE,
+    FeatureType.BLIND_HOLE,
+    FeatureType.BREAKTHROUGH_HOLE,
+    FeatureType.COUNTERBORE,
+    FeatureType.COUNTERSINK,
+    FeatureType.THREADED_HOLE,
+    FeatureType.PARTIAL_BORE,
+)
+
+
+def _hole_through_boss(
+    first: FeatureInstance,
+    second: FeatureInstance,
+    ratio_first: float,
+    ratio_second: float,
+) -> bool:
+    if first.type == FeatureType.BOSS and second.type in _BORE_FAMILY:
+        return ratio_second >= _CONTAINMENT_RATIO and ratio_first < _CONTAINMENT_RATIO
+    if second.type == FeatureType.BOSS and first.type in _BORE_FAMILY:
+        return ratio_first >= _CONTAINMENT_RATIO and ratio_second < _CONTAINMENT_RATIO
+    return False
+
+
+_CAVITY_FAMILY = (
+    FeatureType.SLOT,
+    FeatureType.POCKET,
+    FeatureType.THROUGH_CAVITY,
+    FeatureType.CHANNEL,
+    FeatureType.STEP,
+)
+
+
+def _boss_in_cavity(
+    first: FeatureInstance,
+    second: FeatureInstance,
+    ratio_first: float,
+    ratio_second: float,
+) -> bool:
+    if first.type == FeatureType.BOSS and second.type in _CAVITY_FAMILY:
+        return ratio_first >= _CONTAINMENT_RATIO and ratio_second < _CONTAINMENT_RATIO
+    if second.type == FeatureType.BOSS and first.type in _CAVITY_FAMILY:
+        return ratio_second >= _CONTAINMENT_RATIO and ratio_first < _CONTAINMENT_RATIO
+    return False
+
+
+_WIDENING_HOLE_TYPES = (
+    FeatureType.THROUGH_HOLE,
+    FeatureType.BLIND_HOLE,
+    FeatureType.PARTIAL_BORE,
+    FeatureType.BREAKTHROUGH_HOLE,
+)
+
+
+def _unit_axis(feature: FeatureInstance) -> Optional[tuple[float, float, float]]:
+    key = "through_axis" if "through_axis" in feature.parameters else "axis"
+    value = feature.parameters.get(key)
+    if not isinstance(value, (list, tuple)) or len(value) != 3:
+        return None
+    try:
+        x, y, z = (float(c) for c in value)
+    except (TypeError, ValueError):
+        return None
+    norm = math.sqrt(x * x + y * y + z * z)
+    if norm < 1e-9:
+        return None
+    return (x / norm, y / norm, z / norm)
+
+
+def _cavity_widening(
+    first: FeatureInstance, second: FeatureInstance, i: int, j: int
+) -> Optional[int]:
+    """The index of a hole that is only a through cavity's profile swelling."""
+    if first.type == FeatureType.THROUGH_CAVITY and second.type in _WIDENING_HOLE_TYPES:
+        cavity, hole, index = first, second, j
+    elif second.type == FeatureType.THROUGH_CAVITY and first.type in _WIDENING_HOLE_TYPES:
+        cavity, hole, index = second, first, i
+    else:
+        return None
+    if not hole.faces or not set(hole.faces) <= set(cavity.faces):
+        return None
+    a_hole = _unit_axis(hole)
+    a_cav = _unit_axis(cavity)
+    if a_hole is None or a_cav is None:
+        return None
+    if abs(sum(p * q for p, q in zip(a_hole, a_cav))) <= 0.98:
+        return None
+    return index
 
 
 def _step_beside_rib(
@@ -342,7 +590,9 @@ class _Bore:
         self.caps: list[float] = []
 
 
-def _merge_split_bores(features, dropped, graph: AttributedAdjacencyGraph) -> None:
+def _merge_split_bores(
+    features, dropped, graph: AttributedAdjacencyGraph, on_merit=None
+) -> None:
     """Rejoin fragments of one bore that a crossing void broke in two.
 
     A hole crossed by another hole survives resolution as two features, which
@@ -360,6 +610,23 @@ def _merge_split_bores(features, dropped, graph: AttributedAdjacencyGraph) -> No
         )
         if bore is not None
     ]
+
+    # A bore cannot be longer than the part. Every test below is topological
+    # and has no sense of scale, so the part's bounding diagonal is kept as a
+    # backstop on a runaway chain of merges. It is not a diagnosis: bores
+    # that look impossibly long are usually opposed drillings across a
+    # central void, which is exactly what this merge is for, so measure the
+    # part before reaching for it.
+    part_diagonal = 0.0
+    whole = Bnd_Box()
+    for node in graph.nodes:
+        if not node.bbox.IsVoid():
+            whole.Add(node.bbox)
+    if not whole.IsVoid():
+        xmin, ymin, zmin, xmax, ymax, zmax = whole.Get()
+        part_diagonal = math.sqrt(
+            (xmax - xmin) ** 2 + (ymax - ymin) ** 2 + (zmax - zmin) ** 2
+        )
 
     for i in range(len(bores)):
         for j in range(i + 1, len(bores)):
@@ -402,8 +669,16 @@ def _merge_split_bores(features, dropped, graph: AttributedAdjacencyGraph) -> No
             ):
                 continue
 
+            # Refuse a merge longer than the part; 2% absorbs box padding.
+            if part_diagonal > 0.0:
+                merged_span = max(first.high, high) - min(first.low, low)
+                if merged_span > part_diagonal * 1.02:
+                    continue
+
             _absorb(features, first, second, base, sign, low, high)
             dropped[second.index] = True
+            if on_merit is not None:
+                on_merit[second.index] = True
 
 
 def _measure_bore(
@@ -412,6 +687,7 @@ def _measure_bore(
     if feature.type not in (
         FeatureType.THROUGH_HOLE,
         FeatureType.BLIND_HOLE,
+        FeatureType.BREAKTHROUGH_HOLE,
         FeatureType.COUNTERBORE,
     ):
         return None
@@ -492,9 +768,20 @@ def _cap_in_gap(first, second, base, sign, gap_low, gap_high) -> bool:
 
 
 def _floored_blind(feature: FeatureInstance) -> bool:
-    return feature.type == FeatureType.BLIND_HOLE and not feature.param(
-        "terminates_in_cavity", False
-    )
+    """A blind hole with a real floor of its own: a complete hole.
+
+    With one exception, and it is a proof rather than a guess: a bore the
+    counterbore test showed re-entering past its "floor" was stopped by the
+    mouth of an internal groove, not by a terminus, so it is a fragment. A
+    gland cut into a bore wall splits it into two such pieces.
+    """
+    if feature.type != FeatureType.BLIND_HOLE:
+        return False
+    if feature.param("terminates_in_cavity", False):
+        return False
+    if feature.param("bore_continues_past_floor", False):
+        return False
+    return True
 
 
 def _absorb(features, first: _Bore, second: _Bore, base, sign, low, high) -> None:

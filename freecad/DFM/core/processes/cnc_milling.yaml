@@ -41,12 +41,16 @@ active_rules:
 - THREAD_RUNOUT
 - THREAD_SHOULDER_PROXIMITY
 - THREAD_WALL_THICKNESS
+- THREAD_PMI_GEOMETRY_MISMATCH
+- THREAD_RELIEF_WIDTH
+- TURNED_PROFILE_RADIUS
 - GROOVE_SQUARE_CORNER
 - HOLE_NONSTANDARD_DIAMETER
 - HOLE_PARTIAL_ENTRY
 - HOLE_COUNTERSINK_ANGLE
 - HOLE_MULTI_PASS
 - HOLE_INTERSECTS_CAVITY
+- HOLE_BREAKOUT_SCAR
 - POCKET_ASPECT_RATIO
 - SLOT_NONSTANDARD_WIDTH
 - FLEXURE_SLIT_PROCESS
@@ -54,6 +58,7 @@ active_rules:
 - MINIMUM_FEATURE_SIZE
 - SHARP_INTERNAL_EDGE
 - PART_MARKING
+- KNURL_PRESENT
 - RAISED_TEXT_MACHINED_FACE
 - FEATURE_COMPLEXITY
 - CASTING_DRAFT_ANGLE
@@ -62,6 +67,13 @@ active_rules:
 - TOOL_ACCESS_SPECIAL_SETUP
 - SURFACE_FINISH_CONFLICT
 - SHEET_INTENT_SHARP_CORNERS
+- GDT_TOLERANCE_ACHIEVABLE
+- GDT_DATUM_VALID
+- GDT_DATUM_UNRESOLVED
+- GDT_SURFACE_FINISH_CONFLICT
+- GDT_FEATURE_TOLERANCE_MISMATCH
+- NOTE_SURFACE_FINISH_DEMANDING
+- SURFACE_FINISH_PER_FACE_DEMANDING
 rule_feedback:
   UNDERCUT_PRESENT:
     warning_msg: ''
@@ -168,6 +180,15 @@ rule_feedback:
   THREAD_WALL_THICKNESS:
     warning_msg: ''
     error_msg: ''
+  THREAD_PMI_GEOMETRY_MISMATCH:
+    warning_msg: ''
+    error_msg: ''
+  THREAD_RELIEF_WIDTH:
+    warning_msg: ''
+    error_msg: ''
+  TURNED_PROFILE_RADIUS:
+    warning_msg: ''
+    error_msg: ''
   GROOVE_SQUARE_CORNER:
     warning_msg: ''
     error_msg: ''
@@ -184,6 +205,9 @@ rule_feedback:
     warning_msg: ''
     error_msg: ''
   HOLE_INTERSECTS_CAVITY:
+    warning_msg: ''
+    error_msg: ''
+  HOLE_BREAKOUT_SCAR:
     warning_msg: ''
     error_msg: ''
   POCKET_ASPECT_RATIO:
@@ -205,6 +229,9 @@ rule_feedback:
     warning_msg: ''
     error_msg: ''
   PART_MARKING:
+    warning_msg: ''
+    error_msg: ''
+  KNURL_PRESENT:
     warning_msg: ''
     error_msg: ''
   RAISED_TEXT_MACHINED_FACE:
@@ -229,6 +256,27 @@ rule_feedback:
     warning_msg: ''
     error_msg: ''
   SHEET_INTENT_SHARP_CORNERS:
+    warning_msg: ''
+    error_msg: ''
+  GDT_TOLERANCE_ACHIEVABLE:
+    warning_msg: ''
+    error_msg: ''
+  GDT_DATUM_VALID:
+    warning_msg: ''
+    error_msg: ''
+  GDT_DATUM_UNRESOLVED:
+    warning_msg: ''
+    error_msg: ''
+  GDT_SURFACE_FINISH_CONFLICT:
+    warning_msg: ''
+    error_msg: ''
+  GDT_FEATURE_TOLERANCE_MISMATCH:
+    warning_msg: ''
+    error_msg: ''
+  NOTE_SURFACE_FINISH_DEMANDING:
+    warning_msg: ''
+    error_msg: ''
+  SURFACE_FINISH_PER_FACE_DEMANDING:
     warning_msg: ''
     error_msg: ''
 rule_criticality:
@@ -267,12 +315,16 @@ rule_criticality:
   THREAD_RUNOUT: HIGH
   THREAD_SHOULDER_PROXIMITY: MEDIUM
   THREAD_WALL_THICKNESS: HIGH
+  THREAD_PMI_GEOMETRY_MISMATCH: MEDIUM
+  THREAD_RELIEF_WIDTH: MEDIUM
+  TURNED_PROFILE_RADIUS: MEDIUM
   GROOVE_SQUARE_CORNER: MEDIUM
   HOLE_NONSTANDARD_DIAMETER: LOW
   HOLE_PARTIAL_ENTRY: HIGH
   HOLE_COUNTERSINK_ANGLE: LOW
   HOLE_MULTI_PASS: LOW
   HOLE_INTERSECTS_CAVITY: MEDIUM
+  HOLE_BREAKOUT_SCAR: MEDIUM
   POCKET_ASPECT_RATIO: LOW
   SLOT_NONSTANDARD_WIDTH: LOW
   FLEXURE_SLIT_PROCESS: MEDIUM
@@ -280,6 +332,7 @@ rule_criticality:
   MINIMUM_FEATURE_SIZE: HIGH
   SHARP_INTERNAL_EDGE: LOW
   PART_MARKING: LOW
+  KNURL_PRESENT: LOW
   RAISED_TEXT_MACHINED_FACE: MEDIUM
   FEATURE_COMPLEXITY: LOW
   CASTING_DRAFT_ANGLE: MEDIUM
@@ -288,6 +341,13 @@ rule_criticality:
   TOOL_ACCESS_SPECIAL_SETUP: MEDIUM
   SURFACE_FINISH_CONFLICT: LOW
   SHEET_INTENT_SHARP_CORNERS: LOW
+  GDT_TOLERANCE_ACHIEVABLE: MEDIUM
+  GDT_DATUM_VALID: MEDIUM
+  GDT_DATUM_UNRESOLVED: MEDIUM
+  GDT_SURFACE_FINISH_CONFLICT: MEDIUM
+  GDT_FEATURE_TOLERANCE_MISMATCH: LOW
+  NOTE_SURFACE_FINISH_DEMANDING: MEDIUM
+  SURFACE_FINISH_PER_FACE_DEMANDING: MEDIUM
 materials:
   Default:
     category: Default
@@ -382,6 +442,15 @@ materials:
       THREAD_WALL_THICKNESS:
         target: '1.5'
         limit: '0.8'
+      THREAD_PMI_GEOMETRY_MISMATCH:
+        target: N/A
+        limit: '0.5'
+      THREAD_RELIEF_WIDTH:
+        target: N/A
+        limit: '1.5'
+      TURNED_PROFILE_RADIUS:
+        target: N/A
+        limit: N/A
       GROOVE_SQUARE_CORNER:
         target: N/A
         limit: '0.0'
@@ -394,6 +463,8 @@ materials:
       HOLE_MULTI_PASS:
         binary_severity: INFO
       HOLE_INTERSECTS_CAVITY:
+        binary_severity: WARNING
+      HOLE_BREAKOUT_SCAR:
         binary_severity: WARNING
       POCKET_ASPECT_RATIO:
         binary_severity: ERROR
@@ -410,6 +481,8 @@ materials:
         target: N/A
         limit: '0.0'
       PART_MARKING:
+        binary_severity: INFO
+      KNURL_PRESENT:
         binary_severity: INFO
       RAISED_TEXT_MACHINED_FACE:
         binary_severity: WARNING
@@ -430,6 +503,21 @@ materials:
         binary_severity: INFO
       SHEET_INTENT_SHARP_CORNERS:
         binary_severity: INFO
+      GDT_DATUM_VALID:
+        binary_severity: WARNING
+      GDT_DATUM_UNRESOLVED:
+        binary_severity: WARNING
+      GDT_FEATURE_TOLERANCE_MISMATCH:
+        binary_severity: WARNING
+      GDT_TOLERANCE_ACHIEVABLE:
+        target: N/A
+        limit: N/A
+      GDT_SURFACE_FINISH_CONFLICT:
+        binary_severity: WARNING
+      NOTE_SURFACE_FINISH_DEMANDING:
+        binary_severity: WARNING
+      SURFACE_FINISH_PER_FACE_DEMANDING:
+        binary_severity: WARNING
   Aluminum (Soft Wrought Alloy):
     category: Aluminium
     is_active: true

@@ -29,7 +29,8 @@ from OCP.gp import gp_Dir, gp_Pnt, gp_Vec
 
 from ..aag import AagNode, AttributedAdjacencyGraph, Concavity, SurfaceType
 from ..features import BORE_TYPES, FeatureInstance, FeatureType
-from .base import FeatureRecognizer, neighbours
+from ..face_extent import band_along, extent_of_face
+from .base import FeatureRecognizer, neighbours, normal_bucket_up_to_sign
 
 
 # A floor must be walled around at least this much of its outer boundary.
@@ -58,6 +59,27 @@ _CORNER_TANGENCY_TOL_MM = 0.05
 _MAX_BLEND_TORUS_MINOR_R = 8.0
 
 
+def _normal_as_the_reference_reads_it(node: AagNode) -> gp_Dir:
+    """A neighbour's outward plane normal as the reference's floor test reads it.
+
+    The reference reads `plane_normal` on every non-cylinder, non-cone
+    neighbour of a floor, freeform ones included. On a face that is not a
+    plane that field was never set, so it holds the default-constructed
+    `gp_Dir`, which is +X on OCCT 7.8 and 8.0 alike, flipped by the face's
+    orientation flag. Ported as it behaves: on torture_freeform_leviathan
+    this is what makes the two B-spline walls of the +Y floor walls, and
+    so a pocket (the pair sit on x = 0, so the sign is decided by the
+    centroids' rounding). Looks unintended in the reference; kept for parity.
+    """
+    if node.plane_normal is not None:
+        normal = gp_Dir(node.plane_normal.XYZ())
+    else:
+        normal = gp_Dir(1.0, 0.0, 0.0)
+    if node.is_reversed:
+        normal.Reverse()
+    return normal
+
+
 class PocketRecognizer(FeatureRecognizer):
     """Finds pockets: a floor, its walls, and the fillets between them."""
 
@@ -77,6 +99,7 @@ class PocketRecognizer(FeatureRecognizer):
         total_area = graph.total_area()
         if total_area <= 1e-9:
             return []
+        self._shape = shape
 
         outer = _PartEnvelope(graph)
         candidates = self._floor_candidates(graph, outer)
@@ -106,6 +129,7 @@ class PocketRecognizer(FeatureRecognizer):
             if floor.face_id in seedable:
                 continue
             faces = self._grow(graph, floor, candidate_ids, taken, total_area)
+            faces = self._pull_in_missing_floor(graph, faces)
             if len(faces) < 3:
                 continue  # a floor and one wall is not a cavity
 
@@ -190,9 +214,7 @@ class PocketRecognizer(FeatureRecognizer):
         cavity, and lie on the floor's *outward* side. A pedestal fused
         underneath a face satisfies the first two with the roles swapped.
         """
-        wall_normal = wall.outward_normal
-        if wall_normal is None:
-            return False
+        wall_normal = _normal_as_the_reference_reads_it(wall)
         if abs(floor_normal.Dot(wall_normal)) >= _WALL_PERPENDICULAR_MAX_DOT:
             return False
         to_floor = gp_Vec(wall.centroid, floor.centroid)
@@ -260,21 +282,6 @@ class PocketRecognizer(FeatureRecognizer):
         candidate_ids: set[int],
     ) -> bool:
         """Whether the cavity should grow into this face."""
-        if neighbour.surface_type is not SurfaceType.PLANE or floor_normal is None:
-            return True  # blends and freeform walls are absorbed on adjacency
-
-        normal = neighbour.outward_normal
-        if normal is None:
-            return True
-        alignment = abs(normal.Dot(floor_normal))
-
-        # Square to the floor is a wall; parallel to it is another floor
-        # level. Anything in between is a sloped exterior surface, unless it
-        # is itself a floor candidate -- both walls of a V-groove are, and
-        # they sit at exactly such an angle to each other.
-        if 0.3 < alignment < 0.9 and neighbour.face_id not in candidate_ids:
-            return False
-
         # The surface a pocket was cut into meets the outside across convex
         # edges, and *mostly* so. An ordinary pocket wall also has one convex
         # edge -- its top rim, where it meets the host face -- so requiring
@@ -293,20 +300,42 @@ class PocketRecognizer(FeatureRecognizer):
             and graph.node(edge.other_face(neighbour.face_id)).surface_type
             is SurfaceType.PLANE
         ]
-        if not external or len(external) * 2 < len(edges):
+        #
+        # Asked of every neighbour, freeform ones included, as the reference
+        # does; only the squareness test below is for planes.
+        if external and len(external) * 2 >= len(edges):
+            # A through-cut wall genuinely reaches the outside twice, at
+            # opposite ends, so its two convex neighbours face away from
+            # each other.
+            through_cut = False
+            for index, first in enumerate(external):
+                normal_a = first.outward_normal
+                if normal_a is None:
+                    continue
+                for second in external[index + 1 :]:
+                    normal_b = second.outward_normal
+                    if normal_b is not None and normal_a.Dot(normal_b) < -0.7:
+                        through_cut = True
+                        break
+                if through_cut:
+                    break
+            if not through_cut:
+                return False
+
+        if neighbour.surface_type is not SurfaceType.PLANE or floor_normal is None:
+            return True  # blends and freeform walls are not held square
+        normal = neighbour.outward_normal
+        if normal is None:
             return True
 
-        # A through-cut wall genuinely reaches the outside twice, at opposite
-        # ends, so its two convex neighbours face away from each other.
-        for index, first in enumerate(external):
-            normal_a = first.outward_normal
-            if normal_a is None:
-                continue
-            for second in external[index + 1 :]:
-                normal_b = second.outward_normal
-                if normal_b is not None and normal_a.Dot(normal_b) < -0.7:
-                    return True
-        return False
+        # Square to the floor is a wall; parallel to it is another floor
+        # level. Anything in between is a sloped exterior surface, unless it
+        # is itself a floor candidate -- both walls of a V-groove are, and
+        # they sit at exactly such an angle to each other.
+        alignment = abs(normal.Dot(floor_normal))
+        if 0.3 < alignment < 0.9 and neighbour.face_id not in candidate_ids:
+            return False
+        return True
 
     # -- measurement --------------------------------------------------------
 
@@ -318,12 +347,35 @@ class PocketRecognizer(FeatureRecognizer):
         floor_normal = floor.outward_normal
         if floor_normal is None:
             return None
+        faces = self._absorb_missed_walls(graph, faces, floor_normal)
 
-        depth = self._depth(graph, faces, floor_normal)
+        shape = getattr(self, "_shape", None)
+        depth = self._depth(graph, faces, floor_normal, shape)
+        if self._through_slit_side(graph, faces, floor, floor_normal, depth):
+            return None
         widths = self._floor_widths(floor)
         if widths is None:
             return None
         min_width, max_width = widths
+        # The narrowest the floor measures across its own planar walls, on
+        # the face itself. The sorted axis-aligned box of the floor is a
+        # diagonal on any pocket not parallel to X, Y or Z, and stays only
+        # for a pocket with no planar wall to measure across.
+        if shape is not None:
+            across: Optional[float] = None
+            for face_id in faces:
+                node = graph.node(face_id)
+                if node.surface_type is not SurfaceType.PLANE or node.face_id == floor.face_id:
+                    continue
+                if node.plane_normal is None:
+                    continue
+                if abs(node.plane_normal.Dot(floor_normal)) >= 0.3:
+                    continue
+                measured = extent_of_face(shape, floor.face_id, node.plane_normal)
+                if measured > 0.1 and (across is None or measured < across):
+                    across = measured
+            if across is not None:
+                min_width = across
 
         walls = [
             graph.node(face_id)
@@ -373,6 +425,123 @@ class PocketRecognizer(FeatureRecognizer):
         )
 
     @staticmethod
+    def _through_slit_side(graph, faces, floor: AagNode, floor_normal: gp_Dir, depth: float) -> bool:
+        """Whether the "floor" is one side wall of a narrow through-cut.
+
+        A slit cut at an angle no cardinal axis matches seeds on its own side
+        wall: the opposite wall faces it a slit-width away, and the walk runs
+        the slit's whole length, so the "depth" comes out many times the
+        gap. Cardinal floors are left alone, as the reference leaves them.
+        """
+        closest = math.inf
+        for face_id in faces:
+            if face_id == floor.face_id:
+                continue
+            node = graph.node(face_id)
+            if node.surface_type is not SurfaceType.PLANE or node.outward_normal is None:
+                continue
+            if floor_normal.Dot(node.outward_normal) > -0.95:
+                continue
+            gap = abs(gp_Vec(floor.centroid, node.centroid).Dot(gp_Vec(floor_normal.XYZ())))
+            closest = min(closest, gap)
+        if closest == math.inf:
+            return False
+        if max(abs(floor_normal.X()), abs(floor_normal.Y()), abs(floor_normal.Z())) > 0.95:
+            return False
+        return (depth > 5.0 * closest and depth > 3.0) or depth < 0.1
+
+    @staticmethod
+    def _pull_in_missing_floor(graph: AttributedAdjacencyGraph, faces: list[int]) -> list[int]:
+        """Add the floor the walk could not reach, found by axis coverage.
+
+        The walk follows concave edges, and an inner-wire edge's concavity
+        can come out with the wrong sign: a floor carrying an island is then
+        no candidate, the walk seeds on a wall, and returns four walls and
+        no floor. When the planar faces collected cover exactly two cardinal
+        axes, a planar face along the third, inside the walls' box and
+        sharing a concave edge with them, is the floor.
+        """
+        collected = set(faces)
+        covered = [False, False, False]
+        for face_id in collected:
+            node = graph.node(face_id)
+            if node.surface_type is not SurfaceType.PLANE or node.outward_normal is None:
+                continue
+            n = node.outward_normal
+            if abs(n.X()) > 0.7:
+                covered[0] = True
+            elif abs(n.Y()) > 0.7:
+                covered[1] = True
+            elif abs(n.Z()) > 0.7:
+                covered[2] = True
+        if sum(covered) != 2:
+            return faces
+        missing = covered.index(False)
+
+        lo = [math.inf] * 3
+        hi = [-math.inf] * 3
+        for face_id in collected:
+            box = graph.node(face_id).bbox
+            if box.IsVoid():
+                continue
+            corners = box.Get()
+            for k in range(3):
+                lo[k] = min(lo[k], corners[k])
+                hi[k] = max(hi[k], corners[k + 3])
+        tol = 1e-3
+        added = []
+        for node in graph.nodes:
+            if node.face_id in collected or node.surface_type is not SurfaceType.PLANE:
+                continue
+            n = node.outward_normal
+            if n is None or abs((n.X(), n.Y(), n.Z())[missing]) < 0.9:
+                continue
+            if node.bbox.IsVoid():
+                continue
+            corners = node.bbox.Get()
+            if any(
+                k != missing and (corners[k] < lo[k] - tol or corners[k + 3] > hi[k] + tol)
+                for k in range(3)
+            ):
+                continue
+            if not any(
+                edge.other_face(node.face_id) in collected
+                for edge in graph.concave_edges_of(node.face_id)
+            ):
+                continue
+            added.append(node.face_id)
+        return sorted(collected | set(added)) if added else faces
+
+    @staticmethod
+    def _absorb_missed_walls(
+        graph: AttributedAdjacencyGraph, faces: list[int], floor_normal: gp_Dir
+    ) -> list[int]:
+        """One hop out: any planar wall square to the floor the walk turned down.
+
+        The walk rejects a wall whose top edge is chewed by features cut into
+        the host face (an axial gland notching a cavity wall), or which it
+        reached before the faces that would have excused it -- an island's
+        four walls, taken in edge order, keep two of them out. Whatever
+        meets the cavity across a concave edge and stands square to the
+        floor (|dot| under 0.3) is a wall of it. Shallower faces are the
+        outside of the part, and are left out.
+        """
+        collected = set(faces)
+        added = set()
+        for face_id in faces:
+            for edge in graph.concave_edges_of(face_id):
+                other = edge.other_face(face_id)
+                if other in collected or not graph.has_node(other):
+                    continue
+                node = graph.node(other)
+                if node.surface_type is not SurfaceType.PLANE or node.outward_normal is None:
+                    continue
+                if abs(node.outward_normal.Dot(floor_normal)) >= 0.3:
+                    continue
+                added.add(other)
+        return sorted(collected | added) if added else faces
+
+    @staticmethod
     def _true_floor(
         graph: AttributedAdjacencyGraph, faces: list[int], seed: AagNode
     ) -> AagNode:
@@ -391,23 +560,40 @@ class PocketRecognizer(FeatureRecognizer):
             normal = node.outward_normal
             if normal is None:
                 continue
-            key = (
-                int(round(abs(normal.X()) * 10)),
-                int(round(abs(normal.Y()) * 10)),
-                int(round(abs(normal.Z()) * 10)),
-            )
+            # Up to sign, so +-X walls share a bucket and mirrored normals do
+            # not (see normal_bucket_up_to_sign).
+            key = normal_bucket_up_to_sign(normal)
             groups.setdefault(key, []).append(node)
 
         if not groups:
             return seed
-        smallest = min(groups.values(), key=lambda members: (len(members), -max(m.area for m in members)))
+        # Fewest members first; a tie goes to the group with the most area
+        # in total (a stepped pocket's floors), as the reference breaks it.
+        smallest = min(
+            groups.values(),
+            key=lambda members: (len(members), -sum(m.area for m in members)),
+        )
         return max(smallest, key=lambda n: (n.area, -n.face_id))
 
     @staticmethod
     def _depth(
-        graph: AttributedAdjacencyGraph, faces: list[int], floor_normal: gp_Dir
+        graph: AttributedAdjacencyGraph,
+        faces: list[int],
+        floor_normal: gp_Dir,
+        shape=None,
     ) -> float:
-        """Extent of the cavity along the floor's normal."""
+        """Extent of the cavity along the floor's normal.
+
+        Measured on the faces (band_along) when the shape is known; the
+        box projection is only the per-face fallback.
+        """
+        if shape is not None:
+            lo, hi = 1.0e18, -1.0e18
+            origin = gp_Pnt(0.0, 0.0, 0.0)
+            for face_id in faces:
+                node = graph.node(face_id)
+                _, lo, hi = band_along(shape, face_id, node.bbox, origin, floor_normal, lo, hi)
+            return hi - lo if hi > lo else 0.0
         box = Bnd_Box()
         found = False
         for face_id in faces:

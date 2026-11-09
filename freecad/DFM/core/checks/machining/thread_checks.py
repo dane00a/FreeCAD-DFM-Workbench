@@ -11,9 +11,9 @@ thread for the lead to run out, room around the entry for the holder, and
 enough material around the bore that the thread has something to hold on to.
 
 All three fire only on a thread the workbench can actually see. A tapped hole
-is modelled as a plain bore at the tap-drill size, so unless somebody cut a
-real helix in the model there is nothing to distinguish it from a clearance
-hole, and guessing from diameter alone would put a thread callout on half the
+is modelled as a plain bore at the tap-drill size, so unless the thread is
+stated (a callout, a declaration) or modelled into the bore's edges there is
+nothing to distinguish it from a clearance hole, and guessing from diameter alone would put a thread callout on half the
 holes in a plate. The recognizer refuses to guess; these rules inherit that
 refusal by reading only features that carry a resolved thread designation.
 """
@@ -21,20 +21,23 @@ refusal by reading only features that carry a resolved thread designation.
 from __future__ import annotations
 
 import math
+import re
 from typing import Optional
 
+from OCP.Bnd import Bnd_Box
+from OCP.BRepBndLib import BRepBndLib
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
-from OCP.gp import gp_Pnt, gp_Vec
+from OCP.gp import gp_Dir, gp_Pnt, gp_Vec
 
 from ...machining.aag import AagNode, SurfaceType
 from ...machining.context import MachiningContext
+from ...machining.face_extent import span_of_face
 from ...machining.features import FeatureInstance, FeatureType
 from ...models import CheckResult, Severity
 from ...registries import register_check
 from ...rules import Rulebook
 from .base import MachiningCheck
-from .hole_checks import HoleEdgeDistanceCheck
 
 
 # Every feature type that can carry a resolved thread spec. A counterbore is
@@ -138,6 +141,14 @@ class ThreadRunoutCheck(MachiningCheck):
         results: list[CheckResult] = []
         for hole in _threaded_features(context):
             if hole.param("is_through"):
+                continue
+            # A purpose-cut thread relief at the bottom of the bore is the
+            # tap's runout; that is what the relief is for. Whether it is
+            # wide enough is the relief-width rule's question. This rule's
+            # figure is the plain bore a tap needs when there is no relief,
+            # and applied to a relieved hole it reports no runout at all on
+            # the one hole that has somewhere for the lead threads to go.
+            if hole.param("ends_in_relief"):
                 continue
 
             diameter = hole.number("diameter_mm") or 0.0
@@ -311,24 +322,28 @@ class ThreadShoulderProximityCheck(MachiningCheck):
         Measured from a probe run up the bore axis out of the hole: the tap
         holder occupies that cylinder, so the distance from the axis to the
         nearest raised face, less the bore radius, is the clearance the
-        holder has. A hole open at both ends is probed from both, since the
-        tap may come in either way.
+        holder has.
+
+        The entry is the reference's: the first large planar neighbour of the
+        bore wall (square to the axis within 0.7, at least three bore
+        cross-sections), and the tap comes in from its side of the bore. A
+        bore with no such neighbour is fed from inside a cavity and has no
+        open entry to crowd.
         """
+        if hole.type != FeatureType.THREADED_HOLE:
+            return None
         bore = _bore_wall(context, hole)
         if bore is None:
             return None
+        entry = self._entry_face(context, bore)
+        if entry is None:
+            return None
 
-        nearest: Optional[float] = None
-        nearest_face = 0
-        for approach in self._approaches(context, hole, bore):
-            found = self._nearest_shoulder(context, hole, bore, nominal, limit, approach)
-            if found is None:
-                continue
-            gap, face_id = found
-            if nearest is None or gap < nearest:
-                nearest, nearest_face = gap, face_id
-
-        if nearest is None or nearest >= limit:
+        found = self._nearest_shoulder(context, hole, bore, nominal, limit, entry)
+        if found is None:
+            return None
+        nearest, nearest_face = found
+        if nearest >= limit:
             return None
 
         clearance = max(0.0, nearest)
@@ -361,85 +376,23 @@ class ThreadShoulderProximityCheck(MachiningCheck):
     # -- which way the tap comes in ------------------------------------------
 
     @staticmethod
-    def _approaches(
-        context: MachiningContext, hole: FeatureInstance, bore: AagNode
-    ) -> list[gp_Vec]:
-        """Unit vectors pointing out of the bore, one per open end.
-
-        A blind hole is settled by its floor: the tap comes in from the other
-        end. A hole open at both ends offers the tap a choice, so both are
-        probed and the worse answer is the one that counts.
-        """
+    def _entry_face(context: MachiningContext, bore: AagNode) -> Optional[AagNode]:
+        """The large planar neighbour of the bore wall the tap enters through."""
         direction = bore.cyl_cone_axis.Direction()
-        axis = gp_Vec(direction)
         cross_section = math.pi * bore.cyl_radius * bore.cyl_radius
-
-        floor: Optional[AagNode] = None
-        for face_id in sorted(hole.faces):
-            if not context.graph.has_node(face_id):
+        for edge in context.graph.edges_of(bore.face_id):
+            other = edge.other_face(bore.face_id)
+            if not context.graph.has_node(other):
                 continue
-            node = context.graph.node(face_id)
-            if node.surface_type is not SurfaceType.PLANE:
+            node = context.graph.node(other)
+            if node.surface_type is not SurfaceType.PLANE or node.plane_normal is None:
                 continue
-            normal = node.outward_normal
-            if normal is None or abs(normal.Dot(direction)) < _ENTRY_AXIS_ALIGNMENT:
-                continue
-            # The floor is about the size of the bore. A large planar member
-            # face is the surface the hole was drilled into, not its bottom.
-            if node.area >= cross_section * _ENTRY_AREA_MULTIPLE:
-                continue
-            if floor is None or node.area < floor.area:
-                floor = node
-
-        if floor is not None:
-            outward = gp_Vec(floor.centroid, bore.centroid)
-            return [axis if outward.Dot(axis) > 0.0 else axis.Reversed()]
-        return [axis, axis.Reversed()]
-
-    @staticmethod
-    def _entry_plane(
-        context: MachiningContext, hole: FeatureInstance, bore: AagNode, up: gp_Vec
-    ) -> Optional[tuple[AagNode, float]]:
-        """The face the tap enters through, and its height along the approach.
-
-        The reference finds this as a large planar neighbour of the bore
-        wall. That does not survive the port: a thread modelled as a real
-        helix cuts the bore into fragments, and the fragment that carries the
-        thread spec no longer touches the surface the hole was drilled into.
-        So the entry is found by position instead -- the nearest large plane
-        square to the axis that the axis passes through, beyond the far end
-        of the bore.
-        """
-        origin = bore.cyl_cone_axis.Location()
-        cross_section = math.pi * bore.cyl_radius * bore.cyl_radius
-        reach = max(
-            gp_Vec(origin, corner).Dot(up)
-            for face_id in hole.faces
-            if context.graph.has_node(face_id)
-            for corner in _bbox_corners(context.graph.node(face_id))
-        )
-
-        best: Optional[tuple[AagNode, float]] = None
-        for node in sorted(
-            context.graph.nodes_by_surface_type(SurfaceType.PLANE),
-            key=lambda n: n.face_id,
-        ):
-            if hole.has_face(node.face_id) or node.bbox.IsVoid():
-                continue
-            normal = node.outward_normal
-            if normal is None or abs(gp_Vec(normal).Dot(up)) < _ENTRY_AXIS_ALIGNMENT:
+            if abs(node.plane_normal.Dot(direction)) < _ENTRY_AXIS_ALIGNMENT:
                 continue
             if node.area < cross_section * _ENTRY_AREA_MULTIPLE:
                 continue
-            height = gp_Vec(origin, node.centroid).Dot(up)
-            if height < reach:
-                continue  # behind the hole: the tap never passes through it
-            point = origin.Translated(up.Multiplied(height))
-            if not _within_bbox(node, point):
-                continue  # square to the axis but off to one side of it
-            if best is None or height < best[1]:
-                best = (node, height)
-        return best
+            return node
+        return None
 
     def _nearest_shoulder(
         self,
@@ -448,15 +401,16 @@ class ThreadShoulderProximityCheck(MachiningCheck):
         bore: AagNode,
         nominal: float,
         limit: float,
-        up: gp_Vec,
+        entry_face: AagNode,
     ) -> Optional[tuple[float, int]]:
-        """Closest raised face to the tap holder coming in this way."""
-        entry = self._entry_plane(context, hole, bore, up)
-        if entry is None:
-            return None  # a bore fed from inside a cavity has no open entry
-        entry_face, entry_height = entry
-
+        """Closest raised face to the tap holder coming in through this entry."""
         origin = bore.cyl_cone_axis.Location()
+        # Up is out of the bore, toward the entry face.
+        up = gp_Vec(bore.cyl_cone_axis.Direction())
+        if gp_Vec(origin, entry_face.centroid).Dot(up) < gp_Vec(origin, bore.centroid).Dot(up):
+            up.Reverse()
+        entry_height = gp_Vec(origin, entry_face.centroid).Dot(up)
+
         probe_length = max(_HOLDER_PROBE_DIAMETERS * nominal, _HOLDER_PROBE_MIN_MM)
         start = origin.Translated(up.Multiplied(entry_height))
         probe = BRepBuilderAPI_MakeEdge(
@@ -478,6 +432,16 @@ class ThreadShoulderProximityCheck(MachiningCheck):
 
             corners = _bbox_corners(node)
             highest = max(gp_Vec(origin, corner).Dot(up) for corner in corners)
+            # The box contains the face, so its projection is an upper bound:
+            # a face it rejects really does not rise. One it admits is
+            # re-measured on the face itself, because the box overstates by
+            # an amount that moves with where the kernel put the seam.
+            if highest - entry_height >= minimum_height:
+                ok, low, high = span_of_face(
+                    context.shape, node.face_id, gp_Dir(up.XYZ()), 1.0e18, -1.0e18
+                )
+                if ok and high > low:
+                    highest = high - gp_Vec(gp_Pnt(0.0, 0.0, 0.0), origin).Dot(up)
             # It has to rise above the entry plane by enough to matter. A
             # face flush with the entry is the surface the tap works from.
             if highest - entry_height < minimum_height:
@@ -545,7 +509,6 @@ class ThreadWallThicknessCheck(MachiningCheck):
         if limit is None:
             limit = thresholds.thin_wall_error_mm
 
-        bounds = context.plane_bbox_bounds()
         results: list[CheckResult] = []
 
         for hole in _threaded_features(context):
@@ -554,14 +517,12 @@ class ThreadWallThicknessCheck(MachiningCheck):
                 continue
 
             wall = self._nearest_wall(context, hole, diameter)
-            if wall is None and bounds is not None:
+            if wall is None:
                 # Nothing planar beside the bore, so fall back to the outside
-                # of the part -- the same measurement the hole edge-distance
-                # rule makes, and worth reusing rather than approximating
-                # again from the bounding box.
-                outside = HoleEdgeDistanceCheck._distance_to_outside(
-                    context, hole, bounds
-                )
+                # of the part, estimated as the reference does: the first
+                # bore wall's centroid to the nearest side of the whole-part
+                # box, less the radius. Coarse, and only ever the fallback.
+                outside = self._centroid_to_box(context, hole, diameter)
                 if outside is not None and outside > 0.0:
                     wall = outside
             if wall is None:
@@ -609,6 +570,31 @@ class ThreadWallThicknessCheck(MachiningCheck):
                 )
             )
         return results
+
+    @staticmethod
+    def _centroid_to_box(
+        context: MachiningContext, hole: FeatureInstance, diameter: float
+    ) -> Optional[float]:
+        """Wall from the first bore wall's centroid to the part's box sides."""
+        for face_id in hole.faces:
+            if not context.graph.has_node(face_id):
+                continue
+            node = context.graph.node(face_id)
+            if node.surface_type is not SurfaceType.CYLINDER:
+                continue
+            box = Bnd_Box()
+            BRepBndLib.Add_s(context.shape, box)
+            if box.IsVoid():
+                return None
+            xmin, ymin, zmin, xmax, ymax, zmax = box.Get()
+            c = node.centroid
+            nearest = min(
+                min(abs(c.X() - xmin), abs(c.X() - xmax)),
+                min(abs(c.Y() - ymin), abs(c.Y() - ymax)),
+                min(abs(c.Z() - zmin), abs(c.Z() - zmax)),
+            )
+            return nearest - diameter / 2.0
+        return None
 
     @staticmethod
     def _nearest_wall(
@@ -687,18 +673,107 @@ def _bbox_corners(node: AagNode) -> tuple[gp_Pnt, ...]:
     )
 
 
-def _within_bbox(node: AagNode, point: gp_Pnt) -> bool:
-    """Whether a point falls inside a face's bounding box in plan.
+def _nominal_and_pitch(designation: str) -> tuple[float, float]:
+    """Nominal and pitch read straight off a designation, (0, 0) if unreadable.
 
-    Used to ask whether the bore axis passes through a candidate entry face.
-    The box of a face with a hole in it covers the hole, which is exactly the
-    part of it the axis goes through.
+    The reference's ``derive_nominal_pitch``: a metric "M<d>x<p>" or a
+    fractional imperial "<n>/<d>-<tpi>". A bare "M6" or a numbered size such
+    as "#10-32" is not read, as there.
     """
-    if node.bbox.IsVoid():
-        return False
-    xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
-    return (
-        xmin <= point.X() <= xmax
-        and ymin <= point.Y() <= ymax
-        and zmin <= point.Z() <= zmax
-    )
+    match = re.match(r"M(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)", designation, re.IGNORECASE)
+    if match:
+        return float(match.group(1)), float(match.group(2))
+    match = re.match(r"(\d+)/(\d+)\s*-\s*(\d+)", designation)
+    if match:
+        numerator, denominator, tpi = (float(g) for g in match.groups())
+        if denominator > 0.0 and tpi > 0.0:
+            return numerator / denominator * 25.4, 25.4 / tpi
+    return 0.0, 0.0
+
+
+@register_check(Rulebook.THREAD_PMI_GEOMETRY_MISMATCH)
+class ThreadPmiGeometryMismatchCheck(MachiningCheck):
+    """A thread callout the modelled bore cannot have been drilled for.
+
+    The bore of a tapped hole is the tap drill -- nominal less about one
+    pitch -- never the nominal itself, so the measured diameter is held to the
+    tap drill the callout implies, within a tight allowance. Against nominal
+    the comparison misfired on every coarse thread, whose honest undersize
+    exceeds any fixed slack, and missed small-thread mislabels whose whole
+    band is narrower than it.
+
+    Only a thread taken from PMI is judged. A thread named from its own
+    geometry was named to fit that geometry, and cannot disagree with it. The
+    callout still decides what the hole is; this only says the model and the
+    callout do not agree.
+    """
+
+    @property
+    def name(self) -> str:
+        return "Thread PMI Geometry Mismatch Check"
+
+    def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
+        from ...machining.threads import find_by_designation
+
+        allowed = self.safe_float(rule_config.limit)
+        if allowed is None:
+            allowed = context.config.thresholds.thread_diameter_mismatch_mm
+
+        results: list[CheckResult] = []
+        for hole in _threaded_features(context):
+            if hole.param("thread_evidence") != "pmi":
+                continue
+            designation = hole.param("thread_designation")
+            diameter = hole.number("diameter_mm") or 0.0
+            if diameter <= 0.0:
+                continue
+
+            # The tap drill from the table where the thread is tabulated;
+            # otherwise nominal less pitch, which holds to about 0.05 mm
+            # across the metric and unified tables, so the rule still judges
+            # a standard pairing nobody has tabulated.
+            expected = 0.0
+            spec = find_by_designation(designation)
+            if spec is not None and spec.tap_drill_mm > 0.0:
+                expected = spec.tap_drill_mm
+            else:
+                nominal = hole.number("thread_nominal_mm") or 0.0
+                pitch = hole.number("thread_pitch_mm") or 0.0
+                if nominal <= 0.0 or pitch <= 0.0:
+                    nominal, pitch = _nominal_and_pitch(designation)
+                if nominal > 0.0 and pitch > 0.0:
+                    expected = nominal - pitch
+            if expected <= 0.0:
+                continue
+
+            delta = abs(expected - diameter)
+            if delta <= allowed:
+                continue
+
+            results.append(
+                self.finding(
+                    rule,
+                    Severity.WARNING,
+                    f"{delta:.2f} mm off the {designation} tap drill",
+                    self.render(
+                        feedback,
+                        Severity.WARNING,
+                        delta,
+                        allowed,
+                        allowed,
+                        "mm",
+                        f"This hole is called out {designation}, which is tapped "
+                        f"from a {expected:.2f} mm drill, but the modelled bore "
+                        f"measures {diameter:.2f} mm -- {delta:.2f} mm off, past "
+                        f"the {allowed:.2f} mm allowed. Either the callout is "
+                        "wrong or the bore is not drilled for this thread; check "
+                        "which one the design means before it is quoted.",
+                    ),
+                    faces=hole.faces,
+                    value=delta,
+                    limit=allowed,
+                    comparison=">",
+                    unit="mm",
+                )
+            )
+        return results

@@ -31,12 +31,13 @@ from __future__ import annotations
 from typing import Optional, Sequence
 
 from OCP.BRepAdaptor import BRepAdaptor_Surface
-from OCP.gp import gp_Dir, gp_Vec, gp_XYZ
+from OCP.gp import gp_Dir, gp_Pnt, gp_Vec, gp_XYZ
 from OCP.GeomLProp import GeomLProp_SLProps
 from OCP.TopAbs import TopAbs_REVERSED
 
 from ...utils.geometry import FaceIndex
 from ..aag import AagNode, AttributedAdjacencyGraph, SurfaceType
+from ..face_extent import band_along
 from ..features import FeatureInstance, FeatureType
 from .base import FeatureRecognizer
 
@@ -89,6 +90,7 @@ class ChannelRecognizer(FeatureRecognizer):
         claimed: Optional[set[int]] = None,
         prior: Optional[Sequence[FeatureInstance]] = None,
     ) -> list[FeatureInstance]:
+        self._shape = shape
         walls = self._walls(graph, shape)
         if len(walls) < 2:
             return []
@@ -182,36 +184,59 @@ class ChannelRecognizer(FeatureRecognizer):
         if floor is None:
             return None
 
-        gap_axis = _dominant_axis(normal_a)
-        floor_span = floor.bbox_dims()
-        if floor_span[gap_axis] < gap * _HOST_FLOOR_SPAN:
-            return None  # bounded by the walls: a slot bottom, not a plate
-
-        low_a, high_a = _bounds(first)
-        low_b, high_b = _bounds(second)
-        overlap = [
-            min(high_a[k], high_b[k]) - max(low_a[k], low_b[k]) for k in range(3)
-        ]
-        for axis in range(3):
-            if axis != gap_axis and overlap[axis] < _MIN_PROJECTED_OVERLAP_MM:
-                return None  # they are anti-parallel but not opposite
-
+        # Every measurement below is in the channel's own frame: gap = the
+        # first wall's normal, up = the floor's outward normal, run = gap x
+        # up, each measured on the faces (band_along). It was the dominant
+        # cardinal axis of each normal read off the faces' boxes, and on a
+        # slot sunk at 45 degrees (optical_periscope_housing's mirror seats)
+        # that took an end wall's box shadow for a host floor and reported a
+        # channel as deep as the part was wide.
         up = floor.outward_normal
         if up is None:
             return None
-        up_axis = _dominant_axis(up)
-        if up_axis == gap_axis:
-            return None
+        run_vec = gp_Vec(normal_a).Crossed(gp_Vec(up))
+        if run_vec.Magnitude() < 0.5:
+            return None  # degenerate
+        run = gp_Dir(run_vec)
+        shape = getattr(self, "_shape", None)
 
-        depth = min(high_a[up_axis] - low_a[up_axis], high_b[up_axis] - low_b[up_axis])
+        def band(node: AagNode, direction: gp_Dir):
+            ok, low, high = band_along(
+                shape, node.face_id, node.bbox, gp_Pnt(0.0, 0.0, 0.0), direction,
+                1.0e18, -1.0e18,
+            )
+            if not ok or not high > low:
+                return None
+            return low, high
+
+        # A slot bottom spans about the gap; the plate a rib stands on spans
+        # far more, measured along the gap direction.
+        floor_band = band(floor, normal_a)
+        if floor_band is None:
+            return None
+        if floor_band[1] - floor_band[0] < gap * _HOST_FLOOR_SPAN:
+            return None  # bounded by the walls: a slot bottom, not a plate
+
+        # The walls genuinely front each other along up and along run.
+        a_up, b_up = band(first, up), band(second, up)
+        a_run, b_run = band(first, run), band(second, run)
+        if a_up is None or b_up is None or a_run is None or b_run is None:
+            return None
+        overlap_up = min(a_up[1], b_up[1]) - max(a_up[0], b_up[0])
+        overlap_run = min(a_run[1], b_run[1]) - max(a_run[0], b_run[0])
+        if overlap_up < _MIN_PROJECTED_OVERLAP_MM or overlap_run < _MIN_PROJECTED_OVERLAP_MM:
+            return None  # they are anti-parallel but not opposite
+
+        depth = min(a_up[1] - a_up[0], b_up[1] - b_up[0])
         if depth < gap * _MIN_DEPTH_RATIO:
             return None
+        length = overlap_run
 
         return {
             "faces": tuple(sorted((first.face_id, second.face_id))),
             "gap": gap,
             "depth": depth,
-            "length": overlap[3 - gap_axis - up_axis],
+            "length": length,
             "floor": floor.face_id,
             "axis": (
                 round(normal_a.X(), 6),
@@ -244,16 +269,6 @@ class ChannelRecognizer(FeatureRecognizer):
             if candidate.face_id in against_b:
                 return candidate
         return None
-
-
-def _dominant_axis(direction: gp_Dir) -> int:
-    components = (abs(direction.X()), abs(direction.Y()), abs(direction.Z()))
-    return components.index(max(components))
-
-
-def _bounds(node: AagNode) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-    xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
-    return ((xmin, ymin, zmin), (xmax, ymax, zmax))
 
 
 def _average_normal_if_flat(faces: FaceIndex, node: AagNode) -> Optional[gp_Dir]:

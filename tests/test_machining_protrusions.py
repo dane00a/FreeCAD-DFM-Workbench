@@ -122,7 +122,19 @@ def _graph(shape: TopoDS_Shape):
 
 
 def steps_in(shape: TopoDS_Shape):
-    return StepRecognizer().recognize(_graph(shape), shape)
+    """The steps as the resolver leaves them.
+
+    Both faces of a shoulder read as a terrace with the other as its riser,
+    and the recognizer emits both readings, as the reference does; the
+    resolver keeps the first of two with the same faces.
+    """
+    kept, seen = [], set()
+    for step in StepRecognizer().recognize(_graph(shape), shape):
+        key = frozenset(step.faces)
+        if key not in seen:
+            seen.add(key)
+            kept.append(step)
+    return kept
 
 
 def bosses_in(shape: TopoDS_Shape):
@@ -375,6 +387,45 @@ class BossWallTests(unittest.TestCase):
                     [n.face_id for n in sculpted],
                     "a shaped face was taken as a boss wall",
                 )
+
+    def test_a_chamfered_top_edge_does_not_hide_the_walls(self):
+        """Top -> chamfer -> wall is two hops, and the walls still arrive.
+
+        An 80 x 80 x 10 plate with a 30 x 30 x 8 pad whose top edge is broken
+        by a 1 mm chamfer all round. The chamfer bevels on a rectangular pad
+        are planes, not cones, so the second ring has to cross a narrow
+        planar band too.
+        """
+        from OCP.BRepFilletAPI import BRepFilletAPI_MakeChamfer
+        from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
+        from OCP.TopExp import TopExp_Explorer
+        from OCP.TopoDS import TopoDS
+        from OCP.Bnd import Bnd_Box
+        from OCP.BRepBndLib import BRepBndLib
+
+        part = _fuse(_box((-40, -40, 0), (40, 40, 10)), _box((-15, -15, 10), (15, 15, 18)))
+        chamfer = BRepFilletAPI_MakeChamfer(part)
+        explorer = TopExp_Explorer(part, TopAbs_FACE)
+        while explorer.More():
+            face = TopoDS.Face_s(explorer.Current())
+            box = Bnd_Box()
+            BRepBndLib.Add_s(face, box)
+            _, _, zmin, _, _, zmax = box.Get()
+            if abs(zmin - 18.0) < 1e-3 and abs(zmax - 18.0) < 1e-3:
+                edges = TopExp_Explorer(face, TopAbs_EDGE)
+                while edges.More():
+                    chamfer.Add(1.0, TopoDS.Edge_s(edges.Current()))
+                    edges.Next()
+                break
+            explorer.Next()
+        chamfer.Build()
+        self.assertTrue(chamfer.IsDone())
+
+        bosses = self._bosses(chamfer.Shape())
+        self.assertEqual(len(bosses), 1)
+        # Top + chamfer ring + four walls.
+        self.assertGreaterEqual(len(bosses[0].faces), 6)
+        self.assertAlmostEqual(bosses[0].number("height_mm"), 8.0, delta=0.2)
 
 
 class PatternTests(unittest.TestCase):

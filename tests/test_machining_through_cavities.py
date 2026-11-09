@@ -276,11 +276,12 @@ class TestThroughCavityRecognition(unittest.TestCase):
         self.assertAlmostEqual(cavity.number("min_width_mm"), 10.0, places=3)
         self.assertAlmostEqual(cavity.number("max_width_mm"), 20.0, places=3)
 
-    def test_t_slot_profile_turns_six_times(self):
-        """Two of the six corners are external -- where each step meets the
-        neck wall above it -- so counting only inward turns leaves four and
-        reads a T as a plain rectangle."""
-        self.assertEqual(cavities_in(make_t_slot())[0].param("corner_count"), 6)
+    def test_t_slot_counts_its_interior_corners(self):
+        """The reference's `count_corners` counts concave meetings only, so
+        the two external corners where each step meets the neck wall do not
+        count: four. The T is still claimed -- its walls reach all the way
+        through the part, which is what the four-corner gate asks next."""
+        self.assertEqual(cavities_in(make_t_slot())[0].param("corner_count"), 4)
 
     def test_rounded_window_is_claimed_for_its_radii(self):
         """A floorless rounded window has four corners and no other recognizer
@@ -292,10 +293,13 @@ class TestThroughCavityRecognition(unittest.TestCase):
             abs(cavities[0].direction("through_axis").Z()), 1.0, places=6
         )
 
-    def test_rectangular_tunnel_is_left_alone(self):
-        """Four walls and four corners: the slot recognizer reads it without
-        losing anything, so this one stands down."""
-        self.assertEqual(cavities_in(make_rectangular_tunnel()), [])
+    def test_rectangular_tunnel_through_the_part_is_claimed(self):
+        """Four walls and four corners used to be handed to the slot and
+        pocket recognizers -- but both seed on a floor, and a cut that runs
+        clean through the part has none, so the handover was to nobody. The
+        reference (9ac3e748b) now claims a four-corner window whose walls
+        reach through the part; this tunnel does."""
+        self.assertEqual(len(cavities_in(make_rectangular_tunnel())), 1)
 
     def test_blind_pocket_is_not_a_through_cavity(self):
         """Its walls terminate against the part on one side only."""
@@ -305,6 +309,109 @@ class TestThroughCavityRecognition(unittest.TestCase):
         """A pad's walls are convex nearly all round: no interior corners to
         seed on."""
         self.assertEqual(cavities_in(make_boss()), [])
+
+    def test_a_slot_that_swells_into_a_circle_is_one_aperture(self):
+        """The profile-loop pass: every wall stands on one opening.
+
+        A 30-wide slot running in Y through a 120 x 120 x 20 plate, swelling
+        to 50 mm diameter at its middle, used to come back as two cavities
+        with a partial bore between them.
+        """
+        from OCP.BRepPrimAPI import BRepPrimAPI_MakeCylinder
+
+        plate = _cavity((-60, -60, 0), (60, 60, 20))
+        tool = _fuse(
+            _cavity((-15, -40, -1), (15, 40, 21)),
+            BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, -1), gp_Dir(0, 0, 1)), 25.0, 22.0).Shape(),
+        )
+        cavities = cavities_in(_cut(plate, tool))
+        self.assertEqual(len(cavities), 1)
+        self.assertEqual(cavities[0].type, FeatureType.THROUGH_CAVITY)
+        # Both slot walls, both slot ends and both halves of the swell.
+        self.assertGreaterEqual(len(cavities[0].faces), 6)
+        self.assertAlmostEqual(cavities[0].number("width_mm"), 30.0, delta=0.1)
+
+    # -- the rim wire (reference 1130ea105) ----------------------------------
+
+    @staticmethod
+    def _z_cylinder(x, y, r, z0, h):
+        from OCP.BRepPrimAPI import BRepPrimAPI_MakeCylinder
+
+        return BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(x, y, z0), gp_Dir(0, 0, 1)), r, h).Shape()
+
+    def _four_lobe_window(self):
+        """A 30 x 20 window with an R2.5 lobe centred on every corner.
+
+        Every profile vertex is reflex and reads convex; the profile has no
+        concave corner. Small lobes so the profile-loop pass declines it and
+        the flood is what is tested.
+        """
+        tool = _cavity((15, 10, -1), (45, 30, 6))
+        for cx, cy in ((15, 10), (45, 10), (15, 30), (45, 30)):
+            tool = _fuse(tool, self._z_cylinder(cx, cy, 2.5, -1, 7))
+        return _cut(_cavity((0, 0, 0), (60, 40, 5)), tool)
+
+    def test_a_window_with_a_lobe_at_every_corner_is_one_opening(self):
+        from freecad.DFM.core.machining.aag import SurfaceType
+
+        shape = self._four_lobe_window()
+        cavities = cavities_in(shape)
+        self.assertEqual(len(cavities), 1)
+        graph = _graph(shape)
+        kinds = [graph.node(f).surface_type for f in cavities[0].faces]
+        self.assertGreaterEqual(kinds.count(SurfaceType.CYLINDER), 4)
+        self.assertGreaterEqual(kinds.count(SurfaceType.PLANE), 4)
+        self.assertAlmostEqual(cavities[0].number("min_width_mm"), 20.0, delta=0.4)
+        self.assertAlmostEqual(cavities[0].number("max_width_mm"), 30.0, delta=0.6)
+        self.assertAlmostEqual(cavities[0].number("corner_radius_mm"), 2.5, delta=0.05)
+
+    def test_a_keyhole_is_one_opening(self):
+        """A 4 mm slot running out of a 16 mm circle."""
+        tool = _fuse(_cavity((14, 18, -1), (44, 22, 5)), self._z_cylinder(14, 20, 8, -1, 6))
+        shape = _cut(_cavity((0, 0, 0), (60, 40, 4)), tool)
+        cavities = cavities_in(shape)
+        self.assertEqual(len(cavities), 1)
+        self.assertEqual(len(cavities[0].faces), 4)
+        self.assertAlmostEqual(cavities[0].number("min_width_mm"), 4.0, delta=0.08)
+
+    def test_a_boss_on_an_inner_wire_is_not_an_opening(self):
+        shape = _fuse(_cavity((0, 0, 0), (60, 60, 10)), _cavity((20, 20, 10), (40, 40, 22)))
+        self.assertEqual(cavities_in(shape), [])
+
+    def test_a_bore_biting_a_pocket_rim_does_not_make_it_through(self):
+        shape = _cut(_cavity((0, 0, 0), (60, 60, 10)), _cavity((15, 15, 5), (45, 45, 11)))
+        shape = _cut(shape, self._z_cylinder(15, 30, 3, -1, 12))
+        self.assertEqual(cavities_in(shape), [])
+
+    def test_no_shape_means_no_rim_wires(self):
+        shape = _cavity((0, 0, 0), (20, 20, 5))
+        self.assertEqual(ThroughCavityRecognizer().recognize(_graph(shape), None), [])
+
+    def test_a_lobe_bulging_past_its_walls_joins_the_cavity(self):
+        """A keyhole's head meets the walls at convex corners.
+
+        A 20 x 40 window in a 4 mm plate with an R5 lobe centred on its
+        x=50 wall. The walk steps over the lobe, and the closing-arc pass
+        takes it back: it meets two faces the cavity holds, along lines.
+        """
+        from OCP.BRepPrimAPI import BRepPrimAPI_MakeCylinder
+
+        plate = _cavity((0, 0, 0), (100, 100, 4))
+        plate = _cut(plate, _cavity((30, 30, -1), (50, 70, 5)))
+        plate = _cut(
+            plate,
+            BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(50, 50, -1), gp_Dir(0, 0, 1)), 5.0, 6.0).Shape(),
+        )
+        cavities = cavities_in(plate)
+        self.assertEqual(len(cavities), 1)
+        graph = _graph(plate)
+        from freecad.DFM.core.machining.aag import SurfaceType
+
+        arcs = [
+            f for f in cavities[0].faces
+            if graph.node(f).surface_type is SurfaceType.CYLINDER
+        ]
+        self.assertGreaterEqual(len(arcs), 1)
 
 
 class TestSlitRecognition(unittest.TestCase):

@@ -183,6 +183,37 @@ class TestClassification(unittest.TestCase):
 # =============================================================================
 
 
+class TestFlatBlank(unittest.TestCase):
+    """The third sheet route (reference 28a677cd2): a flat constant-gauge
+    plate, cut through and never formed, is a sheet blank."""
+
+    @staticmethod
+    def _plate() -> TopoDS_Shape:
+        return BRepPrimAPI_MakeBox(190.0, 120.0, 3.0).Shape()
+
+    def _holed(self, depth: float) -> TopoDS_Shape:
+        shape = self._plate()
+        for x in (30.0, 95.0, 160.0):
+            axis = gp_Ax2(gp_Pnt(x, 60.0, 3.0 - depth), gp_Dir(0, 0, 1))
+            shape = _cut(shape, BRepPrimAPI_MakeCylinder(axis, 4.0, depth + 1.0).Shape())
+        return shape
+
+    def test_a_plate_cut_through_is_a_sheet_blank(self):
+        result = _classify(self._holed(depth=3.0))
+        self.assertIs(result.type, PartProcessType.SHEET_METAL)
+        self.assertAlmostEqual(result.sheet_thickness_mm, 3.0, places=3)
+
+    def test_featureless_stock_is_not_a_blank(self):
+        """Nothing says a laser was ever involved; the clamping rules exist
+        for exactly this plate."""
+        self.assertIsNot(_classify(self._plate()).type, PartProcessType.SHEET_METAL)
+
+    def test_a_cut_into_one_side_only_is_not_a_blank(self):
+        """Engraving or a blind recess leaves an inner wire on one skin and
+        nothing behind it."""
+        self.assertIsNot(_classify(self._holed(depth=1.0)).type, PartProcessType.SHEET_METAL)
+
+
 class TestMachiningConfig(unittest.TestCase):
     def test_default_library_covers_the_expected_tool_types(self):
         types = {t.type for t in default_tool_library()}

@@ -251,6 +251,19 @@ class TestSlotRecognition(unittest.TestCase):
         boss = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(50, 40, 40), gp_Dir(0, 0, 1)), 12.0, 20.0)
         self.assertEqual(slots_in(_fuse(block(), boss.Shape())), [])
 
+    def test_a_face_carrying_pads_is_not_a_slot(self):
+        """The walls must bound the floor.
+
+        Four 20 x 20 pads on a 100 x 100 plate: two facing pad walls are 20
+        apart, but the face they stand on runs 100 across that direction,
+        five times the width they could enclose.
+        """
+        part = _cavity((0, 0, 0), (100, 100, 10))
+        for x, y in ((10, 10), (70, 10), (10, 70), (70, 70)):
+            part = _fuse(part, _cavity((x, y, 10), (x + 20, y + 20, 13)))
+        graph = AagBuilder(part, FaceIndex(part)).build()
+        self.assertEqual(SlotRecognizer().recognize(graph, part), [])
+
     def test_square_corners_record_no_radius(self):
         # Absent, not zero: a rule must be able to tell an unmeasured radius
         # from a measured radius of nothing.

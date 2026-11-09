@@ -470,6 +470,25 @@ class BendTests(unittest.TestCase):
         self.assertEqual(of_type(features, TAB), [])
         self.assertEqual(of_type(features, NOTCH), [])
 
+    def test_a_press_brake_bend_names_its_family_and_sign(self):
+        """Every fold says which of the four families it is (reference
+        6a8338369), and a signed fold carries the frame its sign is in."""
+        _, _, features = recognize(bracket())
+        bend = of_type(features, BEND)[0]
+        self.assertEqual(bend.param("bend_family"), "cylindrical")
+        self.assertAlmostEqual(abs(bend.number("signed_angle_deg")), 90.0, places=3)
+        self.assertAlmostEqual(bend.number("swept_angle_deg"), 90.0, places=2)
+        self.assertIn(bend.param("fold_sign_from"), (bend.param("panel_a"), bend.param("panel_b")))
+        self.assertIsNone(bend.param("refusal"))
+
+    def test_a_hem_has_no_sign_but_no_refusal(self):
+        """Antiparallel normals cannot be signed; a hem is compared against
+        its normal angle instead, and is not a refusal."""
+        _, _, features = recognize(hemmed_bracket())
+        hem = [b for b in of_type(features, BEND) if b.param("is_hem")][0]
+        self.assertIsNone(hem.param("signed_angle_deg"))
+        self.assertIsNone(hem.param("refusal"))
+
     def test_a_milled_block_has_no_bends(self):
         _, _, features = recognize(milled_block())
         self.assertEqual(of_type(features, BEND), [])

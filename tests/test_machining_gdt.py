@@ -87,12 +87,19 @@ def machined_block() -> TopoDS_Shape:
 
 
 def small_cube() -> TopoDS_Shape:
-    """A 12 mm cube: every face is 144 mm2, under the 200 mm2 datum minimum.
+    """A 12 mm cube with a 3 mm hole through it.
 
-    Nothing on it is big enough to establish a datum on, which is what the
-    datum-validity rule is looking for.
+    Every face is at most 144 mm2, under the 200 mm2 datum minimum, so
+    nothing on it is big enough to establish a datum on -- which is what the
+    datum-validity rule is looking for. The hole is there to carry the
+    callouts: the feature-level GD&T rules judge a frame only through a
+    recognized feature it is attached to, as the reference engine does.
     """
-    return BRepPrimAPI_MakeBox(12.0, 12.0, 12.0).Shape()
+    cube = BRepPrimAPI_MakeBox(12.0, 12.0, 12.0).Shape()
+    drill = BRepPrimAPI_MakeCylinder(
+        gp_Ax2(gp_Pnt(6, 6, -1), gp_Dir(0, 0, 1)), 1.5, 14.0
+    ).Shape()
+    return _cut(cube, drill)
 
 
 # =============================================================================
@@ -151,8 +158,22 @@ def only(findings):
 
 
 def frames(*items):
-    """An annotation source supplying just these feature control frames."""
-    return lambda context: AnnotationSet(frames=list(items))
+    """An annotation source supplying just these feature control frames.
+
+    A frame naming neither faces nor a feature is bound to the part's first
+    recognized feature. The reference judges a frame only through the
+    features it is attached to -- one on nothing is judged by none of the
+    feature-level rules -- so a test frame has to sit on something.
+    """
+
+    def build(context):
+        first = context.recognition.features[0].instance_id
+        for item in items:
+            if not item.face_ids and not item.feature_id:
+                item.feature_id = first
+        return AnnotationSet(frames=list(items))
+
+    return build
 
 
 # =============================================================================
@@ -378,7 +399,9 @@ class TestToleranceAchievable(unittest.TestCase):
 
         finding = only(rule_check(machined_block(), self.RULE, build))
         self.assertIn("position", finding.message)
-        self.assertIn("through hole h_0", finding.message)
+        # Named by the callout, not the feature: the reference keys its
+        # de-duplication on the annotation, so the wording must too.
+        self.assertIn("fcf_1", finding.message)
         self.assertIn("0.005 mm", finding.message)
         self.assertIn("0.050 mm", finding.message)
         self.assertIn("3-axis", finding.message)
@@ -405,7 +428,9 @@ class TestToleranceAchievable(unittest.TestCase):
         finding = only(rule_check(machined_block(), self.RULE, build))
         self.assertEqual(finding.failing_geometry, expected)
 
-    def test_findings_come_out_in_a_stable_order(self):
+    def test_findings_come_out_in_source_order(self):
+        # The reference walks a feature's attached frames in the order the
+        # PMI listed them; so does this.
         build = frames(
             FeatureControlFrame(
                 "fcf_b", type=ToleranceType.POSITION, tolerance_value_mm=0.004
@@ -415,7 +440,43 @@ class TestToleranceAchievable(unittest.TestCase):
             ),
         )
         findings = rule_check(machined_block(), self.RULE, build)
-        self.assertEqual([f.value for f in findings], [0.003, 0.004])
+        self.assertEqual([f.value for f in findings], [0.004, 0.003])
+
+    def test_a_frame_on_no_feature_is_not_judged(self):
+        # Faces no recognized feature owns: the reference attaches the frame
+        # to nothing, and no feature-level rule sees it.
+        build = lambda context: AnnotationSet(
+            frames=[
+                FeatureControlFrame(
+                    "fcf_1",
+                    type=ToleranceType.POSITION,
+                    tolerance_value_mm=0.001,
+                    face_ids=[10_000],
+                )
+            ]
+        )
+        self.assertEqual(rule_check(machined_block(), self.RULE, build), [])
+
+    def test_a_frame_shared_by_two_features_reads_the_same_on_both(self):
+        # Attached through the faces, so it lands on every feature owning
+        # one; the two findings are identical, which is what lets the
+        # aggregation pass fold them into one as the reference does.
+        def build(context):
+            faces = [sorted(f.faces)[0] for f in context.recognition.features[:2]]
+            return AnnotationSet(
+                frames=[
+                    FeatureControlFrame(
+                        "fcf_1",
+                        type=ToleranceType.POSITION,
+                        tolerance_value_mm=0.001,
+                        face_ids=faces,
+                    )
+                ]
+            )
+
+        findings = rule_check(machined_block(), self.RULE, build)
+        self.assertEqual(len(findings), 2)
+        self.assertEqual(findings[0].message, findings[1].message)
 
 
 # =============================================================================

@@ -37,6 +37,11 @@ class FeatureType:
     # Drilled and bored holes
     THROUGH_HOLE = "THROUGH_HOLE"
     BLIND_HOLE = "BLIND_HOLE"
+    # A bore that ends by breaking into another cavity rather than at a floor
+    # it drilled for itself: neither blind nor through. The DFM advice
+    # differs -- no bottom to finish, but a burr that lands inside a cavity a
+    # deburring tool may not reach.
+    BREAKTHROUGH_HOLE = "BREAKTHROUGH_HOLE"
     COUNTERBORE = "COUNTERBORE"
     COUNTERSINK = "COUNTERSINK"
     THREADED_HOLE = "THREADED_HOLE"
@@ -86,6 +91,9 @@ class FeatureType:
     # Other
     PATTERN = "PATTERN"
     MARKING_TEXT = "MARKING_TEXT"
+    # A rolled or cut grip texture: one knurling operation over a patch of
+    # hundreds of facets, none of which is a feature in its own right.
+    KNURL = "KNURL"
     UNKNOWN = "UNKNOWN"
 
 
@@ -93,6 +101,7 @@ HOLE_TYPES = frozenset(
     {
         FeatureType.THROUGH_HOLE,
         FeatureType.BLIND_HOLE,
+        FeatureType.BREAKTHROUGH_HOLE,
         FeatureType.COUNTERBORE,
         FeatureType.COUNTERSINK,
         FeatureType.THREADED_HOLE,

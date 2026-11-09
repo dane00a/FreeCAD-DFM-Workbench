@@ -26,10 +26,13 @@ from typing import Iterator, Optional
 
 from OCP.Bnd import Bnd_Box
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
+from OCP.BRepLProp import BRepLProp_SLProps
 from OCP.TopAbs import TopAbs_OUT
-from OCP.gp import gp_Pnt, gp_Vec
+from OCP.gp import gp_Dir, gp_Pnt, gp_Vec
 
+from ...machining.face_extent import band_along
 from ...machining.aag import AagNode, SurfaceType
 from ...machining.context import MachiningContext
 from ...machining.features import FeatureType
@@ -45,6 +48,7 @@ _BORE_WALL_TYPES = frozenset(
     {
         FeatureType.THROUGH_HOLE,
         FeatureType.BLIND_HOLE,
+        FeatureType.BREAKTHROUGH_HOLE,
         FeatureType.COUNTERBORE,
         FeatureType.COUNTERSINK,
         # A half-open channel three quarters of a millimetre from a pocket
@@ -100,6 +104,7 @@ _WEB_BORE_TYPES = frozenset(
     {
         FeatureType.THROUGH_HOLE,
         FeatureType.BLIND_HOLE,
+        FeatureType.BREAKTHROUGH_HOLE,
         FeatureType.COUNTERBORE,
         FeatureType.COUNTERSINK,
         FeatureType.THREADED_HOLE,
@@ -126,6 +131,16 @@ _BORE_WALL = "bore-wall"
 _BORE_WEB = "bore-web"
 _CONVERGING = "converging"
 
+# A wall with a sculptured surface on one side of it (the reference's pass 4).
+_FREEFORM = "freeform"
+
+# Opposed enough, for a freeform face whose one normal is only its mid-UV
+# normal: the gate is deliberately loose (about 120 degrees apart).
+_FREEFORM_OPPOSED_DOT_MAX = -0.5
+
+# Below this the two faces are touching, or one is a boolean sliver.
+_TOUCHING_MM = 0.01
+
 # Past this the two faces lean the same way and enclose nothing between them.
 _CONVERGING_DOT_MAX = 0.3
 
@@ -144,6 +159,31 @@ _ANTIPARALLEL_DOT_MAX = -0.8
 # Bounding boxes must genuinely overlap in the two in-plane directions;
 # a shared corner is not a wall.
 _OVERLAP_MARGIN_MM = 0.1
+
+
+def _axis_band(node, origin, direction, shape=None) -> tuple[float, float]:
+    """The band a face covers along an axis, measured from ``origin``.
+
+    On the face itself (band_along) when the shape is known; the projected
+    corners of its bounding box only as the fallback. The box answer moves
+    with the face's orientation and with where the seam fell.
+    """
+    low, high = math.inf, -math.inf
+    if shape is not None:
+        ok, low, high = band_along(shape, node.face_id, node.bbox, origin, direction, low, high)
+        if ok:
+            return low, high
+    if node.bbox.IsVoid():
+        return low, high
+    xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
+    dvec = gp_Vec(direction)
+    for x in (xmin, xmax):
+        for y in (ymin, ymax):
+            for z in (zmin, zmax):
+                along = gp_Vec(origin, gp_Pnt(x, y, z)).Dot(dvec)
+                low = min(low, along)
+                high = max(high, along)
+    return low, high
 
 
 def _distance(a: gp_Pnt, b: gp_Pnt) -> float:
@@ -182,6 +222,8 @@ class ThinWallCheck(MachiningCheck):
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
         thresholds = context.config.thresholds
+        # Axis segments below are measured on the faces (band_along).
+        self._shape = context.shape
         target = self.safe_float(rule_config.target)
         limit = self.safe_float(rule_config.limit)
         if target is None:
@@ -191,8 +233,11 @@ class ThinWallCheck(MachiningCheck):
 
         results: list[CheckResult] = []
         reported: set[tuple[int, int]] = set()
+        # Centroid separation of each opposed pair, by (first, second) id.
+        self._separations: dict[tuple[int, int], float] = {}
         muted = self._muted_faces(context)
         rib_faces = self._rib_faces(context)
+        knurl_of = self._knurl_exclusive_faces(context)
 
         # The planar pass, then the bores. Two different shapes of wall and
         # two different measurements, but one rule: what a machinist wants
@@ -212,6 +257,10 @@ class ThinWallCheck(MachiningCheck):
             (a, b, t, _CONVERGING)
             for a, b, t in self._converging_pairs(context, target)
         ]
+        walls += [
+            (a, b, t, _FREEFORM)
+            for a, b, t in self._freeform_pairs(context, target)
+        ]
 
         for first, second, thickness, kind in walls:
             pair = (min(first.face_id, second.face_id), max(first.face_id, second.face_id))
@@ -219,12 +268,22 @@ class ThinWallCheck(MachiningCheck):
                 continue
             if first.face_id in muted or second.face_id in muted:
                 continue
+            # Two facets of ONE knurl's own texture: its teeth are thin by
+            # construction, sized by the knurling wheel, and no end mill
+            # comes near them. Both faces, the same knurl, and owned by
+            # nothing else -- a keyway wall that also belongs to a knurl
+            # feathering a crest land is a real defect and must still speak.
+            owner = knurl_of.get(first.face_id)
+            if owner is not None and owner == knurl_of.get(second.face_id):
+                continue
             if kind is _BORE_WEB:
                 verdict = self._grade_bore_web(thickness, target, limit)
             elif kind is _BORE_WALL:
                 verdict = self._grade_bore_wall(thickness, target, limit)
             elif kind is _CONVERGING:
                 verdict = self._grade_converging(thickness, target, limit)
+            elif kind is _FREEFORM:
+                verdict = self._grade_freeform(thickness, target, limit)
             else:
                 verdict = self._grade(
                     context, first, second, thickness, target, limit,
@@ -245,11 +304,19 @@ class ThinWallCheck(MachiningCheck):
                 "mm",
                 reason,
             )
+            overview = f"{thickness:.2f} mm wall"
+            if kind is _OPPOSED:
+                # The reference records how far an opposed wall runs on
+                # every such finding, thin or thin-by-aspect, and merges
+                # findings only when that agrees too: four 1 mm walls of
+                # four different lengths are four findings, not one.
+                run_length, _ = self._in_plane_extents(first, second)
+                overview += f", {run_length:.2f} mm long"
             results.append(
                 self.finding(
                     rule,
                     severity,
-                    f"{thickness:.2f} mm wall",
+                    overview,
                     message,
                     faces=[first.face_id, second.face_id],
                     value=thickness,
@@ -279,6 +346,25 @@ class ThinWallCheck(MachiningCheck):
         ):
             muted.update(feature.faces)
         return muted
+
+    @staticmethod
+    def _knurl_exclusive_faces(context) -> dict[int, str]:
+        """Face -> knurl instance, for knurl faces NO other feature owns.
+
+        Exclusivity is the engine's own ruling read back: anything at least
+        0.8 inside a knurl was already retired as a facet of the texture, so
+        whatever still co-owns a knurl face is a feature of the part.
+        """
+        owners: dict[int, int] = {}
+        for feature in context.recognition.features:
+            for face_id in feature.faces:
+                owners[face_id] = owners.get(face_id, 0) + 1
+        out: dict[int, str] = {}
+        for feature in context.recognition.of_type(FeatureType.KNURL):
+            for face_id in feature.faces:
+                if owners.get(face_id) == 1:
+                    out.setdefault(face_id, feature.instance_id)
+        return out
 
     @staticmethod
     def _rib_faces(context) -> set[int]:
@@ -354,7 +440,8 @@ class ThinWallCheck(MachiningCheck):
         thickness: float, target: float, limit: float
     ) -> tuple[Severity, float, str]:
         """A wedge of material, measured where it is thinnest."""
-        if thickness <= limit:
+        # Strictly under the floor, as the reference grades this pass.
+        if thickness < limit:
             return (
                 Severity.ERROR,
                 limit,
@@ -371,6 +458,33 @@ class ThinWallCheck(MachiningCheck):
             "will deflect there first; cut it last and lightly.",
         )
 
+    @staticmethod
+    def _grade_freeform(
+        thickness: float, target: float, limit: float
+    ) -> tuple[Severity, float, str]:
+        """A web under a styled surface, measured at its closest point.
+
+        Strictly under the floor is an error, as the reference grades this
+        pass (the planar passes take the floor itself as an error).
+        """
+        if thickness < limit:
+            return (
+                Severity.ERROR,
+                limit,
+                f"Wall bounded by a freeform (sculptured) surface is critically "
+                f"thin ({thickness:.2f} mm at the closest point). Thin webs under "
+                "styled surfaces deflect during finishing passes and are easy "
+                "to break through.",
+            )
+        return (
+            Severity.WARNING,
+            target,
+            f"Wall bounded by a freeform (sculptured) surface is thin "
+            f"({thickness:.2f} mm at the closest point). Thin webs under styled "
+            "surfaces deflect during finishing passes and are easy to break "
+            "through.",
+        )
+
     # -- grading ------------------------------------------------------------
 
     def _grade(
@@ -384,6 +498,20 @@ class ThinWallCheck(MachiningCheck):
         in_rib: bool = False,
     ) -> Optional[tuple[Severity, float, str]]:
         thresholds = context.config.thresholds
+
+        # The reference qualifies an opposed pair twice: first on how far
+        # apart the two planes stand (centroid to centroid along the normal),
+        # and only then on the measured gap. A pair that fails the first --
+        # neither thin nor thin by aspect at its plane separation -- is never
+        # measured. A drafted rib is the case: 2.5 mm between its planes,
+        # 1.5 mm at its tip, and a rib, so the aspect path is closed to it.
+        separation = getattr(self, "_separations", {}).get(
+            (first.face_id, second.face_id)
+        )
+        if separation is not None and not self._qualifies(
+            context, first, second, separation, target, in_rib
+        ):
+            return None
 
         if thickness <= limit:
             return (
@@ -445,6 +573,24 @@ class ThinWallCheck(MachiningCheck):
             "chatter marks and bow even though the thickness itself is acceptable.",
         )
 
+    def _qualifies(
+        self, context, first, second, thickness: float, target: float, in_rib: bool
+    ) -> bool:
+        """Thin outright, or thin by aspect, at this thickness."""
+        if thickness <= target:
+            return True
+        thresholds = context.config.thresholds
+        if in_rib or thickness > thresholds.thin_wall_aspect_max_thickness_mm:
+            return False
+        span, height = self._in_plane_extents(first, second)
+        if span / thickness < thresholds.thin_wall_aspect_warn:
+            return False
+        if height < thickness:
+            return False
+        return not (
+            _faces_the_lathe(context, first) and _faces_the_lathe(context, second)
+        )
+
     @staticmethod
     def _in_plane_extents(first: AagNode, second: AagNode) -> tuple[float, float]:
         """How far a wall runs, and how tall it stands.
@@ -477,96 +623,6 @@ class ThinWallCheck(MachiningCheck):
             lengths.append(max(in_plane))
             heights.append(min(in_plane))
         return (min(lengths), min(heights))
-
-    @staticmethod
-    def _grade_converging(
-        thickness: float, target: float, limit: float
-    ) -> tuple[Severity, float, str]:
-        """A wedge of material, measured where it is thinnest."""
-        if thickness <= limit:
-            return (
-                Severity.ERROR,
-                limit,
-                f"These two faces close to {thickness:.2f} mm apart at their "
-                f"nearest, under the {limit:.2f} mm floor. The wall between "
-                "them tapers to nothing and will break out as the second face "
-                "is cut.",
-            )
-        return (
-            Severity.WARNING,
-            target,
-            f"These two faces converge to {thickness:.2f} mm apart, below the "
-            f"{target:.2f} mm target. The wall is thinnest where they meet and "
-            "will deflect there first; cut it last and lightly.",
-        )
-
-    # -- grading ------------------------------------------------------------
-
-    def _grade(
-        self,
-        context: MachiningContext,
-        first: AagNode,
-        second: AagNode,
-        thickness: float,
-        target: float,
-        limit: float,
-        in_rib: bool = False,
-    ) -> Optional[tuple[Severity, float, str]]:
-        thresholds = context.config.thresholds
-
-        if thickness <= limit:
-            return (
-                Severity.ERROR,
-                limit,
-                f"Only {thickness:.2f} mm of material is left between these two "
-                f"faces, under the {limit:.2f} mm floor. A wall this thin will "
-                "deflect away from the cutter and is likely to distort or break "
-                "out during machining.",
-            )
-
-        if thickness <= target:
-            return (
-                Severity.WARNING,
-                target,
-                f"The wall between these faces is {thickness:.2f} mm, below the "
-                f"{target:.2f} mm target. Expect deflection and chatter; it will "
-                "need light finishing passes and may not hold flatness.",
-            )
-
-        # The broad-and-thin path. Both the span and the thickness have to
-        # qualify, or every large flat face on a normal part would fire.
-        #
-        # A rib is excluded here and only here. Being long and thin is what a
-        # rib is for, and `rib_height_aspect` says so already -- but a rib
-        # thin enough to fail on the measurement alone is still a wall that
-        # will deflect away from the cutter, and the ribfield's 1.2 mm webs
-        # are exactly that. Muting the pair outright lost all three of them.
-        if in_rib:
-            return None
-        if thickness > thresholds.thin_wall_aspect_max_thickness_mm:
-            return None
-
-        span, height = self._in_plane_extents(first, second)
-        if span <= 0.0:
-            return None
-        aspect = span / thickness
-        if aspect < thresholds.thin_wall_aspect_warn:
-            return None
-        # And the wall has to be taller than it is thick. A section shorter
-        # than its own thickness is a stubby ridge standing on the base that
-        # supports it -- the side of a shallow groove -- and how far it runs
-        # is beside the point, because it is not going anywhere.
-        if height < thickness:
-            return None
-
-        return (
-            Severity.WARNING,
-            target,
-            f"This wall is {thickness:.2f} mm thick but {span:.0f} mm across, an "
-            f"aspect ratio of {aspect:.0f}:1. Thin broad sections drum under the "
-            "cutter and relieve residual stress as material comes off, so expect "
-            "chatter marks and bow even though the thickness itself is acceptable.",
-        )
 
     @staticmethod
     def _in_plane_span(first: AagNode, second: AagNode) -> float:
@@ -638,7 +694,18 @@ class ThinWallCheck(MachiningCheck):
                 for edge in context.graph.edges_of(bore.face_id)
             }
 
+            # A wall is material between two cuts. Faces of the same cut
+            # meet, so their separation is zero by construction and means
+            # nothing: a loop gland's corner radii are tangent to its own
+            # straight walls, and measuring one against the other reported
+            # zero-thickness walls of the gland against itself. Two
+            # different features meeting tangentially is a real knife edge
+            # and still measures.
+            own_faces = set(hole.faces)
+
             for plane in planes:
+                if plane.face_id in own_faces:
+                    continue
                 if plane.face_id in fragments or plane.face_id in shoulders:
                     continue
                 # A face the bore breaks into is the face it was drilled
@@ -763,27 +830,30 @@ class ThinWallCheck(MachiningCheck):
         normal = plane.outward_normal
         if normal is None:
             return None
-        span = self._axis_to_plane(bores[0], axis, plane, normal)
+        span = self._axis_to_plane(bores[0], axis, plane, normal, context.shape)
         if span is None:
             return None
         thickness = span - radius
-        return thickness if thickness > _BORE_DEGENERATE_MM else None
+        # A zero wall is the worst wall, not the absence of one. Clearly
+        # negative means the bore has broken through the face: an
+        # intersection, which the hole-intersection rules own. But within
+        # the tolerance of zero the bore runs tangent to the face and the
+        # wall thins to a knife edge, the most severe case this rule has
+        # (a 0.5 mm wall was an error while a 0.0 mm wall was silence).
+        if thickness < -_BORE_DEGENERATE_MM:
+            return None
+        if thickness < _BORE_DEGENERATE_MM:
+            return 0.0
+        return thickness
 
     @staticmethod
-    def _axis_to_plane(bore, axis, plane, normal) -> Optional[float]:
+    def _axis_to_plane(bore, axis, plane, normal, shape=None) -> Optional[float]:
         """The nearest approach of a bore's axis segment to a plane."""
         if bore.bbox.IsVoid():
             return None
-        xmin, ymin, zmin, xmax, ymax, zmax = bore.bbox.Get()
         origin = axis.Location()
         direction = gp_Vec(axis.Direction())
-        low, high = math.inf, -math.inf
-        for x in (xmin, xmax):
-            for y in (ymin, ymax):
-                for z in (zmin, zmax):
-                    along = gp_Vec(origin, gp_Pnt(x, y, z)).Dot(direction)
-                    low = min(low, along)
-                    high = max(high, along)
+        low, high = _axis_band(bore, origin, axis.Direction(), shape)
         if low is math.inf:
             return None
 
@@ -936,7 +1006,7 @@ class ThinWallCheck(MachiningCheck):
 
     def _axes_merge(self, first, second) -> bool:
         """Whether two bores have run into each other."""
-        distance = self._axis_gap(first, second)
+        distance = self._axis_gap(first, second, getattr(self, "_shape", None))
         if distance is None:
             return False
         return distance <= (first.cyl_radius + second.cyl_radius) * _WEB_MERGE_SLACK
@@ -976,7 +1046,7 @@ class ThinWallCheck(MachiningCheck):
         return measured if measured >= _BORE_DEGENERATE_MM else None
 
     @staticmethod
-    def _axis_gap(first, second) -> Optional[float]:
+    def _axis_gap(first, second, shape=None) -> Optional[float]:
         """The closest approach of two bores' axis segments.
 
         Segment to segment rather than line to line: two holes drilled from
@@ -987,16 +1057,9 @@ class ThinWallCheck(MachiningCheck):
         for node in (first, second):
             if node.bbox.IsVoid() or node.cyl_cone_axis is None:
                 return None
-            xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
             anchor = node.cyl_cone_axis.Location()
             direction = gp_Vec(node.cyl_cone_axis.Direction())
-            low, high = math.inf, -math.inf
-            for x in (xmin, xmax):
-                for y in (ymin, ymax):
-                    for z in (zmin, zmax):
-                        along = gp_Vec(anchor, gp_Pnt(x, y, z)).Dot(direction)
-                        low = min(low, along)
-                        high = max(high, along)
+            low, high = _axis_band(node, anchor, node.cyl_cone_axis.Direction(), shape)
             segments.append((gp_Vec(anchor.XYZ()), direction, low, high))
 
         (origin_a, dir_a, low_a, high_a) = segments[0]
@@ -1096,6 +1159,102 @@ class ThinWallCheck(MachiningCheck):
 
                 yield first, second, thickness
 
+    def _freeform_pairs(
+        self, context: MachiningContext, target: float
+    ) -> Iterator[tuple[AagNode, AagNode, float]]:
+        """Yield walls with a freeform face on one side, and how thin they are.
+
+        A freeform face (B-spline, revolved, extruded, other) never enters the
+        planar passes, so a web under a styled top was invisible: the 0.7 mm
+        between a sculpted lid and the pocket floor below it. Each freeform
+        face is paired with every plane and every other freeform face, and
+        the thickness is the exact closest approach.
+
+        No size gate on the freeform side: a styled top is one big face, often
+        a quarter of the part, and it is exactly the surface that bounds the
+        thin web. The partner keeps the planar passes' exterior-face gate.
+
+        Material between, not air: both outward normals must point away from
+        the other face. Two walls of one channel face each other across the
+        void and are skipped; the web between two channels is not. A freeform
+        face's orientation is its normal at mid-UV -- rough on a wavy face,
+        good enough for the loose opposition gate.
+        """
+        nodes = context.graph.nodes
+        freeform = [node for node in nodes if node.surface_type.is_freeform]
+        if not freeform:
+            return
+        planes = [node for node in nodes if node.surface_type is SurfaceType.PLANE]
+        total_area = sum(node.area for node in nodes)
+
+        normals: dict[int, Optional[gp_Dir]] = {}
+
+        def mid_normal(node: AagNode) -> Optional[gp_Dir]:
+            if node.face_id not in normals:
+                normals[node.face_id] = self._mid_outward_normal(context, node)
+            return normals[node.face_id]
+
+        for ff in freeform:
+            n_ff = mid_normal(ff)
+            if n_ff is None:
+                continue
+            partners: list[tuple[AagNode, gp_Dir]] = [
+                (plane, plane.outward_normal)
+                for plane in planes
+                if plane.outward_normal is not None
+            ]
+            for other in freeform:
+                if other is ff:
+                    continue
+                n_other = mid_normal(other)
+                if n_other is not None:
+                    partners.append((other, n_other))
+
+            for partner, n_p in partners:
+                if partner.area > total_area * _EXTERIOR_AREA_FRACTION:
+                    continue
+                # A corner, not a wall.
+                if self._share_an_edge(context, ff, partner):
+                    continue
+                if n_ff.Dot(n_p) > _FREEFORM_OPPOSED_DOT_MAX:
+                    continue
+                # Each normal points away from the other face: material
+                # between them, not a shared void.
+                towards = gp_Vec(ff.centroid, partner.centroid)
+                if towards.Magnitude() < 1e-9:
+                    continue
+                if towards.Dot(gp_Vec(n_ff.XYZ())) > 0.0:
+                    continue
+                if towards.Dot(gp_Vec(n_p.XYZ())) < 0.0:
+                    continue
+                thickness = self._measured_distance(context, ff, partner)
+                if thickness is None:
+                    continue
+                if thickness < _TOUCHING_MM or thickness > target:
+                    continue
+                yield ff, partner, thickness
+
+    def _mid_outward_normal(
+        self, context: MachiningContext, node: AagNode
+    ) -> Optional[gp_Dir]:
+        """A face's normal at the middle of its UV range, out of material."""
+        face = self._face_of(context, node.face_id)
+        if face is None:
+            return None
+        try:
+            adaptor = BRepAdaptor_Surface(face)  # named: SLProps holds a ref
+            u = 0.5 * (adaptor.FirstUParameter() + adaptor.LastUParameter())
+            v = 0.5 * (adaptor.FirstVParameter() + adaptor.LastVParameter())
+            props = BRepLProp_SLProps(adaptor, u, v, 1, 1e-7)
+            if not props.IsNormalDefined():
+                return None
+            normal = gp_Dir(props.Normal().XYZ())
+        except Exception:
+            return None
+        if node.is_reversed:
+            normal.Reverse()
+        return normal
+
     @staticmethod
     def _share_an_edge(context, first, second) -> bool:
         return any(
@@ -1105,20 +1264,27 @@ class ThinWallCheck(MachiningCheck):
 
     @staticmethod
     def _meet_through_a_blend(context, first, second, blends: set[int]) -> bool:
-        """Whether the two faces are joined by a fillet or chamfer between them."""
-        if not blends:
-            return False
-        near_first = {
-            edge.other_face(first.face_id)
-            for edge in context.graph.edges_of(first.face_id)
-        } & blends
-        if not near_first:
-            return False
+        """Whether the two faces are joined through a rounded or bevelled face.
+
+        A recognized fillet or chamfer, or any cylinder or torus at all: the
+        blend recognizer declines some small fillets, and the raw cylinder
+        still pinches the measured distance down to the blend's own size.
+        """
         near_second = {
             edge.other_face(second.face_id)
             for edge in context.graph.edges_of(second.face_id)
-        } & blends
-        return bool(near_first & near_second)
+        }
+        for edge in context.graph.edges_of(first.face_id):
+            between = edge.other_face(first.face_id)
+            if between not in near_second or not context.graph.has_node(between):
+                continue
+            node = context.graph.node(between)
+            if (
+                node.surface_type in (SurfaceType.CYLINDER, SurfaceType.TORUS)
+                or between in blends
+            ):
+                return True
+        return False
 
     @staticmethod
     def _face_each_other(start: gp_Pnt, end: gp_Pnt, normal_a, normal_b) -> bool:
@@ -1238,14 +1404,20 @@ class ThinWallCheck(MachiningCheck):
                     continue
 
                 separation = abs(along)
+                # Coincident planes, or a boolean sliver between them: not a
+                # wall. Both the centroid separation and the measured gap are
+                # held to the same hundredth, as the reference does.
+                if separation < _TOUCHING_MM:
+                    continue
                 if separation > ceiling * 2.0:
                     continue  # far too thick to be interesting; skip the solver
                 if not self._overlaps_in_plane(first, second, normal_a):
                     continue
 
                 thickness = self._measured_distance(context, first, second)
-                if thickness is None or thickness <= 1e-6 or thickness > ceiling:
+                if thickness is None or thickness < _TOUCHING_MM or thickness > ceiling:
                     continue
+                self._separations[(first.face_id, second.face_id)] = separation
                 yield (first, second, thickness)
 
     @staticmethod

@@ -36,6 +36,7 @@ from __future__ import annotations
 import math
 from typing import Optional, Sequence
 
+from OCP.Bnd import Bnd_Box
 from OCP.BRep import BRep_Tool
 from OCP.BRepTools import BRepTools
 from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
@@ -198,7 +199,10 @@ class SheetFormedRecognizer(FeatureRecognizer):
         # that says it is a fold rather than a hood. The machining passes'
         # claims say nothing: their reading of an emboss as a boss over a
         # pocket is exactly what this pass exists to overrule.
-        folded = _sheet_claimed(prior)
+        # Plus whatever the pipeline hands in: on a sheet part that is
+        # formed_claimed_faces(), which adds the MARKING_TEXT faces --
+        # engraving is not forming (see that function).
+        folded = _sheet_claimed(prior) | set(claimed or ())
         taken = set(folded)
         faces = _FaceCache(shape)
 
@@ -255,6 +259,7 @@ class SheetFormedRecognizer(FeatureRecognizer):
                 continue
 
             hood = _merge_hoods(graph, patch, host, up, gauge, faces)
+            _add_skin_walk(graph, hood, patch, host, up, gauge, taken, faces)
             if not hood.grounded:
                 continue
 
@@ -354,6 +359,7 @@ class SheetFormedRecognizer(FeatureRecognizer):
                 continue
 
             hood = _scan_hood(graph, crest, host, up, gauge, faces)
+            _add_skin_walk(graph, hood, (crest,), host, up, gauge, taken, faces, (skin,))
             if not hood.grounded:
                 continue
             found.append(
@@ -439,6 +445,7 @@ class SheetFormedRecognizer(FeatureRecognizer):
                 continue
 
             hood = _merge_hoods(graph, patch, host, up, gauge, faces)
+            _add_skin_walk(graph, hood, patch, host, up, gauge, taken, faces)
             if not hood.grounded:
                 continue
             found.append(
@@ -519,6 +526,7 @@ class SheetFormedRecognizer(FeatureRecognizer):
                 continue
 
             hood = _scan_hood(graph, crest, host, up, gauge, faces)
+            _add_skin_walk(graph, hood, (crest,), host, up, gauge, taken, faces, (skin,))
             if not hood.grounded:
                 continue
             found.append(
@@ -576,6 +584,23 @@ class SheetFormedRecognizer(FeatureRecognizer):
                 faces.append(fragment_skin.face_id)
                 taken.add(fragment_skin.face_id)
 
+        # The rest of the punched void. A form's cavity is one connected
+        # region -- the punch displaced it in one stroke -- but a non-convex
+        # outline splits its ceiling into fragments more than one hop from the
+        # seed skin. On sm_formed_shapes' cross emboss the leftovers came back
+        # from the machining recognizers as a POCKET and a SLOT, though their
+        # ceilings sit exactly one gauge under the crest. So flood the
+        # remainder, bounded by the footprint the feature already occupies,
+        # frozen before the walk so the flood cannot grow its own boundary.
+        # A genuinely milled pocket elsewhere on the sheet is not connected
+        # to this void at all.
+        #
+        # Closed forms only. A sheared hood has no enclosed void, and flooding
+        # one absorbs the hinge metal tucked under the deck, widening each
+        # hood's footprint and skewing sheet_formed_pitch.
+        if hood.open_strips == 0:
+            _flood_cavity(graph, faces, taken, crest.area)
+
         dims = sorted(crest.bbox_dims())
         return FeatureInstance(
             instance_id=self.instance_id(index),
@@ -594,6 +619,52 @@ class SheetFormedRecognizer(FeatureRecognizer):
                 ],
             },
         )
+
+
+def _flood_cavity(
+    graph: AttributedAdjacencyGraph,
+    faces: list[int],
+    taken: set[int],
+    crest_area: float,
+) -> None:
+    """Claim every small face connected to ``faces`` inside their footprint."""
+    foot = Bnd_Box()
+    for face_id in faces:
+        if graph.has_node(face_id):
+            foot.Add(graph.node(face_id).bbox)
+    if foot.IsVoid():
+        return
+    # Enlarge widens the gap to at least this tolerance; the footprint is
+    # frozen, so one grown copy serves the whole walk.
+    foot.Enlarge(0.05)
+
+    def inside(box: Bnd_Box) -> bool:
+        if box.IsVoid():
+            return False
+        xn, yn, zn, xx, yx, zx = box.Get()
+        return (
+            not foot.IsOut(gp_Pnt(xn, yn, zn))
+            and not foot.IsOut(gp_Pnt(xx, yx, zx))
+            and not foot.IsOut(gp_Pnt(xn, yx, zx))
+            and not foot.IsOut(gp_Pnt(xx, yn, zn))
+        )
+
+    queue = list(faces)
+    while queue:
+        current = queue.pop()
+        if not graph.has_node(current):
+            continue
+        for neighbour_id in graph.neighbors_of(current):
+            if not graph.has_node(neighbour_id) or neighbour_id in taken:
+                continue
+            neighbour = graph.node(neighbour_id)
+            if neighbour.area > crest_area * _RECESS_NEIGHBOUR_AREA_MULTIPLE:
+                continue  # panels are big
+            if not inside(neighbour.bbox):
+                continue
+            faces.append(neighbour_id)
+            taken.add(neighbour_id)
+            queue.append(neighbour_id)
 
 
 # =============================================================================
@@ -665,8 +736,14 @@ def _scan_hood(
             and abs(strip_out.Dot(crest_out)) < _STRIP_PERPENDICULAR_MAX_DOT
             and _is_gauge_thin_strip(neighbour, gauge)
         ):
+            # A sheared strip is still a wall of the hood, so it goes on to
+            # the grounding walk below rather than skipping it. A radiused
+            # lance reaches its deck through crown arc, ramp and root arc --
+            # four hops, out of this walk's reach -- while its shear face
+            # runs from the crest straight down to the panel in one. Nothing
+            # loosens: the grounding test asks a shear face exactly what it
+            # asks a vertical wall.
             scan.open_strips += 1
-            continue
 
         # Grounding: the wall touches the host plane. Any coplanar fragment
         # will do -- fuse seams split panels.
@@ -712,6 +789,156 @@ def _merge_hoods(
             seen.add(member.face_id)
             merged.cluster.append(member)
     return merged
+
+
+# The bounded descent down a hood's skin. A radiused form reaches its deck
+# through crown arc, ramp and root arc -- out of the one-hop scan's reach -- so
+# a radiused lance owned 8 of its 32 faces. Raising the hop count is not the
+# fix: unconstrained expansion reaches the panel from almost anywhere on a
+# small part and grounding turns vacuous. The walk is a DESCENT, each hop held
+# by four gates: it crosses a TANGENT junction (formed metal is G1, a cut or a
+# milled wall is not), lands on metal with its own constant-gauge skin
+# partner, lands STRICTLY LOWER, and still reaches the deck. A face coplanar
+# with the host is the TERMINAL, checked first: it grounds the walk and is
+# never stepped onto, so no route leaves the form.
+
+#: Backstop only; strict descent is the real bound (the corpus's deepest
+#: chain is crest, crown arc, ramp, root arc).
+_MAX_SKIN_HOPS = 8
+#: How much lower each step must be. Set by the smallest real step in the
+#: corpus: a lance's outer root arc clipped by the deck to a 0.053 mm sliver,
+#: which 0.10 rejected.
+_SKIN_DESCENT_MIN_MM = 0.01
+#: How far below the host plane a face may still reach up from.
+_DECK_SLACK_MM = 0.10
+
+
+def _height_max(node: AagNode, host: AagNode, up: gp_Dir) -> float:
+    return _bbox_reach(node, host.centroid, up)
+
+
+def _height_min(node: AagNode, host: AagNode, up: gp_Dir) -> float:
+    return -_bbox_reach(node, host.centroid, up.Reversed())
+
+
+def _is_panel_face(node: AagNode, host: AagNode, up: gp_Dir) -> bool:
+    """A plane carrying the host's outward direction at the host's offset."""
+    if node.surface_type is not SurfaceType.PLANE:
+        return False
+    normal = node.outward_normal
+    if normal is None or normal.Dot(up) < _COPLANAR_MIN_DOT:
+        return False
+    return _on_the_host_plane(host, node, up)
+
+
+def _dominant_edge(graph: AttributedAdjacencyGraph, a: int, b: int):
+    """The junction of two faces read as one edge: the longest they share."""
+    best = None
+    for edge in graph.edges_of(a):
+        if edge.other_face(a) != b:
+            continue
+        if best is None or edge.shared_edge_length > best.shared_edge_length:
+            best = edge
+    return best
+
+
+def _walk_skin(
+    graph: AttributedAdjacencyGraph,
+    seed: AagNode,
+    host: AagNode,
+    up: gp_Dir,
+    gauge: float,
+    off_limits: set[int],
+    already: set[int],
+    faces: "_FaceCache",
+    may_ground: bool,
+) -> tuple[list[AagNode], bool]:
+    walked: list[AagNode] = []
+    reached_panel = False
+    seen = {seed.face_id}
+    front = [(seed, _height_min(seed, host, up), 0)]
+    while front:
+        current, current_low, hops = front.pop()
+        if hops >= _MAX_SKIN_HOPS:
+            continue
+        for neighbour_id in graph.neighbors_of(current.face_id):
+            if not graph.has_node(neighbour_id):
+                continue
+            neighbour = graph.node(neighbour_id)
+            # Terminal first: the deck grounds the hood and is never entered.
+            if _is_panel_face(neighbour, host, up):
+                if may_ground:
+                    reached_panel = True
+                continue
+            if neighbour_id == host.face_id or neighbour_id in seen:
+                continue
+            if neighbour_id in off_limits:
+                continue  # another feature's metal
+            low = _height_min(neighbour, host, up)
+            if low > current_low - _SKIN_DESCENT_MIN_MM:
+                continue  # not descending
+            if _height_max(neighbour, host, up) < -_DECK_SLACK_MM:
+                continue  # entirely below the deck
+            edge = _dominant_edge(graph, current.face_id, neighbour_id)
+            if edge is None or not edge.is_tangent:
+                continue
+            if _gauge_skin_partner(graph, neighbour, gauge, faces) is None:
+                continue
+            seen.add(neighbour_id)
+            if neighbour_id not in already:
+                walked.append(neighbour)
+            front.append((neighbour, low, hops + 1))
+    return walked, reached_panel
+
+
+def _add_skin_walk(
+    graph: AttributedAdjacencyGraph,
+    hood: "_HoodScan",
+    crest_patch: Sequence[AagNode],
+    host: AagNode,
+    up: gp_Dir,
+    gauge: float,
+    claimed: set[int],
+    faces: "_FaceCache",
+    skins: Optional[Sequence[AagNode]] = None,
+) -> None:
+    """Merge the bounded descent into a hood scan.
+
+    Two seeds and only one grounds: the descent runs from the crest and from
+    its back-side partner, since one stroke displaced both skins, but whether
+    the hood reaches back to its panel is asked of the outer skin alone. The
+    inner walk only extends what the feature claims. Crest fragments and their
+    skins stay out of the cluster (the emit claims those itself) but remain
+    traversable.
+    """
+    if skins is None:
+        skins = [
+            partner
+            for partner in (
+                _gauge_skin_partner(graph, fragment, gauge) for fragment in crest_patch
+            )
+            if partner is not None
+        ]
+    have = {member.face_id for member in hood.cluster}
+    have.update(fragment.face_id for fragment in crest_patch)
+    have.update(skin.face_id for skin in skins)
+    frozen = set(have)
+
+    def absorb(walked: list[AagNode]) -> None:
+        for node in walked:
+            if node.face_id not in have:
+                have.add(node.face_id)
+                hood.cluster.append(node)
+
+    for fragment in crest_patch:
+        walked, reached = _walk_skin(
+            graph, fragment, host, up, gauge, claimed, frozen, faces, True
+        )
+        hood.grounded = hood.grounded or reached
+        absorb(walked)
+    for skin in skins:
+        walked, _ = _walk_skin(graph, skin, host, up, gauge, claimed, frozen, faces, False)
+        absorb(walked)
 
 
 def _on_the_host_plane(host: AagNode, node: AagNode, up: gp_Dir) -> bool:
@@ -1030,6 +1257,62 @@ def _sampled_skin_partner(
 # =============================================================================
 # Geometry helpers
 # =============================================================================
+
+
+def _is_profile_wall_marking(feature, graph: AttributedAdjacencyGraph, gauge: float) -> bool:
+    """A MARKING_TEXT with at least one face on the blank's own sheared profile."""
+    from .sheet_outline_recognizer import is_sheet_profile_edge
+
+    if feature.type != FeatureType.MARKING_TEXT:
+        return False
+    return any(is_sheet_profile_edge(graph, face_id, gauge) for face_id in feature.faces)
+
+
+def drop_profile_wall_marking(
+    features: list, graph: AttributedAdjacencyGraph, gauge: float
+) -> list:
+    """Drop the MARKING_TEXT that is a row of cutout walls read from the side.
+
+    Run at the top of the sheet stage, before the formed pass is handed its
+    claimed set. It used to run at the end, so a marking this was going to
+    delete still vetoed every formed hood whose shear lip it had swallowed:
+    sm_e_chassis lost all five louvers that way, invisibly, because the
+    marking was gone by the time anything was reported. sm_hd_bracket's
+    "three glyphs" -- two obround cutout walls and a sliver, coplanar and
+    evenly spaced -- are the case it was written for.
+    """
+    if gauge <= 0.0:
+        return features
+    return [f for f in features if not _is_profile_wall_marking(f, graph, gauge)]
+
+
+def formed_claimed_faces(
+    features: Sequence[FeatureInstance], graph: AttributedAdjacencyGraph, gauge: float
+) -> set[int]:
+    """The faces the formed pass must treat as already spoken for.
+
+    BEND, TAB, NOTCH and MARKING_TEXT, minus any marking on a sheared profile
+    wall. ENGRAVING IS NOT FORMING: a formed feature displaces the skin and
+    the back carries its mirror, engraving removes material from one side.
+    From the front they look alike -- an engraved logo came back as a louver
+    and an emboss many gauges tall -- and the marking pass, which outranks
+    everything, ran in the earlier phase where the resolver never arbitrates
+    against this one. Built here and not inline at the call site so that the
+    profile-wall exclusion cannot be lost by reordering the pipeline.
+    """
+    out: set[int] = set()
+    for feature in features:
+        if feature.type not in (
+            FeatureType.BEND,
+            FeatureType.TAB,
+            FeatureType.NOTCH,
+            FeatureType.MARKING_TEXT,
+        ):
+            continue
+        if _is_profile_wall_marking(feature, graph, gauge):
+            continue
+        out.update(feature.faces)
+    return out
 
 
 def _sheet_claimed(prior: Optional[Sequence[FeatureInstance]]) -> set[int]:

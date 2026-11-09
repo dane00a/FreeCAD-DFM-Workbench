@@ -143,6 +143,45 @@ def plain_tap_drill_hole(radius=3.4) -> TopoDS_Shape:
     )
 
 
+def spline_seamed_tap_drill_hole(radius=3.4) -> TopoDS_Shape:
+    """A 6.8 mm through bore whose seam edge is a spline, not a line.
+
+    That is the signature the reference reads as a modelled thread: two or
+    more spline edges on the bore wall (the seam is visited once per side),
+    running through its interior, at least 80% of the circumference long in
+    total. STEP files from some systems write every edge as a spline, which
+    is how nist_ctc_05's ten tapped holes come to be read as threaded.
+    """
+    from OCP.BRep import BRep_Builder, BRep_Tool
+    from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+    from OCP.Geom import Geom_TrimmedCurve
+    from OCP.GeomAbs import GeomAbs_Cylinder
+    from OCP.GeomConvert import GeomConvert
+    from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
+    from OCP.TopExp import TopExp_Explorer
+    from OCP.TopoDS import TopoDS
+
+    shape = plain_tap_drill_hole(radius)
+    faces = TopExp_Explorer(shape, TopAbs_FACE)
+    while faces.More():
+        face = TopoDS.Face_s(faces.Current())
+        faces.Next()
+        if BRepAdaptor_Surface(face).GetType() != GeomAbs_Cylinder:
+            continue
+        edges = TopExp_Explorer(face, TopAbs_EDGE)
+        while edges.More():
+            edge = TopoDS.Edge_s(edges.Current())
+            edges.Next()
+            if not BRep_Tool.IsClosed_s(edge, face):
+                continue
+            adaptor = BRepAdaptor_Curve(edge)
+            first, last = adaptor.FirstParameter(), adaptor.LastParameter()
+            line = BRep_Tool.Curve_s(edge, 0.0, 0.0)
+            spline = GeomConvert.CurveToBSplineCurve_s(Geom_TrimmedCurve(line, first, last))
+            BRep_Builder().UpdateEdge(edge, spline, 1e-7)
+    return shape
+
+
 def holes_in(shape, hole_type):
     context = list(
         MachiningAnalyzer()
@@ -269,31 +308,41 @@ class TestExternalThreadRecognition(unittest.TestCase):
 class TestTappedHoles(unittest.TestCase):
     """Internal threads, which are promoted from bores by the hole pass."""
 
-    def test_a_modelled_tapped_hole_is_promoted(self):
-        found = holes_in(tapped_blind_hole(), FeatureType.THREADED_HOLE)
+    # The reference's geometric test reads a bore's own spline edges, not a
+    # helix found anywhere on the part (its HoleRecognizer::try_thread,
+    # Check 1). These replace the helix-search tests that stood here.
+
+    def test_spline_edges_on_the_bore_promote_it(self):
+        found = holes_in(spline_seamed_tap_drill_hole(), FeatureType.THREADED_HOLE)
         self.assertEqual(len(found), 1)
 
     def test_the_tap_drill_names_the_thread(self):
-        # The bore diameter is the tap drill by definition, so once a helix
-        # has confirmed a thread the table can name it.
-        thread = holes_in(tapped_blind_hole(), FeatureType.THREADED_HOLE)[0]
+        # The bore diameter is the tap drill by definition, so once the
+        # edges have confirmed a thread the table can name it.
+        thread = holes_in(spline_seamed_tap_drill_hole(), FeatureType.THREADED_HOLE)[0]
         self.assertEqual(thread.param("thread_designation"), "M8x1.25")
         self.assertAlmostEqual(thread.number("diameter_mm"), 6.8, places=2)
 
-    def test_the_tapped_length_is_measured_not_assumed(self):
-        # Worst-casing to the full hole depth would fire the run-out rule on
-        # every part that took the trouble to model its thread.
-        thread = holes_in(tapped_blind_hole(), FeatureType.THREADED_HOLE)[0]
-        depth = thread.number("thread_depth_mm")
-        self.assertIsNotNone(depth)
-        self.assertLess(depth, thread.number("depth_mm"))
+    def test_the_tapped_length_is_the_reach_of_the_advancing_edges(self):
+        # The seam runs the bore's whole length, so that is the tapped length.
+        thread = holes_in(spline_seamed_tap_drill_hole(), FeatureType.THREADED_HOLE)[0]
+        self.assertAlmostEqual(thread.number("thread_depth_mm"), 30.0, places=3)
 
     def test_the_evidence_is_recorded(self):
         self.assertEqual(
-            holes_in(tapped_blind_hole(), FeatureType.THREADED_HOLE)[0].param(
+            holes_in(spline_seamed_tap_drill_hole(), FeatureType.THREADED_HOLE)[0].param(
                 "thread_evidence"
             ),
             "modelled_helix",
+        )
+
+    def test_a_swept_helix_that_splits_the_bore_is_refused(self):
+        # Cutting a swept thread splits the bore into coaxial cylinder
+        # fragments, each touching the next. The reference refuses any bore
+        # whose wall touches another cylinder (the cross-bore guard), so this
+        # model reads as a plain bore there and must here too.
+        self.assertEqual(
+            holes_in(tapped_blind_hole(), FeatureType.THREADED_HOLE), []
         )
 
     def test_a_bare_tap_drill_hole_is_not_tapped(self):

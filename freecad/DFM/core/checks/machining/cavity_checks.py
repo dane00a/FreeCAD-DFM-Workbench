@@ -130,8 +130,12 @@ class PocketCornerRadiusCheck(MachiningCheck):
                 face_id in unreachable for face_id in cavity.faces
             ):
                 continue
-            # Absent means the recognizer found no fillet at all, which is a
-            # square corner. Present and zero means the same thing measured.
+            # Absent means the recognizer found no internal vertical corner
+            # to measure -- a slot cut by the slit pass, or a relief whose
+            # only corners are external -- and there is nothing to say, as
+            # the reference skips it. Present and zero is a square corner.
+            if cavity.param("corner_radius_mm") is None:
+                continue
             radius = cavity.number("corner_radius_mm", 0.0) or 0.0
             if radius > limit:
                 continue
@@ -175,6 +179,10 @@ class PocketCornerRadiusCheck(MachiningCheck):
                     limit=limit,
                     comparison="<",
                     unit="mm",
+                    # As the reference files it: a slot's square corner is a
+                    # slot finding, a pocket's (or cut-through cavity's) a
+                    # pocket one.
+                    category="slot" if cavity.type == FeatureType.SLOT else "",
                 )
             )
         return results

@@ -4,21 +4,23 @@
 
 """Tests for the tapped-hole rules.
 
-Every fixture here carries a real modelled helix, because that is the only
-way a thread reaches these rules: the workbench refuses to infer one from
-diameter alone, so a plain bore at a tap-drill size is a bore and nothing
-more. The tests hold that line -- a drilled block with a 6.8 mm hole in it
-must stay silent under all three rules.
+Every tapped hole here is declared, the way a threaded ``PartDesign::Hole``
+declares it, because a statement is how a thread reaches these rules: the
+workbench refuses to infer one from diameter alone, so a plain bore at a
+tap-drill size is a bore and nothing more. The tests hold that line -- a
+drilled block with a 6.8 mm hole in it must stay silent under all three
+rules.
 
-The geometry is deliberately awkward in one respect worth knowing about. A
-modelled thread cuts the bore into fragments, so the face carrying the thread
-spec no longer touches the surface the hole was drilled through. The shoulder
-rule has to find that surface by position rather than by adjacency, and the
-raised-pad cases below are what pin that down.
+No helix is cut any more. The geometric test is the reference's, which reads
+a bore's own spline edges and refuses a bore that touches another cylinder,
+and a swept thread splits the bore into exactly such touching fragments: it
+would neither promote the bore nor leave it measurable as one hole.
+
 """
 
 import math
 import unittest
+from unittest import mock
 
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
 from OCP.BRepBuilderAPI import (
@@ -45,7 +47,9 @@ from OCP.gp import (
 )
 from OCP.TopoDS import TopoDS_Shape
 
+from freecad.DFM.core.analyzers import machining_analyzer
 from freecad.DFM.core.analyzers.machining_analyzer import MachiningAnalyzer
+from freecad.DFM.core.machining.thread_sources import ThreadDeclaration, ThreadEvidence
 from freecad.DFM.core.models import Severity
 from freecad.DFM.core.processes.process import RuleFeedback, RuleLimit
 from freecad.DFM.core.registries import get_check_class
@@ -97,6 +101,12 @@ def block(x0=-10.0) -> TopoDS_Shape:
     return BRepPrimAPI_MakeBox(gp_Pnt(x0, -10, 0), gp_Pnt(10, 10, 30)).Shape()
 
 
+#: The thread each tapped fixture declares, as the document would declare
+#: it, keyed by the shape it was declared on. The shape is held alongside so
+#: its id cannot be reused by a later, undeclared one.
+_DECLARED: dict = {}
+
+
 def tapped_hole(
     solid: TopoDS_Shape,
     x: float = 0.0,
@@ -106,25 +116,27 @@ def tapped_hole(
 ) -> TopoDS_Shape:
     """An M8 tapped hole entering the underside of a solid.
 
-    The bore starts a millimetre below the block so it opens cleanly, and the
-    thread is a swept helix rather than a drawn one, which is what the hole
-    recognizer needs before it will call the bore tapped at all.
+    The bore starts a millimetre below the block so it opens cleanly. The
+    thread is declared rather than cut: ``turns`` and ``groove`` survive from
+    when a swept helix was cut here, and ``turns`` still sets the tapped
+    length the declaration states.
     """
     bore = BRepPrimAPI_MakeCylinder(
         gp_Ax2(gp_Pnt(x, 0.0, -1.0), gp_Dir(0, 0, 1)), TAP_DRILL_RADIUS, hole_depth
     ).Shape()
-    profile = BRepBuilderAPI_MakePolygon(
-        gp_Pnt(TAP_DRILL_RADIUS - 0.2, 0, 0),
-        gp_Pnt(TAP_DRILL_RADIUS + groove, 0, PITCH * 0.35),
-        gp_Pnt(TAP_DRILL_RADIUS - 0.2, 0, PITCH * 0.7),
-        True,
-    ).Wire()
-    move = gp_Trsf()
-    move.SetTranslation(gp_Vec(x, 0.0, 0.0))
-    thread = BRepBuilderAPI_Transform(
-        _swept_thread(TAP_DRILL_RADIUS, PITCH, turns, profile), move, True
-    ).Shape()
-    return _cut(_cut(solid, bore), thread)
+    shape = _cut(solid, bore)
+    _DECLARED[id(shape)] = shape, (
+        ThreadDeclaration(
+            designation="M8x1.25",
+            nominal_mm=8.0,
+            pitch_mm=PITCH,
+            positions=((x, 0.0, 0.0),),
+            direction=(0.0, 0.0, 1.0),
+            bore_window=(2.0 * TAP_DRILL_RADIUS, 2.0 * TAP_DRILL_RADIUS),
+            depth_mm=turns * PITCH,
+        ),
+    )
+    return shape
 
 
 def plain_drilled_block() -> TopoDS_Shape:
@@ -157,12 +169,23 @@ def counterbored_tapped_hole(outer_diameter: float) -> TopoDS_Shape:
     mouth = BRepPrimAPI_MakeCylinder(
         gp_Ax2(gp_Pnt(0, 0, -1), gp_Dir(0, 0, 1)), outer_diameter / 2.0, 2.0
     ).Shape()
-    return _cut(tapped_hole(block()), mouth)
+    tapped = tapped_hole(block())
+    shape = _cut(tapped, mouth)
+    _DECLARED[id(shape)] = shape, _DECLARED[id(tapped)][1]
+    return shape
 
 
 def analyse(shape, prefs=None):
     face_index, edge_index = FaceIndex(shape), EdgeIndex(shape)
-    return MachiningAnalyzer().execute(shape, face_index, edge_index, prefs=prefs or {})
+    entry = _DECLARED.get(id(shape))
+    declarations = entry[1] if entry is not None and entry[0] is shape else ()
+    evidence = ThreadEvidence(declarations=declarations)
+    with mock.patch.object(
+        machining_analyzer, "thread_evidence_for", lambda *a, **k: evidence
+    ):
+        return MachiningAnalyzer().execute(
+            shape, face_index, edge_index, prefs=prefs or {}
+        )
 
 
 def rule_check(shape, rule, target="N/A", limit="N/A", severity="WARNING"):
@@ -201,25 +224,31 @@ class TestThreadRunout(unittest.TestCase):
 
     def test_a_hole_tapped_almost_to_the_bottom_is_reported(self):
         # Roughly two millimetres of clearance below the last thread against
-        # the 3.1 mm an M8 tap wants.
-        findings = rule_check(tapped_hole(block(), hole_depth=16.0), self.RULE)
+        # the 3.1 mm an M8 tap wants. The depths here were 16 mm while the
+        # bore came back as two holes, the threaded fragments and the plain
+        # length below them; since the seam-half fold (reference d73d5f833)
+        # it is one hole measured whole, so the geometry states the
+        # clearance it means.
+        findings = rule_check(tapped_hole(block(), hole_depth=10.5), self.RULE)
         self.assertEqual(severities(findings), [Severity.WARNING])
         self.assertLess(findings[0].value, findings[0].limit)
 
     def test_the_finding_names_the_thread_and_the_basis(self):
-        message = rule_check(tapped_hole(block(), hole_depth=16.0), self.RULE)[0].message
+        message = rule_check(tapped_hole(block(), hole_depth=10.5), self.RULE)[0].message
         self.assertIn("M8x1.25", message)
         self.assertIn("1.25 mm pitch", message)
 
     def test_a_configured_minimum_raises_the_bar(self):
         # A shop insisting on six millimetres of run-out turns down a hole
-        # the pitch alone would have passed.
-        self.assertTrue(rule_check(tapped_hole(block()), self.RULE, limit="6.0"))
+        # the pitch alone would have passed: about four millimetres here.
+        shape = tapped_hole(block(), hole_depth=12.5)
+        self.assertEqual(rule_check(shape, self.RULE), [])
+        self.assertTrue(rule_check(shape, self.RULE, limit="6.0"))
 
     def test_a_configured_minimum_never_lowers_it(self):
         # One millimetre is less than an M8 tap's lead needs, and setting it
         # does not licence tapping closer than the pitch demands.
-        shape = tapped_hole(block(), hole_depth=16.0)
+        shape = tapped_hole(block(), hole_depth=10.5)
         self.assertTrue(rule_check(shape, self.RULE, limit="1.0"))
 
     def test_a_through_hole_runs_out_into_fresh_air(self):

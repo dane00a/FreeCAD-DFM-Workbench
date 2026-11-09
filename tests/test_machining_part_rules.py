@@ -137,6 +137,27 @@ class TestMinimumFeatureSize(unittest.TestCase):
     def test_an_ordinary_hole_passes(self):
         self.assertEqual(rule_check(drilled_block(), self.RULE), [])
 
+    @staticmethod
+    def grooved_bore(width: float) -> TopoDS_Shape:
+        """A Ø8 bore with a 0.4 mm deep ring groove of the given width."""
+        up = gp_Dir(0, 0, 1)
+        body = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, 0), up), 20.0, 30.0).Shape()
+        body = _cut(body, BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, -0.1), up), 4.0, 30.2).Shape())
+        ring = _cut(
+            BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, 12.0), up), 4.4, width).Shape(),
+            BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, 11.9), up), 4.0, width + 0.2).Shape(),
+        )
+        return _cut(body, ring)
+
+    def test_a_shallow_groove_is_not_a_tool_size_problem(self):
+        # Depth constrains reach, not tool size: a 0.9 mm grooving insert
+        # taking a 0.4 mm cut is routine turning.
+        self.assertEqual(rule_check(self.grooved_bore(0.9), self.RULE), [])
+
+    def test_a_groove_narrower_than_any_tool_still_fires(self):
+        # The control: the same groove 0.3 mm wide needs a 0.3 mm tool.
+        self.assertTrue(rule_check(self.grooved_bore(0.3), self.RULE))
+
 
 class TestSharpInternalEdge(unittest.TestCase):
     RULE = Rulebook.SHARP_INTERNAL_EDGE

@@ -27,6 +27,7 @@ from .draft_recognizer import DraftRecognizer
 from .external_thread_recognizer import ExternalThreadRecognizer
 from .groove_recognizer import GrooveRecognizer
 from .hole_recognizer import HoleRecognizer
+from .knurl_recognizer import KnurlRecognizer
 from .marking_recognizer import MarkingRecognizer
 from .pattern_recognizer import PatternRecognizer
 from .pocket_recognizer import PocketRecognizer
@@ -68,6 +69,10 @@ RECOGNIZER_PIPELINE: list[type[FeatureRecognizer]] = [
     # Late, so it can overrule the per-stroke claims the cavity and
     # protrusion passes made on engraved characters.
     MarkingRecognizer,
+    # After marking, whose faces never seed a knurl, so a real engraved
+    # serial cannot be re-explained as a texture. It retires what the earlier
+    # passes claimed inside its patch before the pattern pass runs.
+    KnurlRecognizer,
     # Last: it groups features the others have already produced.
     PatternRecognizer,
 ]
@@ -103,6 +108,7 @@ __all__ = [
     "FeatureRecognizer",
     "GrooveRecognizer",
     "HoleRecognizer",
+    "KnurlRecognizer",
     "MarkingRecognizer",
     "PatternRecognizer",
     "PocketRecognizer",

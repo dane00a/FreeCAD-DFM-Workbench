@@ -32,14 +32,33 @@ from typing import Optional, Sequence
 from ..aag import AagNode, AttributedAdjacencyGraph, SurfaceType
 from ..features import FeatureInstance, FeatureType
 from ..helix import Helix, candidate_axes, faces_touching, find_helices
-from ..threads import match_major_diameter
+from ..threads import find_by_designation, match_major_diameter
+from ...utils.geometry import FaceIndex
 from .base import FeatureRecognizer, axes_are_coaxial
 
+# Same-radius tolerance for the fragments of one split cylinder.
+_RADIUS_EPS = 1.0e-4
+
+
+def _axial_extent(faces: FaceIndex, face_id: int) -> float:
+    """A cylindrical face's length along its axis: its V parameter range."""
+    from OCP.BRepAdaptor import BRepAdaptor_Surface
+
+    face = faces.face_at(face_id)
+    if face is None or face.IsNull():
+        return 0.0
+    surface = BRepAdaptor_Surface(face, True)
+    return abs(surface.LastVParameter() - surface.FirstVParameter())
 
 
 
 class ExternalThreadRecognizer(FeatureRecognizer):
-    """Finds modelled external threads by their helices."""
+    """External threads a STEP callout names, then modelled ones by their helices.
+
+    The callout channel is the reference's whole recognizer; the helix
+    search is this workbench's own and only speaks for bands no callout
+    already named.
+    """
 
     prefix = "xt"
 
@@ -57,20 +76,112 @@ class ExternalThreadRecognizer(FeatureRecognizer):
         if shape is None:
             return []
 
+        found = self._from_pmi(graph, shape)
+        offset = len(found)
+        stated = {face_id for feature in found for face_id in feature.faces}
+
         axes = candidate_axes(graph)
         if not axes:
-            return []
+            return found
 
         helices = find_helices(shape, axes)
-        if not helices:
+        for index, helix in enumerate(helices):
+            feature = self._to_feature(helix, graph, shape)
+            if feature is None:
+                continue
+            # A band the callout already named is that thread; its helix
+            # says nothing more.
+            if stated.intersection(feature.faces):
+                continue
+            feature.instance_id = self.instance_id(offset + index)
+            found.append(feature)
+        return found
+
+    # -- PMI ------------------------------------------------------------------
+
+    def _from_pmi(self, graph: AttributedAdjacencyGraph, shape) -> list[FeatureInstance]:
+        """External threads a STEP file's thread callouts name.
+
+        The reference's whole recognizer: a callout linked to the outside of
+        a shaft makes that band, with its coaxial same-radius fragments, an
+        external thread. Bores are the hole pass's to thread.
+        """
+        evidence = getattr(self, "thread_evidence", None)
+        pmi = getattr(evidence, "pmi", None) if evidence is not None else None
+        if not pmi:
             return []
 
         found: list[FeatureInstance] = []
-        for index, helix in enumerate(helices):
-            feature = self._to_feature(helix, graph, shape)
-            if feature is not None:
-                feature.instance_id = self.instance_id(index)
-                found.append(feature)
+        claimed: set[int] = set()
+        cylinders = graph.nodes_by_surface_type(SurfaceType.CYLINDER)
+        faces = None
+        for seed in cylinders:
+            if seed.is_internal or seed.face_id in claimed:
+                continue
+            callout = pmi.get(seed.face_id)
+            if callout is None or not callout.designation:
+                continue
+            if seed.cyl_cone_axis is None:
+                continue
+
+            # The seam or a tangent line splits a full cylinder in two.
+            band = [seed]
+            for other in cylinders:
+                if other is seed or other.is_internal or other.face_id in claimed:
+                    continue
+                if other.cyl_cone_axis is None:
+                    continue
+                if abs(other.cyl_radius - seed.cyl_radius) > _RADIUS_EPS:
+                    continue
+                if not axes_are_coaxial(other.cyl_cone_axis, seed.cyl_cone_axis):
+                    continue
+                band.append(other)
+
+            nominal, pitch = callout.nominal_mm, callout.pitch_mm
+            if nominal <= 0.0 or pitch <= 0.0:
+                spec = find_by_designation(callout.designation)
+                if spec is not None:
+                    nominal = nominal if nominal > 0.0 else spec.nominal_mm
+                    pitch = pitch if pitch > 0.0 else spec.pitch_mm
+
+            # A callout names a diameter and the face has to be it. An
+            # external thread's major diameter is nominal less a small
+            # allowance, so a cylinder more than a tenth off nominal is not
+            # the thread described -- nist_ctc_04's M12 callout also lands on
+            # the two halves of a Ø60 pocket wall.
+            major = 2.0 * seed.cyl_radius
+            if nominal > 0.0 and abs(major - nominal) > 0.10 * nominal:
+                continue
+
+            if faces is None:
+                faces = FaceIndex(shape)
+            length = 0.0
+            for node in band:
+                claimed.add(node.face_id)
+                length = max(length, _axial_extent(faces, node.face_id))
+
+            direction = seed.cyl_cone_axis.Direction()
+            parameters: dict = {
+                "axis": (direction.X(), direction.Y(), direction.Z()),
+                "major_diameter_mm": major,
+                "length_mm": length,
+                "thread_designation": callout.designation,
+            }
+            if nominal > 0.0:
+                parameters["thread_nominal_mm"] = nominal
+            if pitch > 0.0:
+                parameters["thread_pitch_mm"] = pitch
+            parameters["thread_evidence"] = (
+                "user_confirmed" if callout.source == "user_confirmed" else "pmi"
+            )
+            found.append(
+                FeatureInstance(
+                    instance_id=self.instance_id(len(found)),
+                    type=FeatureType.EXTERNAL_THREAD,
+                    faces=[node.face_id for node in band],
+                    parameters=parameters,
+                )
+            )
         return found
 
     # -- features -----------------------------------------------------------

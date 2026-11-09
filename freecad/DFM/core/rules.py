@@ -252,7 +252,9 @@ class Rulebook(Enum):
             "Width of a relief groove at the end of a thread, so the tool "
             "has somewhere to run out."
         ),
-        family=RuleFamily.GROOVE,
+        # The reference files it with the thread rules: it is the thread's
+        # run-out that it protects, not the groove.
+        family=RuleFamily.THREAD,
     )
     GROOVE_SQUARE_CORNER = RuleType(
         "Groove Square Corner",
@@ -417,6 +419,15 @@ class Rulebook(Enum):
         description="Material left around a tapped hole.",
         family=RuleFamily.THREAD,
     )
+    THREAD_PMI_GEOMETRY_MISMATCH = RuleType(
+        "Thread PMI Geometry Mismatch",
+        shape=RuleShape.LIMIT_ONLY,
+        unit="mm",
+        comparison="max",
+        field_labels=("At most",),
+        description="A thread callout whose tap drill disagrees with the modelled bore.",
+        family=RuleFamily.THREAD,
+    )
 
     # -- machining: more hole policy ----------------------------------------
     HOLE_NONSTANDARD_DIAMETER = RuleType(
@@ -452,6 +463,16 @@ class Rulebook(Enum):
         shape=RuleShape.BINARY,
         unit=None,
         description="Drill breaking into a pocket or slot part way down.",
+        family=RuleFamily.HOLE,
+    )
+    HOLE_BREAKOUT_SCAR = RuleType(
+        "Hole Breakout Scar",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description=(
+            "Bore breaking out into a cavity whose tool clips an adjacent wall, "
+            "leaving a notch beside the breakout."
+        ),
         family=RuleFamily.HOLE,
     )
 
@@ -512,6 +533,13 @@ class Rulebook(Enum):
         shape=RuleShape.BINARY,
         unit=None,
         description="Engraved or embossed text, and how it should be applied.",
+        family=RuleFamily.PART,
+    )
+    KNURL_PRESENT = RuleType(
+        "Knurl Present",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description="A knurled patch: one knurling operation, whose specification the model cannot carry.",
         family=RuleFamily.PART,
     )
     RAISED_TEXT_MACHINED_FACE = RuleType(
@@ -677,11 +705,9 @@ class Rulebook(Enum):
 
     # -- inspection: geometric dimensioning and tolerancing -----------------
     #
-    # Dormant. These read tolerance and surface-finish annotations, which a
-    # FreeCAD document does not carry today -- the workbench has nowhere to
-    # get a feature control frame from. They are ported and registered so
-    # that the day the annotations arrive the policy is already written and
-    # already editable by the shop, rather than being a second project.
+    # These read tolerance and surface-finish annotations: a STEP file's PMI,
+    # read on import (machining/pmi). A FreeCAD document part carries none,
+    # so on one they are silent.
     GDT_TOLERANCE_ACHIEVABLE = RuleType(
         "Tolerance Achievable",
         shape=RuleShape.MIN_AND_MAX,
@@ -908,6 +934,16 @@ class Rulebook(Enum):
         shape=RuleShape.BINARY,
         unit=None,
         description="A fold modelled with no radius, which no brake produces.",
+        family=RuleFamily.SHEET,
+    )
+    SHEET_BEND_OPERATIONS = RuleType(
+        "Bend Program",
+        shape=RuleShape.BINARY,
+        unit=None,
+        description=(
+            "How many press-brake hits the folds resolve to, and every fold the "
+            "census could not develop."
+        ),
         family=RuleFamily.SHEET,
     )
     SHEET_FORMED_NEAR_BEND = RuleType(

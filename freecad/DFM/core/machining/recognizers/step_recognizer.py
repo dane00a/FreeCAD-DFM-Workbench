@@ -30,6 +30,7 @@ from OCP.Bnd import Bnd_Box
 from OCP.gp import gp_Dir
 
 from ..aag import AagEdge, AagNode, AttributedAdjacencyGraph, SurfaceType
+from ..face_extent import span_of_face
 from ..features import FeatureInstance, FeatureType
 from .base import FeatureRecognizer
 
@@ -78,27 +79,60 @@ class StepRecognizer(FeatureRecognizer):
         claimed: Optional[set[int]] = None,
         prior: Optional[Sequence[FeatureInstance]] = None,
     ) -> list[FeatureInstance]:
-        # The claim set does the work a resolver does in the reference, which
-        # emits every reading it finds and sorts them out afterwards. Cavities
-        # run first, and a channel floor has concave walls on two sides and
-        # open ends on the other two -- a terrace by every local test. Once the
-        # slot has claimed it there is nothing left to argue about.
+        # `claimed` is deliberately ignored, as the reference ignores it: no
+        # recogniser there is told what the others claimed, so the step pass
+        # emits every terrace reading it finds and the resolver sorts them
+        # out afterwards. Standing down on claimed faces changed what the
+        # pattern pass sees, which runs on the raw readings: the 48 broached
+        # slots of turbine_compressor_disk, claimed first by the slit pass,
+        # lost the STEP readings the reference groups into its second
+        # PATTERN, and the rosette bars of text_neg_decor_groove theirs.
         extent = _part_extent(graph)
-        taken: set[int] = set(claimed or ())
         found: list[FeatureInstance] = []
+        # (seed, riser, index into found) per candidate, for the mutual-pair
+        # pass below.
+        candidates: list[tuple[AagNode, AagNode, int]] = []
+        self._shape = shape
 
         for seed in graph.nodes_by_surface_type(SurfaceType.PLANE):
-            if seed.face_id in taken:
+            result = self._recognize_one(graph, seed, extent)
+            if result is None:
                 continue
-            feature = self._recognize_one(graph, seed, extent)
-            if feature is None:
-                continue
-            found.append(feature)
+            feature, riser = result
+            candidates.append((seed, riser, len(found)))
             # Both faces of a shoulder read as a terrace -- the riser is a
             # step with the horizontal face as its wall, seen from the side --
-            # and the two readings describe the same machining operation. The
-            # first one found owns the pair.
-            taken.update(feature.faces)
+            # and both readings are emitted, as the reference does: the
+            # resolver keeps the first of two with the same faces. Collapsing
+            # them here instead (the first found owning the pair) changed what
+            # the pattern pass sees, which runs on the raw readings: four
+            # re-entrant corners of a cross read as four STEPs made a 2 x 2
+            # grid, where the reference's eight readings make no pattern.
+            found.append(feature)
+
+        # A mutual pair is one step, measured one way. Two perpendicular
+        # planes joined by a concave edge, each with a convex edge elsewhere,
+        # both qualify as a terrace with the other as its riser, and the two
+        # readings measure different numbers (height is the riser's extent,
+        # width the terrace's). Which one survived used to depend on
+        # traversal order, which a moved seam permutes: the reference
+        # measured the same two faces of knurl_neg_flatted_shaft as 0.34 x
+        # 0.16 one way and 0.26 x 0.21 the other. So both report the
+        # measurement of the preferred terrace (_geometric_less). Faces and
+        # types are untouched.
+        by_seed = {seed.face_id: i for i, (seed, _, _) in enumerate(candidates)}
+        for seed, riser, index in candidates:
+            j = by_seed.get(riser.face_id)
+            if j is None:
+                continue
+            other_seed, other_riser, other_index = candidates[j]
+            if other_riser.face_id != seed.face_id:
+                continue  # not mutual
+            if not _geometric_less(other_seed, seed):
+                continue  # this one is preferred
+            source = found[other_index].parameters
+            found[index].parameters["step_height_mm"] = source["step_height_mm"]
+            found[index].parameters["step_width_mm"] = source["step_width_mm"]
 
         for index, feature in enumerate(found):
             feature.instance_id = self.instance_id(index)
@@ -111,7 +145,7 @@ class StepRecognizer(FeatureRecognizer):
         graph: AttributedAdjacencyGraph,
         seed: AagNode,
         extent: tuple[float, float, float],
-    ) -> Optional[FeatureInstance]:
+    ) -> Optional[tuple[FeatureInstance, AagNode]]:
         # A face with an inner wire is the host something was cut into, not a
         # terrace. Seeding one produces a bogus step sized to whatever the
         # feature's depth happens to be.
@@ -136,11 +170,34 @@ class StepRecognizer(FeatureRecognizer):
         if self._is_opening_wall(graph, seed, normal, concave_neighbours):
             return None
 
-        step_height = self._riser_height(normal, concave_neighbours)
-        if step_height is None:
+        riser = self._riser(graph, normal, concave_neighbours)
+        if riser is None:
             return None
+        riser_node, step_height = riser
 
-        face_dims = seed.bbox_dims()
+        # The step face's own box, its seam twin included -- and only that.
+        # A floor the seam crosses arrives as two faces, and its half-box is
+        # not its box. Not is_surface_continuation, which the riser height
+        # does use: this box also decides the silhouette gate, and widening
+        # it to every coplanar fragment re-gates candidates part-wide (the
+        # reference tried it and lost a sheet-metal verdict).
+        step_box = Bnd_Box()
+        if not seed.bbox.IsVoid():
+            step_box.Add(seed.bbox)
+        for edge in graph.edges_of(seed.face_id):
+            if not edge.is_seam:
+                continue
+            twin = edge.other_face(seed.face_id)
+            if twin == seed.face_id or not graph.has_node(twin):
+                continue
+            twin_box = graph.node(twin).bbox
+            if not twin_box.IsVoid():
+                step_box.Add(twin_box)
+        if step_box.IsVoid():
+            face_dims = seed.bbox_dims()
+        else:
+            xmin, ymin, zmin, xmax, ymax, zmax = step_box.Get()
+            face_dims = (xmax - xmin, ymax - ymin, zmax - zmin)
         width = _narrow_in_plane_dim(face_dims)
         if self._spans_the_part(normal, face_dims, extent, len(concave)):
             return None
@@ -159,19 +216,22 @@ class StepRecognizer(FeatureRecognizer):
             if node.surface_type is SurfaceType.PLANE
         ]
 
-        return FeatureInstance(
-            instance_id=self.instance_id(0),
-            type=FeatureType.STEP,
-            faces=faces,
-            parameters={
-                "step_height_mm": round(step_height, 6),
-                "step_width_mm": round(width, 6),
-                "normal": (
-                    round(normal.X(), 6),
-                    round(normal.Y(), 6),
-                    round(normal.Z(), 6),
-                ),
-            },
+        return (
+            FeatureInstance(
+                instance_id=self.instance_id(0),
+                type=FeatureType.STEP,
+                faces=faces,
+                parameters={
+                    "step_height_mm": round(step_height, 6),
+                    "step_width_mm": round(width, 6),
+                    "normal": (
+                        round(normal.X(), 6),
+                        round(normal.Y(), 6),
+                        round(normal.Z(), 6),
+                    ),
+                },
+            ),
+            riser_node,
         )
 
     # -- guards -------------------------------------------------------------
@@ -246,15 +306,21 @@ class StepRecognizer(FeatureRecognizer):
 
     # -- measurement --------------------------------------------------------
 
-    @staticmethod
-    def _riser_height(
-        normal: gp_Dir, concave_neighbours: Sequence[tuple[AagNode, AagEdge]]
-    ) -> Optional[float]:
-        """Height of the wall the terrace drops from, or None if there is none.
+    def _riser(
+        self,
+        graph: AttributedAdjacencyGraph,
+        normal: gp_Dir,
+        concave_neighbours: Sequence[tuple[AagNode, AagEdge]],
+    ) -> Optional[tuple[AagNode, float]]:
+        """The wall the terrace drops from and its height, or None.
 
-        The first perpendicular planar neighbour wins, and neighbours arrive in
-        face-id order, so a terrace with two risers always reports the same one.
+        Chosen by geometry, not by order: the tallest riser, ties going to
+        _geometric_less. The reference took the first wall in edge order
+        until a moved seam permuted that order and the reported height with
+        it.
         """
+        best: Optional[AagNode] = None
+        best_height = 0.0
         for wall, _ in concave_neighbours:
             if wall.surface_type is not SurfaceType.PLANE:
                 continue
@@ -263,9 +329,17 @@ class StepRecognizer(FeatureRecognizer):
                 continue
             if abs(normal.Dot(wall_normal)) >= _WALL_PERPENDICULAR_MAX_DOT:
                 continue
-            dx, dy, dz = wall.bbox_dims()
-            return abs(dx * normal.X() + dy * normal.Y() + dz * normal.Z())
-        return None
+            height = _wall_height(graph, self._shape, wall, normal)
+            if (
+                best is None
+                or height > best_height + 1e-9
+                or (abs(height - best_height) <= 1e-9 and _geometric_less(wall, best))
+            ):
+                best = wall
+                best_height = height
+        if best is None:
+            return None
+        return best, best_height
 
     @staticmethod
     def _pad_top_width(
@@ -335,6 +409,60 @@ def _part_extent(graph: AttributedAdjacencyGraph) -> tuple[float, float, float]:
         return (0.0, 0.0, 0.0)
     xmin, ymin, zmin, xmax, ymax, zmax = box.Get()
     return (xmax - xmin, ymax - ymin, zmax - zmin)
+
+
+def _geometric_less(a: AagNode, b: AagNode) -> bool:
+    """A total order on faces that uses geometry only.
+
+    The more horizontal face first (a terrace is what the part's own up axis
+    looks down on), then the larger, then by centroid. Tolerances keep a
+    floating-point tie from deciding it.
+    """
+    za = abs(a.plane_normal.Z()) if a.plane_normal is not None else 0.0
+    zb = abs(b.plane_normal.Z()) if b.plane_normal is not None else 0.0
+    if abs(za - zb) > 1e-6:
+        return za > zb
+    scale = max(a.area, b.area, 1.0)
+    if abs(a.area - b.area) > 1e-6 * scale:
+        return a.area > b.area
+    p, q = a.centroid, b.centroid
+    if abs(p.X() - q.X()) > 1e-6:
+        return p.X() < q.X()
+    if abs(p.Y() - q.Y()) > 1e-6:
+        return p.Y() < q.Y()
+    return p.Z() < q.Z() - 1e-6
+
+
+def _wall_height(
+    graph: AttributedAdjacencyGraph, shape, wall: AagNode, normal: gp_Dir
+) -> float:
+    """How tall a riser is along the terrace normal, measured from the wall.
+
+    Not from its bbox diagonal: projecting an axis-aligned diagonal onto the
+    step's normal answers about the box's corners and swings with the wall's
+    orientation (the reference measured 0.34 against 0.07 on one solid with
+    the seam moved). And over the whole wall, fragments included: a wall the
+    seam crosses can arrive as two faces, and is_surface_continuation says
+    which neighbours are the same surface carrying on. The box answer stays
+    as the fallback for a wall with no sampleable boundary.
+    """
+    dx, dy, dz = wall.bbox_dims()
+    height = abs(dx * normal.X() + dy * normal.Y() + dz * normal.Z())
+    if shape is None:
+        return height
+    lo, hi = 1.0e300, -1.0e300
+    ok, lo, hi = span_of_face(shape, wall.face_id, normal, lo, hi)
+    for edge in graph.edges_of(wall.face_id):
+        if not edge.is_surface_continuation:
+            continue
+        twin = edge.other_face(wall.face_id)
+        if twin == wall.face_id or not graph.has_node(twin):
+            continue
+        twin_ok, lo, hi = span_of_face(shape, twin, normal, lo, hi)
+        ok = ok or twin_ok
+    if ok and hi > lo:
+        height = hi - lo
+    return height
 
 
 def _outer_wire_only(edges: Sequence[AagEdge]) -> list[AagEdge]:

@@ -29,6 +29,7 @@ from typing import Optional, Sequence
 from OCP.gp import gp_Dir, gp_Vec
 
 from ..aag import AagNode, AttributedAdjacencyGraph, Concavity, SurfaceType
+from ..face_extent import span_of_face
 from ..features import FeatureInstance, FeatureType
 from .base import FeatureRecognizer, neighbours
 
@@ -142,6 +143,10 @@ class SlitRecognizer(FeatureRecognizer):
         # reason. Honouring the claim set here defeated that ordering before
         # it ever ran.
         taken: set[int] = set()
+        # Spans are measured on the faces of this shape for the duration of
+        # the call (see _interval_along), and cached: the recogniser tests
+        # plane pairs, so one face is asked about the same direction often.
+        _SPANS.reset(shape)
 
         found = self._floored_slits(graph, taken)
         found.extend(self._penetrating_slits(graph, found, taken))
@@ -213,7 +218,13 @@ class SlitRecognizer(FeatureRecognizer):
             low = min(_interval_along(graph.node(f), run)[0] for f in group)
             high = max(_interval_along(graph.node(f), run)[1] for f in group)
             length = high - low
-            if depth < _MIN_DEPTH_MM or length < width:
+            # No longer than it is wide is not a slot -- but equal is the
+            # bound, not past it, and a part built exactly on it must not be
+            # decided by the fifteenth decimal: euro_lock_cylinder's 10 x 10
+            # plug slot measured length - width = -3.6e-15 on one seam and +0
+            # on another once length came from the faces.
+            bound_tol = 1e-9 * max(1.0, width)
+            if depth < _MIN_DEPTH_MM or length < width - bound_tol:
                 continue
 
             reentrant = (
@@ -634,8 +645,49 @@ class SlitRecognizer(FeatureRecognizer):
 # =============================================================================
 
 
+class _Spans:
+    """Face spans along a direction, measured from the face and cached.
+
+    It was each face's axis-aligned box projected corner by corner, and on a
+    wall bounded by an arc or an intersection curve that box is built from
+    the curve's parametrisation -- i.e. the seam: the reference measured a
+    clamp slit 20.98 / 21.00 long on one solid. The box stays as the
+    fallback for a face with no sampleable boundary.
+    """
+
+    def __init__(self) -> None:
+        self.shape = None
+        self.cache: dict = {}
+
+    def reset(self, shape) -> None:
+        self.shape = shape
+        self.cache = {}
+
+    def interval(self, node: AagNode, direction: gp_Dir) -> Optional[tuple[float, float]]:
+        if self.shape is None:
+            return None
+        key = (
+            node.face_id,
+            round(direction.X() * 1e9),
+            round(direction.Y() * 1e9),
+            round(direction.Z() * 1e9),
+        )
+        if key in self.cache:
+            return self.cache[key]
+        ok, low, high = span_of_face(self.shape, node.face_id, direction, 1.0e300, -1.0e300)
+        result = (low, high) if ok and high > low else None
+        self.cache[key] = result
+        return result
+
+
+_SPANS = _Spans()
+
+
 def _interval_along(node: AagNode, direction: gp_Dir) -> tuple[float, float]:
-    """The span of a face's bounding box projected onto a direction."""
+    """The span of a face projected onto a direction."""
+    measured = _SPANS.interval(node, direction)
+    if measured is not None:
+        return measured
     if node.bbox.IsVoid():
         return (0.0, 0.0)
     xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()

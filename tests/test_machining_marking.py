@@ -277,8 +277,13 @@ class EngravedTextTests(unittest.TestCase):
         self.assertEqual(markings_in(make_engraved_strokes(width=5.0)), [])
 
     def test_deep_strokes_are_not_text(self):
-        """Past 1.6 mm nobody is engraving; that is a machined recess."""
-        self.assertEqual(markings_in(make_engraved_strokes(depth=2.0)), [])
+        """Past 3 mm nobody is engraving; that is a machined recess.
+
+        The ceiling is the marking-process depth (the reference's
+        kMaxMarkDepthMm, 3.0) since the staged rewrite; the old 1.6 mm slab
+        it replaced dropped real 2.5 mm engravings.
+        """
+        self.assertEqual(markings_in(make_engraved_strokes(depth=3.5)), [])
 
     def test_scattered_glyphs_are_not_a_text_block(self):
         self.assertEqual(markings_in(make_scattered_strokes()), [])
@@ -350,17 +355,22 @@ class BackgroundReliefTests(unittest.TestCase):
     """Letters left standing where the background was milled away."""
 
     def test_relieved_plaque_is_marking(self):
+        """One raised marking. Two readings of the plaque compete -- the
+        islands on the plaque's top face, and the letters standing proud of
+        the milled field floor -- and the reference ranks the proud reading
+        higher (it has a baseline and three regions), so that one is emitted."""
         found = markings_in(make_background_relief())
         self.assertEqual(len(found), 1)
-        self.assertTrue(found[0].param("background_relief"))
         self.assertEqual(found[0].param("marking_type"), "raised")
+        self.assertEqual(found[0].param("ink_kind"), "proud_top")
 
     def test_islands_are_counted_and_measured(self):
         marking = markings_in(make_background_relief())[0]
         self.assertEqual(marking.param("glyph_count"), 3)
         self.assertAlmostEqual(marking.number("depth_mm"), 1.0, places=3)
-        # Area over half perimeter, which for an annulus is its wall thickness.
-        self.assertAlmostEqual(marking.number("stroke_width_mm"), 2.0, places=2)
+        # Measured on the raster by a distance transform, which reads an
+        # annulus close to its wall thickness.
+        self.assertAlmostEqual(marking.number("stroke_width_mm"), 2.0, delta=0.2)
 
     def test_flush_boss_is_not_a_letter(self):
         """Wider than any stroke, so the whole plaque is left alone."""
@@ -370,16 +380,28 @@ class BackgroundReliefTests(unittest.TestCase):
 class FloorlessMarkTests(unittest.TestCase):
     """V-cut and ball-nose engraving, which has no flat floor to key on."""
 
-    def test_ball_nose_strokes_are_marking(self):
-        found = markings_in(make_floorless_mark())
-        self.assertEqual(len(found), 1)
-        self.assertTrue(found[0].param("floorless"))
-        self.assertEqual(found[0].param("marking_type"), "engraved")
+    def test_two_crossing_strokes_are_too_simple_to_be_a_mark(self):
+        """A single connected region needs a stroke count of 2.5 to stand on
+        its own (the reference's kSingleRegionComplexityMin): a plus sign of
+        two strokes is 1.3 and is refused, as a lone annulus or L would be."""
+        self.assertEqual(markings_in(make_floorless_mark()), [])
 
     def test_stroke_width_comes_from_opposing_walls(self):
-        marking = markings_in(make_floorless_mark())[0]
-        self.assertAlmostEqual(marking.number("stroke_width_mm"), 0.6, places=3)
-        self.assertAlmostEqual(marking.number("depth_mm"), 1.3, places=3)
+        """Stage 1 still reads the floorless relief correctly: no flat face,
+        width from the gap between opposing walls, depth from the reach."""
+        from freecad.DFM.core.machining.recognizers.marking.model import InkKind
+        from freecad.DFM.core.machining.recognizers.marking.relief_generator import (
+            generate_relief_candidates,
+        )
+
+        shape = make_floorless_mark()
+        index = FaceIndex(shape)
+        graph = AagBuilder(shape, index).build()
+        scene = generate_relief_candidates(graph, index)
+        regions = [r for r in scene.regions if r.ink_kind is InkKind.WALL_GAP]
+        self.assertEqual(len(regions), 1)
+        self.assertAlmostEqual(regions[0].stroke_w_mm, 0.6, places=3)
+        self.assertAlmostEqual(regions[0].depth_mm, 1.3, places=3)
 
     def test_through_window_is_not_a_stroke(self):
         self.assertEqual(markings_in(make_through_window()), [])

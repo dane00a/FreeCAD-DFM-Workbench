@@ -126,6 +126,11 @@ class TurnedProfileRecognizer(FeatureRecognizer):
         curve is not shaped at all. A tight concave one that runs tangentially
         into its neighbours at both ends is a blend running along an edge --
         which is a transition between two surfaces, not a surface.
+
+        This is not an exact mirror of every freeform rule: the internal
+        radius rule also reports blend bands, since a tight blend still needs
+        a small tool. Those bands are not lost here -- the blend recognizer
+        seeds them as fillets.
         """
         concave = node.freeform_min_concave_radius_mm
 
@@ -136,12 +141,18 @@ class TurnedProfileRecognizer(FeatureRecognizer):
                 return False
             return 1.0 / node.freeform_max_convex_curvature > blend_radius
 
-        if concave <= blend_radius:
-            # Tangent at both ends means it is bridging two surfaces rather
-            # than being one.
-            tangent = sum(1 for edge in graph.edges_of(node.face_id) if edge.is_tangent)
-            if tangent >= 2:
-                return False
+        # Tangency decides, not size. Tangent at both ends means it is
+        # bridging two surfaces rather than being one, whatever its radius:
+        # a sculpted pocket wall meets its floor and its edge break at sharp
+        # dihedrals. This veto used to apply only up to the blend radius,
+        # while the blend recognizer refuses a patch above that same radius,
+        # so a blend network at R25 turning its corners on B-spline patches
+        # was a fillet to nobody and sculpture here. The blend recognizer
+        # claims such a corner patch on its own test (tangent to two fillets
+        # of matching radius).
+        tangent = sum(1 for edge in graph.edges_of(node.face_id) if edge.is_tangent)
+        if tangent >= 2:
+            return False
 
         return True
 

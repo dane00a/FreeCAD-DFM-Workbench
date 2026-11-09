@@ -41,6 +41,12 @@ class MachiningContext:
 
     recognition: "RecognitionResult" = field(default_factory=lambda: RecognitionResult())
 
+    #: The part's tolerance and finish callouts, when they arrived with the
+    #: shape (an :class:`~.annotations.AnnotationSet`). ``None`` means none
+    #: did, and :func:`~.annotations.annotations_for` falls back to the
+    #: installed annotation source.
+    annotations: Optional[object] = None
+
     _volume: Optional[float] = None
     _bbox_dims: Optional[tuple[float, float, float]] = None
     _plane_bbox_dims: Optional[tuple[float, float, float]] = None
@@ -108,18 +114,28 @@ class MachiningContext:
                 self._plane_bbox_dims = (xmax - xmin, ymax - ymin, zmax - zmin)
         return self._plane_bbox_dims
 
-    def plane_bbox_bounds(self):
+    def plane_bbox_bounds(self, exact: bool = False):
         """(lows, highs) of the plane-only box, or None when there are none.
 
         Rules that ask how close a feature sits to the outside of the part
         need the actual faces of the envelope, not just its size.
+
+        ``exact`` builds the box with ``AddOptimal`` on the planar faces
+        rather than from the graph's padded face boxes. ``BRepBndLib::Add``
+        pads a plane bounded by arcs by an amount set by how those arcs are
+        parametrised -- i.e. by the seam: the reference measured one hole's
+        edge distance 1.997 and 1.971 mm on the same solid.
         """
         box = Bnd_Box()
         found = False
         for node in self.graph.nodes:
             if node.surface_type is not SurfaceType.PLANE or node.bbox.IsVoid():
                 continue
-            box.Add(node.bbox)
+            if exact:
+                face = self.face_index.face_at(node.face_id)
+                BRepBndLib.AddOptimal_s(face, box, False, False)
+            else:
+                box.Add(node.bbox)
             found = True
         if not found or box.IsVoid():
             return None

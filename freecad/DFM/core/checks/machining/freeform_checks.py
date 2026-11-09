@@ -17,10 +17,9 @@ cannot be finished at all, however long anyone is willing to run the machine;
 and a bowl sunk past its own equator cannot be reached by a straight tool at
 any radius, because the rim is in the way.
 
-Which faces count as sculpture is settled before these rules run: the
-turned-profile recognizer already drops blends modelled as splines and, on a
-lathe part, hands revolved bands over as turned profiles instead. So a region
-that arrives here is one somebody set out to shape.
+Which faces count as sculpture is read off the adjacency graph, as the
+reference reads it, rather than off the FREEFORM_SURFACE features: a shaped
+face no recognizer kept still has to be cut. `_sculpted_faces` says which.
 """
 
 from __future__ import annotations
@@ -28,7 +27,9 @@ from __future__ import annotations
 import math
 from typing import Optional
 
+from ...machining.aag import SurfaceType
 from ...machining.config import MachiningConfig
+from ...machining.process_classifier import PartProcessType
 from ...machining.features import FeatureType
 from ...models import CheckResult, Severity
 from ...registries import register_check
@@ -54,6 +55,11 @@ _MM_PER_M = 1000.0
 _BURDEN_MODERATE_PATH_M = 10.0
 _BURDEN_HEAVY_PATH_M = 50.0
 
+# A face is sculpted when it curves tighter than this, convexly (a 500 mm
+# radius). A flat ruled spline carries near-zero curvature and machines
+# like a plane.
+_MIN_SCULPT_CURVATURE = 1.0 / 500.0
+
 
 def _smallest_milling_radius(config: MachiningConfig) -> Optional[float]:
     """Radius of the smallest cutter that could work a hollow, or None."""
@@ -72,6 +78,72 @@ def _ball_nose_radii(config: MachiningConfig) -> list[float]:
         for tool in config.tools_of_type("ball_nose")
         if tool.min_diameter_mm > 0.0
     )
+
+
+def _sculpted_faces(context, skip_blend_bands: bool = False) -> list:
+    """Every sculpted face of the part, read off the graph, not off features.
+
+    The reference scans its adjacency graph for these two rules, so a
+    sculpted face counts whether or not a FREEFORM_SURFACE feature claimed
+    it: a concave B-spline band that no recognizer kept still has a radius
+    a cutter has to fit.
+
+    A face counts when its sampled curvature says it is shaped: any concave
+    region, or convex curvature tighter than a 500 mm radius (a flat ruled
+    spline machines like a plane). Left out:
+
+    - a revolved face on a turned or mill-turn part, which the lathe forms;
+    - ENGRAVING IS NOT SCULPTING: a face a MARKING_TEXT owns. A letter has
+      tight concave corners by design and is cut by a V-bit, a laser or a
+      die. The scan is filtered, not the finding, so a part with a mark and
+      a real sculpted region still reports the region;
+    - for the finishing estimate only, a blend band (see `_blend_band`).
+    """
+    marking: set[int] = set()
+    for feature in context.recognition.of_type(FeatureType.MARKING_TEXT):
+        marking.update(feature.faces)
+    lathe = context.process_type in (PartProcessType.TURNED, PartProcessType.MILL_TURN)
+    blend_max = context.config.thresholds.freeform_blend_band_max_radius_mm
+    faces = []
+    for node in context.graph.nodes:
+        if not _is_sculpted(node):
+            continue
+        if lathe and node.surface_type is SurfaceType.REVOLVED:
+            continue
+        if node.face_id in marking:
+            continue
+        if skip_blend_bands and _blend_band(context, node, blend_max):
+            continue
+        faces.append(node)
+    return faces
+
+
+def _is_sculpted(node) -> bool:
+    if not node.has_freeform_curvature:
+        return False
+    if node.freeform_min_concave_radius_mm > 0.0:
+        return True
+    return node.freeform_max_convex_curvature > _MIN_SCULPT_CURVATURE
+
+
+def _blend_band(context, node, blend_max: float) -> bool:
+    """A fillet in B-spline clothing, which no ball nose has to finish.
+
+    Convex-only: a tight convex radius (an edge round along a curved edge,
+    which OCCT emits as a spline). Concave: a blend-scale radius and tangent
+    to its neighbours on at least two sides, which is what a rolling-ball
+    blend is by construction; a sculpted wall meets its surroundings sharp.
+    """
+    concave = node.freeform_min_concave_radius_mm
+    if concave <= 0.0:
+        convex = node.freeform_max_convex_curvature
+        if convex <= 0.0:
+            return False
+        return 1.0 / convex <= blend_max
+    if concave > blend_max:
+        return False
+    tangent = sum(1 for edge in context.graph.edges_of(node.face_id) if edge.is_tangent)
+    return tangent >= 2
 
 
 @register_check(Rulebook.FREEFORM_INTERNAL_RADIUS)
@@ -112,20 +184,20 @@ class FreeformInternalRadiusCheck(MachiningCheck):
 
         tight: list = []
         mild: list = []
-        for region in context.recognition.of_type(FeatureType.FREEFORM_SURFACE):
-            radius = region.number("min_concave_radius_mm") or 0.0
-            # A convex-only region has no internal radius: any tool rolls
+        for node in _sculpted_faces(context):
+            radius = node.freeform_min_concave_radius_mm
+            # A convex-only face has no internal radius: any tool rolls
             # over the outside of it.
             if radius <= 0.0:
                 continue
             if radius < required:
-                tight.append(region)
+                tight.append(node)
             elif radius < info_tier:
-                mild.append(region)
+                mild.append(node)
 
         results: list[CheckResult] = []
         if tight:
-            worst = min(r.number("min_concave_radius_mm") for r in tight)
+            worst = min(n.freeform_min_concave_radius_mm for n in tight)
             results.append(
                 self.finding(
                     rule,
@@ -157,7 +229,7 @@ class FreeformInternalRadiusCheck(MachiningCheck):
             )
 
         if mild:
-            worst = min(r.number("min_concave_radius_mm") for r in mild)
+            worst = min(n.freeform_min_concave_radius_mm for n in mild)
             results.append(
                 self.finding(
                     rule,
@@ -213,29 +285,31 @@ class FreeformFinishingCheck(MachiningCheck):
         smallest_ball = ball_radii[0]
 
         thresholds = context.config.thresholds
-        regions = context.recognition.of_type(FeatureType.FREEFORM_SURFACE)
+        regions = _sculpted_faces(context, skip_blend_bands=True)
         if not regions:
             return []
 
         total_area = 0.0
         tightest = 0.0
         unreachable: list = []
-        for region in regions:
-            total_area += region.number("area_mm2") or 0.0
-            radius = region.number("min_concave_radius_mm") or 0.0
+        for node in regions:
+            total_area += node.area
+            radius = node.freeform_min_concave_radius_mm
             if radius <= 0.0:
                 continue
             if tightest == 0.0 or radius < tightest:
                 tightest = radius
             if radius < smallest_ball:
-                unreachable.append(region)
+                unreachable.append(node)
 
         scallop_um = thresholds.freeform_scallop_target_um
         scallop_mm = scallop_um / _MICRONS_PER_MM
 
         if unreachable:
-            worst = min(r.number("min_concave_radius_mm") for r in unreachable)
-            severity = self.severity_from_rule_config(rule_config)
+            worst = min(n.freeform_min_concave_radius_mm for n in unreachable)
+            # A warning, as the reference grades it, whatever the rule's
+            # configured severity.
+            severity = Severity.WARNING
             return [
                 self.finding(
                     rule,
@@ -456,8 +530,11 @@ class SphericalPocketUndercutCheck(MachiningCheck):
 
 
 def _faces_of(regions) -> list[int]:
-    """Every face claimed by a group of regions, in a stable order."""
+    """Every face of a group of graph faces or regions, in a stable order."""
     faces: set[int] = set()
     for region in regions:
-        faces.update(region.faces)
+        if hasattr(region, "face_id"):
+            faces.add(region.face_id)
+        else:
+            faces.update(region.faces)
     return sorted(faces)

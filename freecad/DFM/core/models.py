@@ -49,6 +49,18 @@ class CheckResult:
     comparison: str = ""
     unit: str = ""
 
+    # How many indistinguishable findings this one stands for, after
+    # `..core.aggregation` has collapsed them. One means what it says and is
+    # also what every check emits: a check has no idea it is about to be
+    # merged, and the default is here so none of them has to learn.
+    occurrence_count: int = 1
+
+    # The finding's own category, when it is not the rule family's. The
+    # reference stamps a rule that fires on both a POCKET and a SLOT with the
+    # feature's category, not the rule's (pocket_square_corner on a slot is a
+    # "slot" finding). Empty means the rule family's.
+    category: str = ""
+
     failing_geometry: list[Any] = field(default_factory=list)
 
     refs: list[GeometryRef] = field(default_factory=list)

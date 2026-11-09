@@ -525,7 +525,11 @@ class RuleThresholds:
     # part can pass every other rule and still run long.
     feature_complexity_warn: float = 40.0
     feature_complexity_error: float = 80.0
-    sharp_edge_min_deviation_deg: float = 30.0
+    # 45, not 30. 30 was set just high enough to clear one housing's volute
+    # wedges and let a 144 degree tapered shoulder through as a sharp corner.
+    # Across the corpus the deviations leave an empty band from 40 to 75
+    # degrees, and half a standard 90 degree corner sits inside it.
+    sharp_edge_min_deviation_deg: float = 45.0
     material_removal_warn_pct: float = 70.0
     material_removal_error_pct: float = 85.0
     chamfer_standard_angle_deg: float = 45.0

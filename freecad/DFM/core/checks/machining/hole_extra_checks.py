@@ -35,7 +35,11 @@ from ...models import CheckResult, Severity
 from ...registries import register_check
 from ...rules import Rulebook
 from .base import MachiningCheck
-from .hole_checks import HoleIntersectingCheck, HoleWebThicknessCheck
+from .hole_checks import (
+    _axis_segment,
+    _first_cylinder,
+    _segment_segment_distance,
+)
 
 
 # A tapped hole is drilled at its tap drill and finished by the tap, so the
@@ -44,6 +48,7 @@ from .hole_checks import HoleIntersectingCheck, HoleWebThicknessCheck
 _SIZED_BORE_TYPES = (
     FeatureType.THROUGH_HOLE,
     FeatureType.BLIND_HOLE,
+    FeatureType.BREAKTHROUGH_HOLE,
     FeatureType.COUNTERBORE,
     FeatureType.COUNTERSINK,
 )
@@ -63,18 +68,16 @@ _STANDARD_COUNTERSINK_ANGLES_DEG = (60.0, 82.0, 90.0, 100.0, 110.0, 120.0)
 # reported there is not reported a second time here.
 _TOUCH_TOLERANCE_MM = 0.1
 
-# The cavity families a bore can break into. No hole type appears here on
-# purpose: a bore running into another bore is the intersecting-holes rule's
-# business, and PARTIAL_BORE is a milled saddle rather than a drilled void.
-_CAVITY_TYPES = (
+# The cavity families a through passage can link, the reference's list. No
+# hole type appears here on purpose: a bore running into another bore is the
+# intersecting-holes rule's business.
+_BREACHED_CAVITY_TYPES = (
     FeatureType.POCKET,
     FeatureType.SLOT,
-    FeatureType.CHANNEL,
     FeatureType.THROUGH_CAVITY,
     FeatureType.SPHERICAL_POCKET,
     FeatureType.FLEXURE_SLIT,
     FeatureType.BROACHED_SLOT,
-    FeatureType.V_GROOVE,
     FeatureType.UNDERCUT,
 )
 
@@ -251,13 +254,21 @@ class HolePartialEntryCheck(MachiningCheck):
 
         results: list[CheckResult] = []
         for hole in context.recognition.of_type(
-            FeatureType.THROUGH_HOLE, FeatureType.BLIND_HOLE
+            FeatureType.THROUGH_HOLE,
+            FeatureType.BLIND_HOLE,
+            FeatureType.BREAKTHROUGH_HOLE,
         ):
             diameter = hole.number("diameter_mm") or 0.0
             depth = hole.number("depth_mm") or 0.0
             if diameter <= 0.0:
                 continue
-            if depth / diameter < thresholds.hole_partial_entry_min_depth_ratio:
+            # The tolerance is load-bearing: hole_partial_entry_blind is built
+            # to sit exactly on the bound (6 mm, 18 mm deep, ratio 3.0), and a
+            # bare comparison decided that fixture on the last bits of a double
+            # once depth was measured from the face (17.999999999999797). The
+            # threshold is unchanged; a deliberate boundary fixture must land
+            # on the side its author intended.
+            if depth / diameter < thresholds.hole_partial_entry_min_depth_ratio - 1e-9:
                 continue
 
             axis = _bore_axis(context, hole)
@@ -322,22 +333,32 @@ class HolePartialEntryCheck(MachiningCheck):
     def _entries(
         context: MachiningContext, hole: FeatureInstance, axis: gp_Dir
     ) -> list[tuple[int, float]]:
-        """Every planar mouth of the bore, with how square it is to the axis.
+        """Every plane beside the bore, with how square it is to the axis.
+
+        Any planar neighbour of a bore wall that the hole does not own, as the
+        reference collects them -- not only the convex rims. A plane meeting
+        the wall concavely is still a face square enough to start the drill
+        from, and one such face is all it takes.
 
         `outward_normal` rather than the raw plane normal: the stored sense
         depends on which kernel built the solid, and the corrected one does
         not. The magnitude of the dot is what is wanted either way -- entering
         from above and below a plate are the same geometry.
         """
+        own = set(hole.faces)
         entries: list[tuple[int, float]] = []
-        for face_id in _rim_neighbours(context, hole):
-            node = context.graph.node(face_id)
-            if node.surface_type is not SurfaceType.PLANE:
-                continue
-            normal = node.outward_normal
-            if normal is None:
-                continue
-            entries.append((face_id, abs(axis.Dot(normal))))
+        for wall in _cylinder_nodes(context, hole):
+            for edge in context.graph.edges_of(wall.face_id):
+                face_id = edge.other_face(wall.face_id)
+                if face_id in own or not context.graph.has_node(face_id):
+                    continue
+                node = context.graph.node(face_id)
+                if node.surface_type is not SurfaceType.PLANE:
+                    continue
+                normal = node.outward_normal
+                if normal is None:
+                    continue
+                entries.append((face_id, abs(axis.Dot(normal))))
         return entries
 
 
@@ -422,22 +443,16 @@ class HoleMultiPassCheck(MachiningCheck):
         return "Hole Multi-Pass Check"
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
-        thresholds = context.config.thresholds
-
         results: list[CheckResult] = []
         for hole in context.recognition.of_type(FeatureType.THROUGH_HOLE):
-            passes = int(hole.number("fragment_count") or 1)
+            # The recognizer counts the passes: one, plus one per void too
+            # wide for the drill to cross still guided.
+            passes = int(hole.number("drilling_passes") or 1)
             if passes <= 1:
                 continue
 
             diameter = hole.number("diameter_mm") or 0.0
             void = hole.number("max_void_mm") or 0.0
-            if diameter <= 0.0:
-                continue
-            # The same gate the depth rule uses to decide whether the drill
-            # crosses the gap or has to be restarted beyond it.
-            if void <= diameter * thresholds.hole_deep_single_pass_void_ratio:
-                continue
 
             contiguous = hole.number("max_contiguous_depth_mm") or 0.0
             depth = hole.number("depth_mm") or 0.0
@@ -460,9 +475,14 @@ class HoleMultiPassCheck(MachiningCheck):
                         1.0,
                         1.0,
                         "",
-                        f"This {diameter:.1f} mm through hole is interrupted by a "
-                        f"{void:.1f} mm cavity, {void / diameter:.1f} times the "
-                        "drill diameter. The drill has nothing to steer on crossing "
+                        f"This {diameter:.1f} mm through hole is interrupted by "
+                        + (
+                            f"a {void:.1f} mm cavity, {void / diameter:.1f} times the "
+                            "drill diameter. "
+                            if void > 0.0 and diameter > 0.0
+                            else "an internal cavity. "
+                        )
+                        + "The drill has nothing to steer on crossing "
                         f"a gap that wide, so the bore comes in as {passes} separate "
                         "drillings rather than one -- each its own operation, and "
                         "its own setup if the far end cannot be reached from the "
@@ -477,9 +497,87 @@ class HoleMultiPassCheck(MachiningCheck):
         return results
 
 
+@register_check(Rulebook.HOLE_BREAKOUT_SCAR)
+class HoleBreakoutScarCheck(MachiningCheck):
+    """A bore whose tool clipped a wall where it broke out.
+
+    A drill breaking out into a cavity close beside a wall runs part of its
+    end into that wall and leaves a notch beyond the breakout -- a burr trap
+    inside the cavity, where a deburring tool may not reach. The recognizer
+    records the notch on the hole; this reports it, anchored to the notch
+    itself so the viewer shows where it is.
+    """
+
+    _TYPES = (
+        FeatureType.THROUGH_HOLE,
+        FeatureType.COUNTERBORE,
+        FeatureType.COUNTERSINK,
+        FeatureType.THREADED_HOLE,
+    )
+
+    @property
+    def name(self) -> str:
+        return "Hole Breakout Scar Check"
+
+    def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
+        results: list[CheckResult] = []
+        for hole in context.recognition.of_type(*self._TYPES):
+            scar_faces = hole.param("breakout_scar_faces") or []
+            if not scar_faces:
+                continue
+            diameter = hole.number("diameter_mm") or 0.0
+            overshoot = hole.number("breakout_overshoot_mm") or 0.0
+            area = hole.number("breakout_scar_area_mm2") or 0.0
+            # Two shapes of the same defect. The notch is a flat or conical
+            # step the tool's end clipped beside the breakout; the overshoot
+            # arc is the bore itself running past its exit and scoring an
+            # adjacent wall along part of its circumference.
+            if hole.param("breakout_scar_kind") == "overshoot_arc":
+                summary = f"{overshoot:.2f} mm overshoot scores a wall"
+                advice = (
+                    f"This {diameter:.1f} mm bore runs {overshoot:.2f} mm past its "
+                    f"exit and scores an adjacent wall along part of its "
+                    f"circumference ({area:.1f} mm2). The scored arc is a burr "
+                    "trap in a place a deburring tool cannot reach, and the "
+                    "interrupted cut is hard on the drill. Shorten the drilling "
+                    "depth or move the bore clear of the wall."
+                )
+            else:
+                summary = f"{overshoot:.2f} mm notch beside breakout"
+                advice = (
+                    f"This {diameter:.1f} mm bore breaks out into a cavity, but "
+                    f"its tool clips an adjacent wall and leaves a notch "
+                    f"{overshoot:.2f} mm deep ({area:.1f} mm2) beside the "
+                    "breakout. The notch is a burr trap that is hard to reach "
+                    "for deburring. Move the bore clear of the wall, or stop "
+                    "the tool at the breakout."
+                )
+            results.append(
+                self.finding(
+                    rule,
+                    Severity.WARNING,
+                    summary,
+                    self.render(
+                        feedback,
+                        Severity.WARNING,
+                        overshoot,
+                        0.0,
+                        0.0,
+                        "mm",
+                        advice,
+                    ),
+                    faces=list(scar_faces),
+                    value=overshoot,
+                    limit=0.0,
+                    comparison=">",
+                    unit="mm",
+                )
+            )
+        return results
+
+
 # How closely a bore has to follow the part's rotation axis to have been
 # opened on the lathe rather than drilled.
-_LATHE_AXIS_DOT = 0.95
 
 
 @register_check(Rulebook.HOLE_INTERSECTS_CAVITY)
@@ -560,35 +658,10 @@ class HoleIntersectsCavityCheck(MachiningCheck):
                 continue
             if self._blend_capped(context, hole):
                 continue
-            if self._bored_on_the_lathe(context, hole):
-                continue
             if self._touches_another_bore(context, hole, holes):
                 continue
             found.append(hole)
         return found
-
-    @staticmethod
-    def _bored_on_the_lathe(context: MachiningContext, hole: FeatureInstance) -> bool:
-        """Whether this bore was made on the axis the part was turned about.
-
-        A bore down the middle of a turned part is opened with a boring bar
-        while the part spins, and it stops wherever the previous turned form
-        left off -- a counterbore, a recess, the back of a flange. Nothing
-        broke into anything: that is the order the operations were done in.
-
-        The concern this rule carries is a drill arriving somewhere it was
-        not expected, and that is a milling concern. A cross-drilled hole on
-        the same part still fires, because it is not on the lathe axis and
-        does meet whatever it meets by surprise.
-        """
-        process = context.part_process
-        if not process.has_axis or not context.is_turning_family:
-            return False
-        axis = HoleWebThicknessCheck._axis_line(context, hole)
-        if axis is None:
-            return False
-        rotation = process.axis_of_revolution
-        return abs(axis.Direction().Dot(rotation.Direction())) > _LATHE_AXIS_DOT
 
     def _through_breaches(
         self,
@@ -611,7 +684,7 @@ class HoleIntersectsCavityCheck(MachiningCheck):
         match against. Passages between cavities the piercing does not
         unseat -- channels, through cavities -- are found.
         """
-        cavity_faces = context.recognition.faces_of_type(*_CAVITY_TYPES)
+        cavity_faces = context.recognition.faces_of_type(*_BREACHED_CAVITY_TYPES)
         if not cavity_faces:
             return []
 
@@ -622,7 +695,8 @@ class HoleIntersectsCavityCheck(MachiningCheck):
             if hole.type != FeatureType.THROUGH_HOLE and not hole.param("is_through"):
                 continue
 
-            hosts = _rim_neighbours(context, hole)
+            own = set(hole.faces)
+            hosts = [host for host in _rim_neighbours(context, hole) if host not in own]
             # Fewer than two means the rims are inside the hole's own stack of
             # steps, which is a counterbore rather than a breach.
             if len(hosts) < 2:
@@ -644,7 +718,9 @@ class HoleIntersectsCavityCheck(MachiningCheck):
         bull-nosed floor. Without this a radiused blind hole reports as
         breaking into itself.
         """
-        for node in _cylinder_nodes(context, hole):
+        # The hole's first cylinder, as the reference asks it.
+        first = _first_cylinder(context, hole)
+        for node in [first] if first is not None else []:
             for edge in context.graph.edges_of(node.face_id):
                 if edge.concavity is not Concavity.TANGENT and not edge.is_tangent:
                     continue
@@ -666,25 +742,21 @@ class HoleIntersectsCavityCheck(MachiningCheck):
         fall out of it too -- their axis distance is zero -- because a
         counterbore stack is not a breach into anything.
         """
-        axis = HoleWebThicknessCheck._axis_line(context, hole)
-        if axis is None:
+        mine = _first_cylinder(context, hole)
+        if mine is None:
             return False
-        radius = (hole.number("diameter_mm") or 0.0) / 2.0
-
+        start, length = _axis_segment(context, mine)
         for other in holes:
             if other is hole:
                 continue
-            other_axis = HoleWebThicknessCheck._axis_line(context, other)
-            if other_axis is None:
+            theirs = _first_cylinder(context, other)
+            if theirs is None:
                 continue
-            distance = HoleIntersectingCheck._axis_distance(axis, other_axis)
-            if distance is None:
-                continue
-            reach = radius + (other.number("diameter_mm") or 0.0) / 2.0
-            if distance > reach + _TOUCH_TOLERANCE_MM:
-                continue
-            if HoleIntersectingCheck._spans_overlap(
-                context, hole, other, axis, other_axis
-            ):
+            other_start, other_length = _axis_segment(context, theirs)
+            gap = _segment_segment_distance(
+                start, mine.cyl_cone_axis.Direction(), length,
+                other_start, theirs.cyl_cone_axis.Direction(), other_length,
+            )
+            if gap <= mine.cyl_radius + theirs.cyl_radius + _TOUCH_TOLERANCE_MM:
                 return True
         return False

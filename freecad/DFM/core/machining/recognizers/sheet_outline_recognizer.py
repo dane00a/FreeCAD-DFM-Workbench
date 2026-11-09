@@ -31,10 +31,12 @@ from __future__ import annotations
 
 from typing import Optional, Sequence
 
+from OCP.BRepBndLib import BRepBndLib
 from OCP.Bnd import Bnd_Box
 from OCP.gp import gp_Dir, gp_Pnt, gp_Vec
 
 from ..aag import AagNode, AttributedAdjacencyGraph, SurfaceType
+from ..face_extent import face_by_id
 from ..features import SHEET_TYPES, FeatureInstance, FeatureType
 from ..process_classifier import PartProcessType
 from .base import FeatureRecognizer
@@ -82,6 +84,11 @@ _CONNECTOR_PERPENDICULAR_MAX_DOT = 0.3
 _CONNECTOR_SPAN_SLACK = 1.5
 _CONNECTOR_SPAN_SLACK_GAUGES = 2.0
 
+# A tab is at most this share of its host panel's edge, with a floor so a
+# small tongue on a small panel survives. Flanges are well above the floor.
+_TAB_PANEL_FRACTION = 1.0 / 3.0
+_TAB_FLOOR_MM = 10.0
+
 
 class SheetOutlineRecognizer(FeatureRecognizer):
     """Recognizes tabs and notches on a sheet part's free outline."""
@@ -109,6 +116,7 @@ class SheetOutlineRecognizer(FeatureRecognizer):
         # honouring the general claimed set would silence it on every part.
         taken = _sheet_claimed(prior)
 
+        self._shape = shape
         strips = self._sheared_strips(graph, gauge, taken)
         chains = self._arc_chains(graph, gauge, taken)
         candidates = self._pairs(graph, strips, chains, gauge)
@@ -173,6 +181,27 @@ class SheetOutlineRecognizer(FeatureRecognizer):
         half-disc top of a round tab end that never merged into the panel, and
         skin fragments pairing across the thickness read as phantom tabs.
         """
+        # The blank's silhouette, from planar faces only (a curved face's box
+        # pads after booleans). It is what tells a tab from a corner: a tab
+        # projects FROM the outline, so a strip lying on the silhouette is the
+        # blank's own edge rather than one of a tab's flanks.
+        #
+        # Exact boxes (AddOptimal), not the graph's: BRepBndLib::Add pads a
+        # plane bounded by arcs by an amount set by the arcs' parametrisation,
+        # i.e. by where a seam fell, against a 0.05 mm tolerance below. Both
+        # sides use them so an angled strip is judged consistently.
+        exact: dict[int, Bnd_Box] = {}
+        shape = getattr(self, "_shape", None)
+        for node in graph.nodes_by_surface_type(SurfaceType.PLANE):
+            box = Bnd_Box()
+            face = face_by_id(shape, node.face_id) if shape is not None else None
+            if face is not None:
+                BRepBndLib.AddOptimal_s(face, box, False, False)
+            exact[node.face_id] = box if not box.IsVoid() else node.bbox
+        part_box = Bnd_Box()
+        for node in graph.nodes_by_surface_type(SurfaceType.PLANE):
+            part_box.Add(exact[node.face_id])
+
         strips: list[_Strip] = []
         for node in graph.nodes_by_surface_type(SurfaceType.PLANE):
             if node.face_id in taken:
@@ -185,7 +214,14 @@ class SheetOutlineRecognizer(FeatureRecognizer):
                 continue
             if not _bridges_gauge(graph, node, normal):
                 continue
-            strips.append(_Strip(node, normal, _largest_extent(node)))
+            strips.append(
+                _Strip(
+                    node,
+                    normal,
+                    _largest_extent(node),
+                    _on_silhouette(part_box, node, normal, exact.get(node.face_id)),
+                )
+            )
         return strips
 
     def _arc_chains(
@@ -202,12 +238,18 @@ class SheetOutlineRecognizer(FeatureRecognizer):
         into fragments, so adjacent fragments are flooded into one chain and
         connect as a unit.
         """
+        # A cut band through the blank has its AXIS along the gauge and spans
+        # it. The second-smallest-extent test the flat strips use measures a
+        # sheared strip's thickness, which only a narrow arc passes: a
+        # keyhole's circle, 7 mm across in a 1.5 mm sheet, was invisible.
         arcs = [
             node
             for node in graph.nodes_by_surface_type(SurfaceType.CYLINDER)
             if node.face_id not in taken
+            and not node.bbox.IsVoid()
+            and node.cyl_cone_axis is not None
             and gauge * _STRIP_MIN_GAUGES
-            <= _second_smallest_extent(node)
+            <= _extent_along(node, node.cyl_cone_axis.Direction())
             <= gauge * _STRIP_MAX_GAUGES
         ]
         by_id = {node.face_id: node for node in arcs}
@@ -288,6 +330,22 @@ class SheetOutlineRecognizer(FeatureRecognizer):
                 # the gap between them is air: a NOTCH. Pointing away means
                 # metal in between: a TAB.
                 is_notch = reach > 0.0
+                # A TAB projects from the outline, so both its flanks are
+                # interior cuts and the outline is its tip. A leftover corner
+                # where an under-fold cut stops has its faces ON the
+                # silhouette, and it is nobody's tab. A NOTCH is not tested
+                # this way: a relief cut in from the edge legitimately has its
+                # far side on the outline.
+                if not is_notch and (side_a.silhouette or side_b.silhouette):
+                    continue
+                # A tab is a tongue, and a tongue has shoulders: a projection
+                # small against the edge it comes off, with that edge running
+                # on past it on both sides. A FLANGE is the edge itself, the
+                # full width of its panel, and its BEND already describes it.
+                # Without this, which flanges read as tabs depended on whether
+                # a relief cut happened to chop their end into a strip.
+                if not is_notch and gap > _tab_ceiling(graph, side_a, side_b):
+                    continue
                 candidates.append(
                     (
                         gap,
@@ -331,6 +389,18 @@ class SheetOutlineRecognizer(FeatureRecognizer):
         def spans_the_gap(length: float) -> bool:
             return length <= span_limit and length < shortest_run
 
+        # Every connector is collected, both kinds, because the COUNT decides
+        # whether this is a tab or notch at all. A tab or notch is a bite out
+        # of an edge the blank already had, so exactly one end of the U is
+        # closed: where the cut reaches the edge, the strip along it is
+        # interrupted and touches only one wall. A U closed at both ends is
+        # an enclosed aperture through the panel, and emitting nothing leaves
+        # all its walls for the cavity recognizer to claim as one feature.
+        # Stopping at the first hit also let a flat end win over the arc end
+        # of an obround slot, leaving the arc to be called a stray fillet.
+        connectors = 0
+        flat: Optional["_Strip"] = None
+        curved: Optional["_ArcChain"] = None
         for index, candidate in enumerate(strips):
             if index in (first, second):
                 continue
@@ -346,7 +416,9 @@ class SheetOutlineRecognizer(FeatureRecognizer):
                 continue
             if not spans_the_gap(candidate.length):
                 continue
-            return (candidate, None)
+            connectors += 1
+            if flat is None:
+                flat = candidate
 
         for chain in chains:
             touches_a = False
@@ -359,9 +431,13 @@ class SheetOutlineRecognizer(FeatureRecognizer):
                 continue
             if not spans_the_gap(chain.length):
                 continue
-            return (None, chain)
+            connectors += 1
+            if curved is None:
+                curved = chain
 
-        return (None, None)
+        if connectors != 1:
+            return (None, None)
+        return (flat, curved)
 
 
 # =============================================================================
@@ -372,12 +448,15 @@ class SheetOutlineRecognizer(FeatureRecognizer):
 class _Strip:
     """A sheared edge of the blank, reduced to what the pairing needs."""
 
-    __slots__ = ("node", "normal", "length")
+    __slots__ = ("node", "normal", "length", "silhouette")
 
-    def __init__(self, node: AagNode, normal: gp_Dir, length: float):
+    def __init__(
+        self, node: AagNode, normal: gp_Dir, length: float, silhouette: bool = False
+    ):
         self.node = node
         self.normal = normal
         self.length = length  # the long dimension, running along the outline
+        self.silhouette = silhouette  # lies on the blank's own outline
 
 
 class _ArcChain:
@@ -410,6 +489,64 @@ def _sheet_claimed(prior: Optional[Sequence[FeatureInstance]]) -> set[int]:
     }
 
 
+def _tab_ceiling(
+    graph: AttributedAdjacencyGraph, side_a: "_Strip", side_b: "_Strip"
+) -> float:
+    """The widest a tab between these flanks may be: a share of its host panel.
+
+    The host panel's edge is measured along the gap, on the skins beside
+    either flank. The floor keeps a genuinely small tongue on a small panel
+    and sits well under flange scale, so it can never re-admit a flange.
+    """
+    gap_dir = side_a.normal
+    panel = 0.0
+    for side in (side_a, side_b):
+        for neighbour_id in graph.neighbors_of(side.node.face_id):
+            if not graph.has_node(neighbour_id):
+                continue
+            neighbour = graph.node(neighbour_id)
+            if neighbour.surface_type is not SurfaceType.PLANE:
+                continue
+            normal = neighbour.outward_normal
+            # The panel skins stand square to the strip's own normal.
+            if normal is None or abs(normal.Dot(side.normal)) > _SKIN_PERPENDICULAR_MAX_DOT:
+                continue
+            if neighbour.bbox.IsVoid():
+                continue
+            xn, yn, zn, xx, yx, zx = neighbour.bbox.Get()
+            extent = (
+                abs(gap_dir.X()) * (xx - xn)
+                + abs(gap_dir.Y()) * (yx - yn)
+                + abs(gap_dir.Z()) * (zx - zn)
+            )
+            panel = max(panel, extent)
+    if panel <= 0.0:
+        return float("inf")
+    return max(panel * _TAB_PANEL_FRACTION, _TAB_FLOOR_MM)
+
+
+def _box_reach(box: Bnd_Box, direction: gp_Vec) -> float:
+    """The furthest a box's corners reach along ``direction``, from the origin."""
+    xn, yn, zn, xx, yx, zx = box.Get()
+    return max(
+        x * direction.X() + y * direction.Y() + z * direction.Z()
+        for x in (xn, xx)
+        for y in (yn, yx)
+        for z in (zn, zx)
+    )
+
+
+def _on_silhouette(
+    part_box: Bnd_Box, node: AagNode, normal: gp_Dir, box: Optional[Bnd_Box] = None
+) -> bool:
+    """Whether the face reaches as far out along its normal as the blank does."""
+    if part_box.IsVoid():
+        return False
+    direction = gp_Vec(normal)
+    own = box if box is not None else node.bbox
+    return abs(_box_reach(own, direction) - _box_reach(part_box, direction)) < 0.05
+
+
 def _second_smallest_extent(node: AagNode) -> float:
     """The middle of the three bounding-box dimensions.
 
@@ -417,6 +554,16 @@ def _second_smallest_extent(node: AagNode) -> float:
     own -- so the middle one is how far it reaches across the sheet.
     """
     return sorted(node.bbox_dims())[1]
+
+
+def _extent_along(node: AagNode, direction: gp_Dir) -> float:
+    """The face's bounding-box extent projected onto ``direction``."""
+    xn, yn, zn, xx, yx, zx = node.bbox.Get()
+    return (
+        abs(direction.X()) * (xx - xn)
+        + abs(direction.Y()) * (yx - yn)
+        + abs(direction.Z()) * (zx - zn)
+    )
 
 
 def _largest_extent(node: AagNode) -> float:
@@ -444,3 +591,26 @@ def _bridges_gauge(
                 return True  # both skins accounted for
         seen.append(other)
     return False
+
+
+def is_sheet_profile_edge(
+    graph: AttributedAdjacencyGraph, face_id: int, gauge: float
+) -> bool:
+    """A wall cut through the blank: one gauge deep, both skins beside it.
+
+    The one definition of "a wall cut through this blank" the sheet passes
+    share -- the bend recognizer's shear test, the blank purge and this
+    recognizer's own strips all ask it -- so they cannot drift apart.
+    """
+    if gauge <= 0.0 or not graph.has_node(face_id):
+        return False
+    node = graph.node(face_id)
+    if node.surface_type is not SurfaceType.PLANE:
+        return False
+    thin = _second_smallest_extent(node)
+    if thin > gauge * _STRIP_MAX_GAUGES or thin < gauge * _STRIP_MIN_GAUGES:
+        return False
+    normal = node.outward_normal
+    if normal is None:
+        return False
+    return _bridges_gauge(graph, node, normal)

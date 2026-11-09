@@ -27,7 +27,15 @@ from collections import deque
 from typing import Optional, Sequence
 
 from OCP.Bnd import Bnd_Box
-from OCP.gp import gp_Dir, gp_Vec
+from OCP.BRepTools import BRepTools
+from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_WIRE
+from OCP.TopExp import TopExp, TopExp_Explorer
+from OCP.TopoDS import TopoDS
+from OCP.TopTools import (
+    TopTools_IndexedDataMapOfShapeListOfShape,
+    TopTools_IndexedMapOfShape,
+)
+from OCP.gp import gp_Dir, gp_Pnt, gp_Vec
 
 from ..aag import AagNode, AttributedAdjacencyGraph, Concavity, SurfaceType
 from ..features import FeatureInstance, FeatureType
@@ -83,6 +91,11 @@ _OUTER_SILHOUETTE_SPAN_SHARE = 0.85
 # six times.
 _MAX_RECTANGULAR_CORNERS = 4
 
+# Share of the part's own extent along the through axis a four-corner
+# window's walls must reach before it counts as a cut that passes through
+# rather than a recess. See the gate in _describe.
+_THROUGH_SPAN_SHARE = 0.90
+
 
 class ThroughCavityRecognizer(FeatureRecognizer):
     """Recognizes cavities open at both ends."""
@@ -116,13 +129,18 @@ class ThroughCavityRecognizer(FeatureRecognizer):
         visited: set[int] = set()
         found: list[FeatureInstance] = []
 
+        # The openings' profiles, read off the B-rep once (see _RimWires).
+        rim = _RimWires.build(graph, shape)
+
+        found.extend(self._profile_loop_pass(graph, area_cap, part_box, visited))
+
         for seed in graph.nodes_by_surface_type(SurfaceType.PLANE):
             if seed.face_id in visited:
                 continue
             if not self._may_seed(graph, seed, area_cap, part_box):
                 continue
 
-            faces, boundary_normals = self._grow(graph, seed, area_cap, part_box)
+            faces, boundary_normals = self._grow(graph, seed, area_cap, part_box, rim)
             if len(faces) < _MIN_CAVITY_FACES:
                 visited.add(seed.face_id)
                 continue
@@ -135,6 +153,201 @@ class ThroughCavityRecognizer(FeatureRecognizer):
         for index, feature in enumerate(found):
             feature.instance_id = self.instance_id(index)
         return found
+
+    # -- profile-loop pass ----------------------------------------------------
+
+    def _profile_loop_pass(
+        self,
+        graph: AttributedAdjacencyGraph,
+        area_cap: float,
+        part_box: Bnd_Box,
+        visited: set[int],
+    ) -> list[FeatureInstance]:
+        """Apertures grown by their opening rather than by concavity.
+
+        A cut is a tool sweeping a closed profile: planes where the profile
+        ran straight, cylinders or cones where it curved, meeting tangentially,
+        convexly, concavely or sharply depending only on which way it turned.
+        The concavity flood needs a traversal rule for every such meeting and
+        stops where none was written, leaving the far side of the profile to
+        another recognizer (a slot with a swell at its middle came back as two
+        cavities and a partial bore). What is invariant about one cut is that
+        every wall is swept along one axis and stands on one opening: the
+        inner wire of the face it was cut into. Stepped apertures, whose lower
+        walls never reach the entry, are left to the flood that follows.
+        Faces claimed here join `visited`.
+        """
+        found: list[FeatureInstance] = []
+
+        def swept_along(node: AagNode, axis: gp_Dir) -> bool:
+            if node.surface_type is SurfaceType.PLANE:
+                normal = node.outward_normal
+                return normal is not None and abs(normal.Dot(axis)) < _WALL_PERPENDICULAR_MAX_DOT
+            if node.surface_type in (SurfaceType.CYLINDER, SurfaceType.CONE):
+                cyl_axis = node.cyl_cone_axis
+                return cyl_axis is not None and abs(cyl_axis.Direction().Dot(axis)) > 0.9
+            return False
+
+        # A host is a face an aperture was cut into; it never joins the cavity.
+        def is_host(node: AagNode) -> bool:
+            return node.inner_loop_count > 0 or node.area > area_cap
+
+        for host in graph.nodes_by_surface_type(SurfaceType.PLANE):
+            if host.inner_loop_count <= 0:
+                continue
+            axis = host.outward_normal
+            if axis is None:
+                continue
+
+            seeds: list[int] = []
+            for edge in graph.edges_of(host.face_id):
+                if not edge.is_inner_wire_edge:
+                    continue
+                nb_id = edge.other_face(host.face_id)
+                if not graph.has_node(nb_id) or nb_id in visited:
+                    continue
+                nb = graph.node(nb_id)
+                if is_host(nb) or not swept_along(nb, axis):
+                    continue
+                seeds.append(nb_id)
+            if not seeds:
+                continue
+
+            on_wire = set(seeds)
+            seen_here: set[int] = set()
+            for seed in seeds:
+                if seed in seen_here or seed in visited:
+                    continue
+                # The profile is the wire: walk only faces standing on this
+                # opening, never outward by adjacency. Flooding across swept
+                # neighbours leaked into a neighbouring pocket, a boss and a
+                # set of flexure slits; being swept makes a face a wall of
+                # some cut, standing on this opening makes it a wall of this
+                # one.
+                walls = {seed}
+                stack = [seed]
+                while stack:
+                    cur = stack.pop()
+                    for nb_id in graph.neighbors_of(cur):
+                        if nb_id not in on_wire or nb_id in walls or nb_id in visited:
+                            continue
+                        if not graph.has_node(nb_id):
+                            continue
+                        if _is_part_outer(graph.node(nb_id), part_box):
+                            continue
+                        walls.add(nb_id)
+                        stack.append(nb_id)
+                seen_here |= walls
+                if len(walls) < 2:
+                    continue
+                feature = self._describe_profile(graph, host, axis, sorted(walls), part_box)
+                if feature is None:
+                    continue
+                visited.update(walls)
+                found.append(feature)
+        return found
+
+    def _describe_profile(
+        self,
+        graph: AttributedAdjacencyGraph,
+        host: AagNode,
+        axis: gp_Dir,
+        walls: list[int],
+        part_box: Bnd_Box,
+    ) -> Optional[FeatureInstance]:
+        # Through: the walls reach an opening on the far side too, a plane
+        # whose normal opposes the host's.
+        exits = False
+        for wall_id in walls:
+            for edge in graph.edges_of(wall_id):
+                nb_id = edge.other_face(wall_id)
+                if nb_id == host.face_id or not graph.has_node(nb_id):
+                    continue
+                nb = graph.node(nb_id)
+                if nb.surface_type is not SurfaceType.PLANE:
+                    continue
+                normal = nb.outward_normal
+                if normal is not None and normal.Dot(axis) < -0.9:
+                    exits = True
+                    break
+            if exits:
+                break
+        if not exits:
+            return None
+
+        planar = curved = 0
+        min_r = 0.0
+        for wall_id in walls:
+            node = graph.node(wall_id)
+            if node.surface_type is SurfaceType.PLANE:
+                planar += 1
+                continue
+            curved += 1
+            if node.surface_type is SurfaceType.CYLINDER and (
+                min_r == 0.0 or node.cyl_radius < min_r
+            ):
+                min_r = node.cyl_radius
+        if planar == 0:
+            return None  # a bore: the hole family owns it
+        if curved == 0:
+            return None  # a square profile: slot or pocket
+
+        # A simple profile belongs to whoever already reads it. Four corners
+        # or fewer is a rounded rectangle, which pocket or slot serve well.
+        # The reference counts concave wall-to-wall corners only here.
+        corners = _concave_corners(graph, walls)
+        if corners + curved <= _MAX_RECTANGULAR_CORNERS:
+            return None
+
+        gaps = self._facing_gaps(self._walls(graph, walls, axis))
+        if not gaps:
+            return None
+
+        # One profile has one scale. 0.5 mm flexure slits opening into an
+        # 85 mm bore share a boundary, not an operation: no tool cuts a
+        # profile spanning 176 to 1.
+        if not _one_scale(gaps):
+            return None
+
+        # The profile must actually swell. An arc about the width of the cut
+        # is the cut turning; an arc much smaller is a corner break, which
+        # belongs to the blend family.
+        swells = any(
+            graph.node(w).surface_type is SurfaceType.CYLINDER
+            and 2.0 * graph.node(w).cyl_radius >= 0.5 * gaps[0]
+            for w in walls
+        )
+        if not swells:
+            return None
+
+        cavity_box = _combined_box(graph.node(w) for w in walls)
+        if cavity_box.IsVoid():
+            return None
+        extents = _box_extents(cavity_box)
+        depth = abs(axis.X()) * extents[0] + abs(axis.Y()) * extents[1] + abs(axis.Z()) * extents[2]
+        if not part_box.IsVoid() and self._spans_the_part(
+            extents, _box_extents(part_box), axis
+        ):
+            return None
+
+        return FeatureInstance(
+            instance_id=self.instance_id(0),
+            type=FeatureType.THROUGH_CAVITY,
+            faces=list(walls),
+            parameters={
+                "through_axis": (round(axis.X(), 6), round(axis.Y(), 6), round(axis.Z(), 6)),
+                "depth_mm": round(depth, 6),
+                "min_width_mm": round(gaps[0], 6),
+                "max_width_mm": round(gaps[-1], 6),
+                "width_mm": round(gaps[0], 6),
+                "length_mm": round(gaps[-1], 6),
+                "is_open": True,
+                "corner_radius_mm": round(min_r, 6),
+                "corner_count": corners + curved,
+                "has_step_transitions": self._has_steps(graph, walls, axis),
+                "face_count": len(walls),
+            },
+        )
 
     # -- seeding ------------------------------------------------------------
 
@@ -170,6 +383,15 @@ class ThroughCavityRecognizer(FeatureRecognizer):
                 # their own right.
                 if other.surface_type is SurfaceType.CYLINDER and other.is_internal:
                     corner_radii += 1
+            elif edge.concavity is Concavity.CONVEX:
+                # A lobe is the same evidence. Where an arc bulges past the
+                # wall it joins, the metal between them comes to a point and
+                # the junction reads convex, but the wall still ends in an
+                # arc. A keyhole's slot wall has one tangent corner (its
+                # rounded end) and one convex lobe (the circle), so counting
+                # tangents alone it never seeded.
+                if other.surface_type is SurfaceType.CYLINDER and other.is_internal:
+                    corner_radii += 1
         return concave >= 2 or corner_radii >= 2
 
     # -- growth -------------------------------------------------------------
@@ -180,31 +402,73 @@ class ThroughCavityRecognizer(FeatureRecognizer):
         seed: AagNode,
         area_cap: float,
         part_box: Bnd_Box,
+        rim: "_RimWires",
     ) -> tuple[list[int], list[gp_Dir]]:
         """Collect the wall band and the normals of what it terminates against.
 
-        Two passes. The first walks genuine interior corners only, which
-        gathers the sub-cavity around the seed. The second re-runs from the
-        step faces it found, this time crossing their convex edges as well:
-        a step at a land-to-relief transition meets the walls above it at an
-        external corner, so a concave-only walk stops dead there even though
-        both sections belong to the same window.
+        Three steps, run in rounds until nothing is added:
+
+        LOCAL -- a walk across junctions that are unambiguous: concave (a
+        corner of the profile) or tangent (an arc flowing out of its wall).
+
+        STEP -- a cut whose profile changes partway down meets the land
+        across a convex step ring; from the small cardinal step faces already
+        collected, the walk also crosses that one convex junction. It asks
+        whether a wall belongs to this opening further along the axis, not
+        whether it belongs to this profile.
+
+        WIRE -- close the opening along its rim wire: every wall standing on
+        a rim wire some collected wall stands on joins it. The wire is a
+        cycle, so this carries the walk past a bulging lobe, a reflex vertex
+        or any profile turn no local rule was written for. It replaces the
+        terminal-arc branch and the closing-arc pass, both of which tried to
+        decide from local convexity whether the arc beyond a junction was
+        part of this profile.
+
+        The steps feed each other (a lobe pulled in by the wire may have
+        tangent neighbours, a wall reached locally may stand on a second
+        wire), hence the rounds.
         """
         collected = {seed.face_id}
         boundary_normals: list[gp_Dir] = []
-
         queue: deque[int] = deque([seed.face_id])
-        self._walk(graph, queue, collected, boundary_normals, area_cap, part_box, False)
 
-        steps = [
-            face_id
-            for face_id in sorted(collected)
-            if self._is_step_face(graph.node(face_id), area_cap)
-        ]
-        queue = deque(steps)
-        self._walk(graph, queue, collected, boundary_normals, area_cap, part_box, True)
+        for _ in range(64):
+            before = len(collected)
+            self._walk(graph, queue, collected, boundary_normals, area_cap, part_box, False)
+            queue.extend(
+                face_id
+                for face_id in sorted(collected)
+                if self._is_step_face(graph.node(face_id), area_cap)
+            )
+            self._walk(graph, queue, collected, boundary_normals, area_cap, part_box, True)
+            self._wire_step(graph, queue, collected, rim, area_cap, part_box)
+            self._walk(graph, queue, collected, boundary_normals, area_cap, part_box, False)
+            if len(collected) == before:
+                break
 
         return (sorted(collected), boundary_normals)
+
+    @staticmethod
+    def _wire_step(
+        graph: AttributedAdjacencyGraph,
+        queue: deque[int],
+        collected: set[int],
+        rim: "_RimWires",
+        area_cap: float,
+        part_box: Bnd_Box,
+    ) -> None:
+        if not rim.wires:
+            return
+        for face_id in sorted(collected):
+            for wire_index in rim.of_face.get(face_id, ()):
+                for wall_id in rim.wires[wire_index]:
+                    if wall_id in collected or not graph.has_node(wall_id):
+                        continue
+                    if not _admissible(graph.node(wall_id), area_cap, part_box):
+                        continue
+                    collected.add(wall_id)
+                    queue.append(wall_id)
 
     def _walk(
         self,
@@ -322,12 +586,20 @@ class ThroughCavityRecognizer(FeatureRecognizer):
         if axis is None:
             return None
 
-        walls = self._walls(graph, faces, axis)
-        if len(walls) < _MIN_WALLS:
+        # The census counts every face swept along the run, curved ends
+        # included; the facing gaps are still measured between the flats.
+        if sum(1 for f in faces if _is_wall(graph.node(f), axis)) < _MIN_WALLS:
             return None
+        walls = self._walls(graph, faces, axis)
 
         gaps = self._facing_gaps(walls)
         if not gaps:
+            return None
+        # One profile has one scale, here as in the profile-loop pass. The
+        # rim wire joins whatever stands on one closed profile, and on a
+        # mount whose 0.5 mm flexure slits run out into an 85 mm bore that
+        # is one 176-to-1 "cavity" in which every slit vanishes.
+        if not _one_scale(gaps):
             return None
 
         # Extents come from the cavity's own box, not the part's. Measuring
@@ -345,7 +617,18 @@ class ThroughCavityRecognizer(FeatureRecognizer):
         if self._spans_the_part(extents, _box_extents(part_box), axis):
             return None
 
-        corners = self._count_corners(graph, faces)
+        # Which way do the walls face? A cavity is bounded by walls that look
+        # into it; the outside of a part by walls that look away. The
+        # silhouette guard above only catches a mis-grown band spanning the
+        # whole part; a flood that traced one lug's outer profile and then
+        # ran on into the slot cut in its top spans a quarter of it. Tested
+        # against the cavity's own box centre, so no notion of where the
+        # part is is needed: a wall whose outward normal points away from
+        # the cavity has the cavity behind it.
+        if _faces_outward(graph, faces, axis, cavity_box):
+            return None
+
+        corners = _concave_corners(graph, faces)
         radii = [
             node.cyl_radius
             for node in (graph.node(face_id) for face_id in faces)
@@ -356,8 +639,20 @@ class ThroughCavityRecognizer(FeatureRecognizer):
         # rectangular cut, and the slot and pocket recognizers describe it
         # better. Rounded windows are the exception: with no floor to seed
         # from, nothing else serves them at all.
+        #
+        # And so is a cut that goes all the way THROUGH. Pocket, slot and slit
+        # are all floor-seeded, so for a through cut the handover is to
+        # nobody and the opening is claimed by no recognizer at all. Whether
+        # the wall band reaches through the part is a statement about the
+        # cut, and the threshold sits in a measured gap: rejected recesses
+        # top out at 0.74 of the part's extent, real through cuts sit at
+        # 0.99999, and the margin is spent on the reject side because an
+        # invented feature is priced. Measured against a box of the PLANE
+        # faces only: a curved face's box is padded out to its control hull,
+        # by about the margin this test needs.
         if corners <= _MAX_RECTANGULAR_CORNERS and not radii:
-            return None
+            if self._through_span_share(graph, axis, depth) < _THROUGH_SPAN_SHARE:
+                return None
 
         return FeatureInstance(
             instance_id=self.instance_id(0),
@@ -385,6 +680,20 @@ class ThroughCavityRecognizer(FeatureRecognizer):
         )
 
     @staticmethod
+    def _through_span_share(graph: AttributedAdjacencyGraph, axis: gp_Dir, depth: float) -> float:
+        """The cavity's depth as a share of the part's extent along its axis."""
+        planes = _combined_box(graph.nodes_by_surface_type(SurfaceType.PLANE))
+        if planes.IsVoid():
+            return 0.0
+        extents = _box_extents(planes)
+        along = (
+            abs(axis.X()) * extents[0]
+            + abs(axis.Y()) * extents[1]
+            + abs(axis.Z()) * extents[2]
+        )
+        return depth / along if along > 1.0e-9 else 0.0
+
+    @staticmethod
     def _through_axis(
         graph: AttributedAdjacencyGraph,
         faces: list[int],
@@ -403,11 +712,7 @@ class ThroughCavityRecognizer(FeatureRecognizer):
         for axis in (gp_Dir(1, 0, 0), gp_Dir(0, 1, 0), gp_Dir(0, 0, 1)):
             count = 0
             for face_id in faces:
-                node = graph.node(face_id)
-                if node.surface_type is not SurfaceType.PLANE:
-                    continue
-                normal = node.outward_normal
-                if normal is not None and abs(normal.Dot(axis)) < _WALL_PERPENDICULAR_MAX_DOT:
+                if _is_wall(graph.node(face_id), axis):
                     count += 1
             if count < _MIN_WALLS:
                 continue
@@ -455,30 +760,6 @@ class ThroughCavityRecognizer(FeatureRecognizer):
                 if gap > _MIN_GAP_MM:
                     gaps.append(gap)
         return sorted(gaps)
-
-    @staticmethod
-    def _count_corners(graph: AttributedAdjacencyGraph, faces: list[int]) -> int:
-        """Corners in the profile: each pair of collected walls that meets.
-
-        Every turn counts, not only the ones that turn inward. Half a T-slot's
-        corners are external: where the step meets the neck wall above it the
-        material forms a 90 degree outside corner, so a concave-only count
-        reads a T as a plain rectangle and rejects exactly the profile this
-        recognizer exists for. Tangent seams are excluded -- a wall split in
-        two by a Boolean is one wall, not a corner.
-        """
-        inside = set(faces)
-        seen: set[tuple[int, int]] = set()
-        for face_id in faces:
-            for edge in graph.edges_of(face_id):
-                if edge.other_face(face_id) not in inside:
-                    continue
-                if edge.concavity not in (Concavity.CONCAVE, Concavity.CONVEX):
-                    continue
-                if edge.is_tangent:
-                    continue
-                seen.add((edge.face_id_a, edge.face_id_b))
-        return len(seen)
 
     @staticmethod
     def _has_steps(
@@ -546,6 +827,235 @@ def _is_part_outer(node: AagNode, part_box: Bnd_Box) -> bool:
         if component < -_CARDINAL_ALIGNMENT_MIN:
             return abs(coordinate - low) < _PART_OUTER_TOLERANCE_MM
     return False
+
+
+def _faces_outward(
+    graph: AttributedAdjacencyGraph, faces: list[int], axis: gp_Dir, box: Bnd_Box
+) -> bool:
+    """More planar walls look away from the cavity's box centre than into it.
+
+    Walls only: a face square to the through axis is an end the cavity
+    passes through, not a side of it.
+    """
+    if box.IsVoid():
+        return False
+    x0, y0, z0, x1, y1, z1 = box.Get()
+    mid = gp_Pnt((x0 + x1) * 0.5, (y0 + y1) * 0.5, (z0 + z1) * 0.5)
+    facing_in = facing_out = 0
+    for face_id in faces:
+        if not graph.has_node(face_id):
+            continue
+        node = graph.node(face_id)
+        if node.surface_type is not SurfaceType.PLANE:
+            continue
+        normal = node.outward_normal
+        if normal is None:
+            continue
+        if abs(normal.Dot(axis)) > 0.7:
+            continue
+        to_mid = gp_Vec(node.centroid, mid)
+        if to_mid.Magnitude() < 1.0e-9:
+            continue
+        if to_mid.Dot(gp_Vec(normal)) > 0.0:
+            facing_in += 1
+        else:
+            facing_out += 1
+    return facing_out > facing_in
+
+
+def _is_wall(node: AagNode, axis: gp_Dir) -> bool:
+    """Whether a face is swept along the through axis: a wall of the cavity.
+
+    A plane whose normal is square to the axis, or a cylinder whose axis runs
+    PARALLEL to it -- a corner radius or a whole rounded end. Counting planes
+    only made the census depend on how the profile is cornered: an obround
+    cutout, the default laser or punch shape, has three flats and one
+    semicylindrical end, and was rejected for having three walls.
+    """
+    if node.surface_type is SurfaceType.PLANE:
+        normal = node.outward_normal
+        return normal is not None and abs(normal.Dot(axis)) < _WALL_PERPENDICULAR_MAX_DOT
+    if node.surface_type is SurfaceType.CYLINDER:
+        cylinder_axis = node.cyl_cone_axis
+        return cylinder_axis is not None and abs(cylinder_axis.Direction().Dot(axis)) > 0.9
+    return False
+
+
+def _one_scale(gaps: list[float]) -> bool:
+    """Whether a profile's facing gaps belong to one cut.
+
+    Faces standing on one opening are one aperture topologically, not one
+    cut: 0.5 mm slits opening into an 85 mm bore span 176 to 1, and no tool
+    cuts that. A slot widening into a swell is 70 against 180.
+    """
+    return bool(gaps) and gaps[-1] <= 10.0 * gaps[0]
+
+
+def _admissible(node: AagNode, area_cap: float, part_box: Bnd_Box) -> bool:
+    """A face that may be a wall: not a host, not oversized, not the outside.
+
+    The rim-wire step's test. Unlike `_may_absorb` it admits a curved face,
+    since a lobe on the wire is exactly what that step exists to collect.
+    """
+    if node.area > area_cap or node.inner_loop_count > 0:
+        return False
+    return not _is_part_outer(node, part_box)
+
+
+class _RimWires:
+    """Which faces stand on which opening's rim wire.
+
+    An opening is a tool sweeping a closed profile, and on the face it was
+    cut into that profile is a wire. Two walls belong to the same opening
+    when their rim edges lie on the same rim wire. That replaces adjacency
+    across a concave edge, a relation that is discontinuous where the truth
+    is constant: as a lobe grows from inscribed to bulging, its junction
+    walks concave -> tangent -> convex while the number of openings never
+    changes. Convexity stays in the classification instead (is this inner
+    wire a depression or a protrusion), where it compares ~90 against ~270
+    degrees.
+
+    Known limits, all failing safe (the wire is not found and the local walk
+    decides alone): a blended or chamfered rim, a split or non-planar host,
+    an island, and an open notch (no inner wire at all).
+    """
+
+    def __init__(self) -> None:
+        self.wires: list[list[int]] = []
+        self.of_face: dict[int, list[int]] = {}
+
+    @classmethod
+    def build(cls, graph: AttributedAdjacencyGraph, shape) -> "_RimWires":
+        rim = cls()
+        if shape is None or shape.IsNull():
+            return rim
+        face_map = TopTools_IndexedMapOfShape()
+        TopExp.MapShapes_s(shape, TopAbs_FACE, face_map)
+        # The graph's face ids are this map's indices. If the two ever
+        # disagree, return nothing rather than attach walls to the wrong
+        # opening; the local walk still runs.
+        if face_map.Extent() == 0 or face_map.Extent() != graph.face_count:
+            return rim
+        edge_faces = TopTools_IndexedDataMapOfShapeListOfShape()
+        TopExp.MapShapesAndAncestors_s(shape, TopAbs_EDGE, TopAbs_FACE, edge_faces)
+
+        for host_id in range(1, face_map.Extent() + 1):
+            if not graph.has_node(host_id):
+                continue
+            host = graph.node(host_id)
+            if host.inner_loop_count <= 0 or host.surface_type is not SurfaceType.PLANE:
+                continue
+            hn = host.outward_normal
+            if hn is None:
+                continue
+            face = TopoDS.Face_s(face_map.FindKey(host_id))
+            outer = BRepTools.OuterWire_s(face)
+            wires = TopExp_Explorer(face, TopAbs_WIRE)
+            while wires.More():
+                wire = TopoDS.Wire_s(wires.Current())
+                wires.Next()
+                if not outer.IsNull() and wire.IsSame(outer):
+                    continue
+                walls, spans, depression = rim._walls_on(
+                    graph, host, hn, host_id, wire, face_map, edge_faces
+                )
+                if not depression:
+                    continue
+                # One rim, one section. Walls of one profile reach equally far
+                # along the axis; a face on the rim reaching much further is
+                # a deeper cut sharing the rim (a through bore biting the edge
+                # of a shallow pocket), and joining it would hand this profile
+                # an exit it does not have. Against the median, loosely (1.5x),
+                # because curved-face boxes pad and Boolean-split walls run
+                # a little short.
+                ordered = sorted(span for _, span in spans)
+                median = ordered[len(ordered) // 2] if ordered else 0.0
+                if median > 1.0e-9:
+                    walls = {face_id for face_id, span in spans if span <= 1.5 * median}
+                # One face across the whole wire is a bore, not a profile.
+                if len(walls) < 2:
+                    continue
+                index = len(rim.wires)
+                rim.wires.append(sorted(walls))
+                for wall_id in sorted(walls):
+                    rim.of_face.setdefault(wall_id, []).append(index)
+        return rim
+
+    @staticmethod
+    def _walls_on(graph, host, hn, host_id, wire, face_map, edge_faces):
+        walls: set[int] = set()
+        spans: list[tuple[int, float]] = []
+        edges = TopExp_Explorer(wire, TopAbs_EDGE)
+        while edges.More():
+            edge = edges.Current()
+            edges.Next()
+            if not edge_faces.Contains(edge):
+                continue
+            incident = edge_faces.FindFromKey(edge)
+            if incident.Extent() != 2:
+                continue  # not a manifold rim edge
+            for other in incident:
+                face_id = face_map.FindIndex(other)
+                if face_id < 1 or face_id == host_id or not graph.has_node(face_id):
+                    continue
+                cand = graph.node(face_id)
+                # Depression or protrusion, per rim edge: the face across a
+                # cut's rim lies below the host plane, a boss's above it.
+                # Measured on the far face's centroid, since a point on the
+                # rim lies in the host plane by construction.
+                side = gp_Vec(host.centroid, cand.centroid).Dot(gp_Vec(hn))
+                if side > 1.0e-6:
+                    return walls, spans, False
+                # A wall of this opening is swept along the rim's axis. A
+                # blended rim puts tori across the wire, none of them a wall,
+                # so the wire is dropped and the local walk decides as
+                # before. Cones stay out: a rim chamfer and a drafted wall
+                # are both cones about the axis and nothing local tells them
+                # apart.
+                if cand.surface_type is SurfaceType.PLANE:
+                    cn = cand.outward_normal
+                    is_wall = cn is not None and abs(cn.Dot(hn)) < 0.3
+                elif cand.surface_type is SurfaceType.CYLINDER:
+                    axis = cand.cyl_cone_axis
+                    is_wall = axis is not None and abs(axis.Direction().Dot(hn)) > 0.9
+                else:
+                    is_wall = False
+                if not is_wall or face_id in walls:
+                    continue
+                walls.add(face_id)
+                span = 0.0
+                if not cand.bbox.IsVoid():
+                    sxn, syn, szn, sxx, syx, szx = cand.bbox.Get()
+                    span = (
+                        abs(hn.X()) * (sxx - sxn)
+                        + abs(hn.Y()) * (syx - syn)
+                        + abs(hn.Z()) * (szx - szn)
+                    )
+                spans.append((face_id, span))
+        return walls, spans, True
+
+
+def _concave_corners(graph: AttributedAdjacencyGraph, faces: list[int]) -> int:
+    """Concave wall-to-wall meetings, each face pair counted once.
+
+    The reference's `count_corners`, used by both passes. Only interior
+    (concave) corners count: a pair of faces meeting convexly inside the set
+    is not a corner of the profile. Counting every turn made two parallel
+    slits joined across a convex ledge a six-corner profile, which this
+    recognizer then claimed from the slit recognizer (nist_ftc_10); the
+    reference counts four there and leaves the slits alone.
+    """
+    inside = set(faces)
+    seen: set[tuple[int, int]] = set()
+    for face_id in faces:
+        for edge in graph.edges_of(face_id):
+            if edge.concavity is not Concavity.CONCAVE:
+                continue
+            nb = edge.other_face(face_id)
+            if nb not in inside:
+                continue
+            seen.add((min(face_id, nb), max(face_id, nb)))
+    return len(seen)
 
 
 def _combined_box(nodes) -> Bnd_Box:

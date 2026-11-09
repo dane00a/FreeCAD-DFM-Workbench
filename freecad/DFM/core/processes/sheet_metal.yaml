@@ -25,12 +25,21 @@ active_rules:
 - SHEET_LOUVER_TALL
 - SHEET_FORMED_PITCH
 - SHEET_SHARP_FOLD
+- SHEET_BEND_OPERATIONS
 - SHEET_FORMED_NEAR_BEND
 - SHEET_FEATURE_COMPLEXITY
 - SHEET_MACHINED_FEATURE
 - PART_ASPECT_RATIO
 - MINIMUM_FEATURE_SIZE
 - PART_MARKING
+- KNURL_PRESENT
+- GDT_TOLERANCE_ACHIEVABLE
+- GDT_DATUM_VALID
+- GDT_DATUM_UNRESOLVED
+- GDT_SURFACE_FINISH_CONFLICT
+- GDT_FEATURE_TOLERANCE_MISMATCH
+- NOTE_SURFACE_FINISH_DEMANDING
+- SURFACE_FINISH_PER_FACE_DEMANDING
 rule_feedback:
   SHEET_BEND_RADIUS_SMALL:
     warning_msg: ''
@@ -92,6 +101,9 @@ rule_feedback:
   SHEET_SHARP_FOLD:
     warning_msg: ''
     error_msg: ''
+  SHEET_BEND_OPERATIONS:
+    warning_msg: ''
+    error_msg: ''
   SHEET_FORMED_NEAR_BEND:
     warning_msg: ''
     error_msg: ''
@@ -108,6 +120,30 @@ rule_feedback:
     warning_msg: ''
     error_msg: ''
   PART_MARKING:
+    warning_msg: ''
+    error_msg: ''
+  KNURL_PRESENT:
+    warning_msg: ''
+    error_msg: ''
+  GDT_TOLERANCE_ACHIEVABLE:
+    warning_msg: ''
+    error_msg: ''
+  GDT_DATUM_VALID:
+    warning_msg: ''
+    error_msg: ''
+  GDT_DATUM_UNRESOLVED:
+    warning_msg: ''
+    error_msg: ''
+  GDT_SURFACE_FINISH_CONFLICT:
+    warning_msg: ''
+    error_msg: ''
+  GDT_FEATURE_TOLERANCE_MISMATCH:
+    warning_msg: ''
+    error_msg: ''
+  NOTE_SURFACE_FINISH_DEMANDING:
+    warning_msg: ''
+    error_msg: ''
+  SURFACE_FINISH_PER_FACE_DEMANDING:
     warning_msg: ''
     error_msg: ''
 rule_criticality:
@@ -131,12 +167,21 @@ rule_criticality:
   SHEET_LOUVER_TALL: MEDIUM
   SHEET_FORMED_PITCH: MEDIUM
   SHEET_SHARP_FOLD: HIGH
+  SHEET_BEND_OPERATIONS: LOW
   SHEET_FORMED_NEAR_BEND: MEDIUM
   SHEET_FEATURE_COMPLEXITY: LOW
   SHEET_MACHINED_FEATURE: MEDIUM
   PART_ASPECT_RATIO: MEDIUM
   MINIMUM_FEATURE_SIZE: HIGH
   PART_MARKING: LOW
+  KNURL_PRESENT: LOW
+  GDT_TOLERANCE_ACHIEVABLE: MEDIUM
+  GDT_DATUM_VALID: MEDIUM
+  GDT_DATUM_UNRESOLVED: MEDIUM
+  GDT_SURFACE_FINISH_CONFLICT: MEDIUM
+  GDT_FEATURE_TOLERANCE_MISMATCH: LOW
+  NOTE_SURFACE_FINISH_DEMANDING: MEDIUM
+  SURFACE_FINISH_PER_FACE_DEMANDING: MEDIUM
 materials:
   Default:
     category: Default
@@ -195,6 +240,8 @@ materials:
         limit: N/A
       SHEET_SHARP_FOLD:
         binary_severity: WARNING
+      SHEET_BEND_OPERATIONS:
+        binary_severity: INFO
       SHEET_FORMED_NEAR_BEND:
         target: N/A
         limit: N/A
@@ -211,6 +258,23 @@ materials:
         limit: '0.5'
       PART_MARKING:
         binary_severity: INFO
+      KNURL_PRESENT:
+        binary_severity: INFO
+      GDT_DATUM_VALID:
+        binary_severity: WARNING
+      GDT_DATUM_UNRESOLVED:
+        binary_severity: WARNING
+      GDT_FEATURE_TOLERANCE_MISMATCH:
+        binary_severity: WARNING
+      GDT_TOLERANCE_ACHIEVABLE:
+        target: N/A
+        limit: N/A
+      GDT_SURFACE_FINISH_CONFLICT:
+        binary_severity: WARNING
+      NOTE_SURFACE_FINISH_DEMANDING:
+        binary_severity: WARNING
+      SURFACE_FINISH_PER_FACE_DEMANDING:
+        binary_severity: WARNING
   Aluminum (Soft Wrought Alloy):
     category: Aluminium
     is_active: true

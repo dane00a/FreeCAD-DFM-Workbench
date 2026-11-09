@@ -182,6 +182,10 @@ class GrooveSquareCornerCheck(MachiningCheck):
                     value=radius,
                     limit=limit,
                     comparison="<",
+                    # The reference files this rule under "slot": a gasket
+                    # loop is milled as a closed slot, and that is the
+                    # category its finding carries there.
+                    category="slot",
                 )
             )
         return results

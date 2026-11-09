@@ -322,8 +322,17 @@ class TestWorkholding(unittest.TestCase):
         self.assertTrue(check(plate, Rulebook.THIN_CLAMPING_DIMENSION, limit="6.0"))
 
     def test_small_part_gets_a_holding_note(self):
-        findings = check(make_tiny_cube(), Rulebook.SMALL_PART_HOLDING)
+        # 25 x 25 x 2: below vise scale and thinner than jaw engagement.
+        wafer = BRepPrimAPI_MakeBox(25.0, 25.0, 2.0).Shape()
+        findings = check(wafer, Rulebook.SMALL_PART_HOLDING)
         self.assertEqual(severities(findings), [Severity.INFO])
+
+    def test_small_part_with_no_datum_sized_flat_gets_no_holding_note(self):
+        # A 12 mm cube has no flat over the 200 mm2 datum area at all. The
+        # reference leaves that to no_datum_face rather than calling it a
+        # missing parallel pair, and 12 mm is thick enough to grip, so there
+        # is no holding concern to note (the `small_part` fixture's golden).
+        self.assertEqual(check(make_tiny_cube(), Rulebook.SMALL_PART_HOLDING), [])
 
     def test_normal_part_gets_no_holding_note(self):
         self.assertEqual(check(make_ordinary_block(), Rulebook.SMALL_PART_HOLDING), [])

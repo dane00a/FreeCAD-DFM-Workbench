@@ -36,6 +36,7 @@ from __future__ import annotations
 
 from typing import Optional, Sequence
 
+from OCP.Bnd import Bnd_Box
 from OCP.gp import gp_Dir, gp_Vec
 
 from ..aag import AagNode, AttributedAdjacencyGraph, SurfaceType
@@ -62,6 +63,11 @@ _GLAND_MAX_RATIO = 2.2
 _FACE_GLAND_MIN_WIDTH_MM = 1.0
 _FACE_GLAND_MAX_WIDTH_MM = 12.0
 _FACE_GLAND_MAX_DEPTH_MM = 10.0
+
+# Fragments of one interrupted face gland: radii equal to within this, and
+# floors in one plane to within the second figure.
+_RADIUS_EPS_MM = 1.0e-4
+_FLOOR_PLANE_TOL_MM = 0.05
 
 # Retaining rings sit in a narrow square-shouldered groove.
 _RETAINING_MAX_WIDTH_MM = 2.5
@@ -154,8 +160,17 @@ class GrooveRecognizer(FeatureRecognizer):
             flank = self._flank_beyond(graph, shoulder, groove, axis)
             if flank is None:
                 continue
+            # Never pair the same flank twice when two shoulders share it.
+            # A bend's outer skin split by a sliver shows a narrow cylinder
+            # with both end faces leading to one neighbouring skin piece, and
+            # counted twice that single piece "flanked" a groove 0.0001 mm
+            # deep (sm_relief_shapes, sm_hd_bracket).
+            if flanks and flanks[-1].face_id == flank.face_id:
+                continue
             shoulders.append(shoulder)
             flanks.append(flank)
+            if len(flanks) == 2:
+                break
 
         if len(shoulders) < 2 or len(flanks) < 2:
             return None
@@ -193,7 +208,13 @@ class GrooveRecognizer(FeatureRecognizer):
         adjacent_thread = next(
             (threads[f.face_id] for f in flanks if f.face_id in threads), None
         )
-        groove_type = self._classify(width, depth, adjacent_thread is not None)
+        groove_type = self._classify(
+            width,
+            depth,
+            adjacent_thread is not None,
+            groove_diameter=groove.cyl_radius * 2.0,
+            is_internal=groove.is_internal,
+        )
 
         parameters = {
             "axis": (
@@ -217,22 +238,16 @@ class GrooveRecognizer(FeatureRecognizer):
             if designation:
                 parameters["adjacent_thread_designation"] = designation
 
-        # The flanks are members, not just context. A groove's faces then
-        # form a superset of what the counterbore path emits for the same
-        # geometry, so a counterbore mistaken for a groove is wholly
-        # contained and the resolver drops it. It also keeps a real bore
-        # alive: the bore has openings the groove does not, and the groove
-        # has flanks the bore's own reading does not, so neither set
-        # contains the other and both survive -- which is right, because a
-        # bore with a relief turned into it is still a bore.
+        # The groove is its own band and shoulders. The flanks are the bore
+        # or shaft it interrupts and belong to that feature; claiming them
+        # too put one face under a groove and a hole at once (relief-undercut
+        # tapped ports). A counterbore read off the relief band is demoted by
+        # the resolver instead. Band first: the resolver reads it as the
+        # groove's floor.
         return FeatureInstance(
             instance_id=self.instance_id(0),
             type=groove_type,
-            faces=sorted(
-                {groove.face_id}
-                | {node.face_id for node in shoulders}
-                | {node.face_id for node in flanks}
-            ),
+            faces=[groove.face_id] + [node.face_id for node in shoulders[:2]],
             parameters=parameters,
         )
 
@@ -257,7 +272,14 @@ class GrooveRecognizer(FeatureRecognizer):
                 return candidate
         return None
 
-    def _classify(self, width: float, depth: float, thread_adjacent: bool) -> str:
+    def _classify(
+        self,
+        width: float,
+        depth: float,
+        thread_adjacent: bool,
+        groove_diameter: float = 0.0,
+        is_internal: bool = False,
+    ) -> str:
         """What the groove is for, from its proportions and its neighbours.
 
         Context beats dimension: a groove next to a thread is a relief
@@ -265,6 +287,15 @@ class GrooveRecognizer(FeatureRecognizer):
         """
         if thread_adjacent:
             return FeatureType.THREAD_RELIEF_GROOVE
+
+        # The catalogue answers next, because it answers exactly. A ring
+        # groove and an O-ring gland are the same shape and at real hardware
+        # sizes their proportions overlap, but a ring groove is cut to a
+        # published row -- the ring is a bought part -- so a groove whose
+        # diameter and width match its bore's DIN 472 row is a ring groove
+        # whatever its proportions look like.
+        if is_internal and _matches_din472(groove_diameter, width, depth):
+            return FeatureType.RETAINING_RING_GROOVE
 
         ratio = width / depth if depth > 1e-9 else 0.0
 
@@ -310,7 +341,30 @@ class GrooveRecognizer(FeatureRecognizer):
         would otherwise emit one bogus circular gland per corner; those loops
         belong to the pass below.
         """
-        found: list[FeatureInstance] = []
+        # A ring can be interrupted: a cavity whose corners reach past it
+        # cuts it into arcs, and the seam splits those again. Judged one
+        # fragment at a time every arc fails the full-ring gate and the gland
+        # goes unrecognised. So the (outer wall, ring floor, inner wall)
+        # triples are collected first, and the coaxial ones of equal radii
+        # sharing one floor plane are grouped; the full-ring test then runs
+        # on the union of a group. Grouping on coaxiality is what still keeps
+        # a rounded-rectangle loop out: its corner arcs each have their own
+        # axis, so they never group.
+        #
+        # The inner wall can be the interrupted one. Grouping answers an
+        # outer wall cut into fragments (each fragment seeds a triple); it
+        # cannot answer the mirror case, a whole outer wall with only the
+        # inner one cut, because then there is exactly one triple and the
+        # inner full-ring test runs against a single arc. On
+        # text_neg_decor_groove three radial bars cut the inner ring's
+        # r=17.4 wall into three 116 degree arcs, so that ring read as
+        # nothing while the outer one, on identical geometry, was a GROOVE.
+        # A triple therefore carries every fragment of its inner wall --
+        # every coaxial convex cylinder of the same radius bounding the same
+        # ring floor -- and the full-ring test runs on their union. The
+        # representative is still the first fragment, so every number a
+        # gland measures is unchanged.
+        triples: list[tuple[AagNode, AagNode, AagNode, float, float, list[AagNode]]] = []
         claimed_outers: set[int] = set()
 
         for outer in graph.nodes_by_surface_type(SurfaceType.CYLINDER):
@@ -330,7 +384,7 @@ class GrooveRecognizer(FeatureRecognizer):
                 if abs(floor_normal.Dot(axis_dir)) <= _SHOULDER_AXIS_ALIGNMENT:
                     continue
 
-                inner = self._inner_wall(graph, floor, outer, axis)
+                inner, inner_fragments = self._inner_wall(graph, floor, outer, axis)
                 if inner is None:
                     continue
 
@@ -340,31 +394,90 @@ class GrooveRecognizer(FeatureRecognizer):
                     continue
                 if not 0.0 < depth <= _FACE_GLAND_MAX_DEPTH_MM:
                     continue
-                if not (_full_ring(outer) and _full_ring(inner)):
-                    continue
 
-                groove_type = self._classify(width, depth, False)
-                claimed_outers.add(outer.face_id)
-                found.append(
-                    FeatureInstance(
-                        instance_id=self.instance_id(0),
-                        type=groove_type,
-                        faces=sorted({outer.face_id, floor.face_id, inner.face_id}),
-                        parameters={
-                            "axis": _axis_tuple(axis_dir),
-                            "groove_diameter_mm": round(outer.cyl_radius * 2.0, 6),
-                            "inner_diameter_mm": round(inner.cyl_radius * 2.0, 6),
-                            "width_mm": round(width, 6),
-                            "depth_mm": round(depth, 6),
-                            "is_internal": False,
-                            "thread_adjacent": False,
-                            "groove_type": groove_type,
-                            "gland_orientation": "face",
-                            "gland_shape": "circular",
-                        },
-                    )
+                centroid = floor.centroid
+                floor_offset = abs(
+                    centroid.X() * floor_normal.X()
+                    + centroid.Y() * floor_normal.Y()
+                    + centroid.Z() * floor_normal.Z()
                 )
+                triples.append((outer, floor, inner, floor_offset, depth, inner_fragments))
+                claimed_outers.add(outer.face_id)
                 break
+
+        found: list[FeatureInstance] = []
+        grouped = [False] * len(triples)
+        for a, seed in enumerate(triples):
+            if grouped[a]:
+                continue
+            members = [a]
+            grouped[a] = True
+            for b in range(a + 1, len(triples)):
+                if grouped[b]:
+                    continue
+                other = triples[b]
+                if not axes_are_coaxial(other[0].cyl_cone_axis, seed[0].cyl_cone_axis):
+                    continue
+                if abs(other[0].cyl_radius - seed[0].cyl_radius) > _RADIUS_EPS_MM:
+                    continue
+                if abs(other[2].cyl_radius - seed[2].cyl_radius) > _RADIUS_EPS_MM:
+                    continue
+                if abs(other[3] - seed[3]) > _FLOOR_PLANE_TOL_MM:
+                    continue
+                members.append(b)
+                grouped[b] = True
+
+            outer_box, inner_box = Bnd_Box(), Bnd_Box()
+            faces: list[int] = []
+            depth = 0.0
+            for m in members:
+                outer, floor, inner, _, member_depth, fragments = triples[m]
+                outer_box.Add(outer.bbox)
+                # Every fragment of the inner wall, not just the
+                # representative: a ring broken into arcs is still a ring.
+                for fragment in fragments:
+                    inner_box.Add(fragment.bbox)
+                depth = max(depth, member_depth)
+                for face_id in (outer.face_id, floor.face_id):
+                    if face_id not in faces:
+                        faces.append(face_id)
+                for fragment in fragments:
+                    if fragment.face_id not in faces:
+                        faces.append(fragment.face_id)
+
+            seed_outer, seed_inner = seed[0], seed[2]
+            axis_dir = seed_outer.cyl_cone_axis.Direction()
+            if not _full_ring_box(outer_box, axis_dir, seed_outer.cyl_radius):
+                continue
+            if not _full_ring_box(inner_box, axis_dir, seed_inner.cyl_radius):
+                continue
+
+            width = seed_outer.cyl_radius - seed_inner.cyl_radius
+            groove_type = self._classify(width, depth, False)
+            parameters = {
+                "axis": _axis_tuple(axis_dir),
+                "groove_diameter_mm": round(seed_outer.cyl_radius * 2.0, 6),
+                "inner_diameter_mm": round(seed_inner.cyl_radius * 2.0, 6),
+                "width_mm": round(width, 6),
+                "depth_mm": round(depth, 6),
+                "is_internal": False,
+                "thread_adjacent": False,
+                "groove_type": groove_type,
+                "gland_orientation": "face",
+                "gland_shape": "circular",
+            }
+            # An interrupted ring is worth saying: the seal land is not
+            # continuous, an inspection and fixturing note in its own right.
+            if len(members) > 1:
+                parameters["ring_segments"] = len(members)
+            found.append(
+                FeatureInstance(
+                    instance_id=self.instance_id(0),
+                    type=groove_type,
+                    faces=faces,
+                    parameters=parameters,
+                )
+            )
 
         return found
 
@@ -374,8 +487,16 @@ class GrooveRecognizer(FeatureRecognizer):
         floor: AagNode,
         outer: AagNode,
         axis,
-    ) -> Optional[AagNode]:
-        """The convex island wall on the far side of a ring floor."""
+    ) -> tuple[Optional[AagNode], list[AagNode]]:
+        """The convex island wall on the far side of a ring floor.
+
+        Returns the representative (the first in neighbour order) and every
+        fragment of that wall: later candidates of the same radius. A
+        different radius is a different wall -- a boss standing in the
+        ring -- and is left alone.
+        """
+        first: Optional[AagNode] = None
+        fragments: list[AagNode] = []
         for candidate, _ in neighbours(graph, floor.face_id):
             if candidate.face_id == outer.face_id:
                 continue
@@ -387,8 +508,13 @@ class GrooveRecognizer(FeatureRecognizer):
                 continue
             if candidate.cyl_radius >= outer.cyl_radius - 1e-6:
                 continue
-            return candidate
-        return None
+            if first is None:
+                first = candidate
+            elif abs(candidate.cyl_radius - first.cyl_radius) > _RADIUS_EPS_MM:
+                continue
+            if all(f.face_id != candidate.face_id for f in fragments):
+                fragments.append(candidate)
+        return first, fragments
 
     # -- loop glands --------------------------------------------------------
 
@@ -435,6 +561,19 @@ class GrooveRecognizer(FeatureRecognizer):
             )
             if not 0.0 < depth <= _FACE_GLAND_MAX_DEPTH_MM:
                 continue
+            # A corner of the channel is exactly as deep as the channel. A
+            # bore that crosses the groove is axis-parallel to the floor
+            # normal too -- it is drilled into the same face -- so the axis
+            # test that collected the corners cannot tell them apart, and a
+            # gasket gland swallowed the bolt holes crossing it. Those bores
+            # then stopped being holes, and the thin web each leaves against
+            # the groove wall went unreported. 1.5x plus a tenth absorbs the
+            # bbox padding a curved face picks up without admitting a bore.
+            corners = [
+                corner
+                for corner in corners
+                if _extent_along(corner, floor_normal) <= depth * 1.5 + 0.1
+            ]
 
             mean_width = (width_min + width_max) * 0.5
             groove_type = self._classify(mean_width, depth, False)
@@ -502,6 +641,56 @@ class GrooveRecognizer(FeatureRecognizer):
 # -- shared geometry ---------------------------------------------------------
 
 
+# DIN 472 internal retaining-ring grooves: (bore d1, groove diameter d2,
+# groove width m), from a manufacturer's spec sheet. Every row satisfies the
+# standard's own identity (d2 - d1) / 2 == t, which is how the rows were
+# validated; rows that failed it are absent rather than guessed. A bore size
+# not listed falls through to the proportion bands, so extending the table can
+# only sharpen the answer.
+_DIN472 = (
+    (8.0, 8.4, 0.90), (9.0, 9.4, 0.90), (10.0, 10.4, 1.10),
+    (12.0, 12.5, 1.10), (13.0, 13.6, 1.10), (14.0, 14.6, 1.10),
+    (15.0, 15.7, 1.10), (16.0, 16.8, 1.10), (17.0, 17.8, 1.10),
+    (21.0, 22.0, 1.10), (22.0, 23.0, 1.10), (28.0, 29.4, 1.30),
+    (34.0, 35.7, 1.60), (35.0, 37.0, 1.60), (36.0, 38.0, 1.60),
+    (37.0, 39.0, 1.60), (38.0, 40.0, 1.60), (40.0, 42.5, 1.90),
+    (42.0, 44.5, 1.90), (45.0, 47.5, 1.90), (47.0, 49.5, 1.90),
+    (55.0, 58.0, 2.20), (56.0, 59.0, 2.20), (58.0, 61.0, 2.20),
+    (60.0, 63.0, 2.20), (62.0, 65.0, 2.20), (63.0, 66.0, 2.20),
+    (65.0, 68.0, 2.70), (68.0, 71.0, 2.70), (70.0, 73.0, 2.70),
+    (72.0, 75.0, 2.70), (75.0, 78.0, 2.70), (85.0, 88.5, 3.20),
+    (88.0, 91.5, 3.20), (90.0, 93.5, 3.20), (92.0, 95.5, 3.20),
+    (95.0, 98.5, 3.20), (110.0, 114.0, 4.20), (112.0, 116.0, 4.20),
+    (115.0, 119.0, 4.20), (135.0, 139.0, 4.20), (140.0, 144.0, 4.20),
+    (145.0, 149.0, 4.20), (150.0, 155.0, 4.20), (155.0, 160.0, 4.20),
+    (160.0, 165.0, 4.20), (165.0, 170.0, 4.20), (170.0, 175.0, 4.20),
+    (175.0, 180.0, 4.20), (195.0, 200.0, 4.20), (200.0, 205.0, 4.20),
+    (210.0, 216.0, 5.20), (220.0, 226.0, 5.20), (230.0, 236.0, 5.20),
+    (240.0, 246.0, 5.20), (250.0, 256.0, 5.20), (300.0, 308.0, 5.20),
+)
+
+# A tenth of a millimetre and a half: the standard's own groove tolerance band
+# is about 0.1 on d2, and a part cut to print lands inside it. Anything
+# looser starts admitting glands.
+_DIN472_TOL_MM = 0.15
+
+
+def _matches_din472(groove_diameter: float, width: float, depth: float) -> bool:
+    """Whether an internal groove is its bore's DIN 472 row.
+
+    The bore is the groove diameter less twice the radial depth. The first
+    row whose bore matches decides.
+    """
+    if groove_diameter <= 0.0 or depth <= 0.0:
+        return False
+    bore = groove_diameter - 2.0 * depth
+    for d1, d2, m in _DIN472:
+        if abs(d1 - bore) > _DIN472_TOL_MM:
+            continue
+        return abs(d2 - groove_diameter) <= _DIN472_TOL_MM and abs(m - width) <= _DIN472_TOL_MM
+    return False
+
+
 def _axis_tuple(direction) -> tuple[float, float, float]:
     return (
         round(direction.X(), 6),
@@ -510,20 +699,15 @@ def _axis_tuple(direction) -> tuple[float, float, float]:
     )
 
 
-def _full_ring(node: AagNode) -> bool:
-    """Whether a cylinder is a near-complete revolution.
-
-    Measured off the bounding box rather than the parametric range, because a
-    ring produced by a boolean often arrives as several faces sharing a seam.
-    """
-    if node.bbox.IsVoid() or node.cyl_cone_axis is None:
+def _full_ring_box(box: Bnd_Box, axis, radius: float) -> bool:
+    """Whether walls whose union box this is make a near-complete revolution."""
+    if box.IsVoid():
         return False
-    xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
+    xmin, ymin, zmin, xmax, ymax, zmax = box.Get()
     spans = (xmax - xmin, ymax - ymin, zmax - zmin)
-    axis = node.cyl_cone_axis.Direction()
     components = (abs(axis.X()), abs(axis.Y()), abs(axis.Z()))
     axial = components.index(max(components))
-    return all(spans[i] >= 1.9 * node.cyl_radius for i in range(3) if i != axial)
+    return all(spans[i] >= 1.9 * radius for i in range(3) if i != axial)
 
 
 def _paired_width(walls: list[AagNode]) -> Optional[tuple[float, float]]:

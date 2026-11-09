@@ -22,6 +22,8 @@ from __future__ import annotations
 from OCP.gp import gp_Pnt, gp_Vec
 
 from ...machining.features import FeatureType
+from ...machining.sheet_folds import feature_fold_refusals
+from ...machining.sheet_ftg import INDETERMINATE, analyse_sheet_folds
 from ...models import CheckResult, Severity
 from ...registries import register_check
 from ...rules import Rulebook
@@ -38,9 +40,11 @@ from .base import (
     bend_axial_span,
     bend_geom,
     bends_of,
+    features_with_sharp_folds,
     gauge_phrase,
     hem_min_return_mm,
     max_std_bend_deg,
+    is_press_brake_bend,
     panel_away_dir,
     panels_coplanar,
     patch_extents_along,
@@ -103,6 +107,11 @@ class SheetBendRadiusCheck(SheetCheck):
 
         results: list[CheckResult] = []
         for feature in sorted_features(context, FeatureType.BEND):
+            # A conical, rolled or sharp fold has no single brake radius to
+            # judge; a sharp fold's zero is honest, and sheet_sharp_fold
+            # already says the radius is missing.
+            if not is_press_brake_bend(feature):
+                continue
             # A hem folds to nearly nothing by design, and a hemming die rather
             # than a vee owns that geometry. The return length is what matters
             # on a hem, and SHEET_HEM_DIMENSIONS asks about it.
@@ -253,6 +262,10 @@ class SheetBendAngleExtremeCheck(SheetCheck):
 
         results: list[CheckResult] = []
         for feature in sorted_features(context, FeatureType.BEND):
+            # Brake tooling limits; a rolled or conical fold is not formed on
+            # a vee die and a sharp fold was not formed at all.
+            if not is_press_brake_bend(feature):
+                continue
             angle = feature.number("angle_deg", 0.0) or 0.0
             if angle <= ceiling:
                 continue
@@ -335,6 +348,10 @@ class SheetBendLongerThanBodyCheck(SheetCheck):
 
         results: list[CheckResult] = []
         for feature in sorted_features(context, FeatureType.BEND):
+            # A sharp fold's length is a crease edge, not a bend line, and the
+            # other non-brake families never meet the brake's bed.
+            if not is_press_brake_bend(feature):
+                continue
             length = feature.number("length_mm", 0.0) or 0.0
             if length <= 0.0 or length <= extent + epsilon:
                 continue
@@ -378,11 +395,13 @@ class SheetBendLongerThanBodyCheck(SheetCheck):
 
 @register_check(Rulebook.SHEET_CLOSED_FLANGE_LOOP)
 class SheetClosedFlangeLoopCheck(SheetCheck):
-    """Panels and bends that close into a ring cannot be folded from one blank.
+    """Panels and bends that close into a loop cannot be folded from one blank.
 
-    Found by union-find over the panel graph: adding a bend whose two panels
-    are already connected closes a cycle, and a cycle means the last fold has
-    nowhere to go.
+    Read off the fold topology: panels are coplanar patches, each fold links
+    two, and a circuit in that graph is a loop. Whether the loop is a closed
+    cross-section or merely rejoins a panel is a measurement -- how far the
+    panel normals turn around the circuit -- and the two price differently,
+    so the message says which, or says it could not tell.
     """
 
     @property
@@ -390,30 +409,53 @@ class SheetClosedFlangeLoopCheck(SheetCheck):
         return "Sheet Closed Flange Loop Check"
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
-        parent: dict[int, int] = {}
-
-        def find(node: int) -> int:
-            root = parent.setdefault(node, node)
-            while root != parent[root]:
-                root = parent[root]
-            while parent[node] != root:  # path compression, iterative
-                parent[node], node = root, parent[node]
-            return root
-
-        bend_count = 0
-        closed = False
-        for bend in bends_of(context):
-            if bend.panel_a is None or bend.panel_b is None:
-                continue
-            bend_count += 1
-            first, second = find(bend.panel_a), find(bend.panel_b)
-            if first == second:
-                closed = True
-                break
-            parent[first] = second
-
-        if not closed:
+        gauge = self.gauge(context)
+        topology = analyse_sheet_folds(context.graph, features_with_sharp_folds(context), gauge)
+        ftg = topology.ftg
+        if not ftg.circuits:
             return []
+
+        panels = topology.graph
+        bend_count = len(panels.links) + panels.collapsed_link_count
+        closed = ftg.closed_circuit()
+        circuit = closed if closed is not None else ftg.circuits[0]
+
+        if closed is not None:
+            message = (
+                "The panels and bends form a closed cross-section: the fold "
+                "topology has a loop and the panel normals turn a full 360 "
+                "degrees around it, so this shape cannot be folded from a "
+                "single flat blank at all. It needs a welded, riveted or "
+                "tab-and-slot seam; settle the seam before quoting."
+            )
+            if ftg.is_prismatic_closed_section:
+                message += (
+                    " All of its folds share one axis, so the section is "
+                    "prismatic -- a tube. Check whether it should be bought as "
+                    "tube stock rather than formed."
+                )
+        elif circuit.closure_known:
+            message = (
+                "The fold topology has a loop, but the panel normals do not turn "
+                f"a full 360 degrees around it ({int(circuit.closure_deg + 0.5)} "
+                "degrees), so the cross-section is not closed: a panel folds away "
+                "and rejoins the same panel elsewhere. That still needs a cut or a "
+                "seam somewhere on the loop, and where it goes changes the blank; "
+                "confirm the intent before quoting."
+            )
+        else:
+            message = (
+                "The fold topology has a loop, and whether the cross-section "
+                f"closes could not be measured ({circuit.closure_refusal}). A "
+                "closed section cannot be folded from one blank and needs a seam; "
+                "a loop that merely rejoins a panel needs a cut. The two price "
+                "differently, so this one needs a human look."
+            )
+
+        faces = []
+        for node_index in circuit.nodes:
+            if node_index < len(panels.nodes):
+                faces.append(panels.nodes[node_index].representative)
 
         # A seam is a decision to make, not a defect: the part is producible
         # once somebody says how it is joined. WARNING, per the reference.
@@ -429,13 +471,125 @@ class SheetClosedFlangeLoopCheck(SheetCheck):
                     0.0,
                     0.0,
                     "",
-                    "The panels and bends on this part close into a loop, so it "
-                    "cannot be folded from one flat blank -- the last fold has "
-                    "nowhere to go. It needs a seam: welded, riveted, or tab and "
-                    "slot. Which one it is wants settling before the part is "
-                    "quoted, because the seam is most of the labour.",
+                    message,
                 ),
+                faces=faces,
                 value=float(bend_count),
+            )
+        ]
+
+
+@register_check(Rulebook.SHEET_BEND_OPERATIONS)
+class SheetBendOperationsCheck(SheetCheck):
+    """The bend program, and every fold the census could not develop.
+
+    Silent on a part whose folds are all press-brake bends, each its own hit,
+    with nothing left over. Speaks when segments on one fold line merge into
+    fewer brake hits than there are bends, when foldability cannot be
+    decided, or when the census is incomplete -- a fold recognized but not
+    developable (conical, rolled, sharp, inconsistent), one whose flange is
+    not planar and so is missing from the fold topology, or one nothing
+    recognized at all. Recognizing a fold is not the same as being able to
+    flatten it, and the two are reported separately on purpose.
+    """
+
+    @property
+    def name(self) -> str:
+        return "Sheet Bend Program Check"
+
+    def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
+        gauge = self.gauge(context)
+        features = features_with_sharp_folds(context)
+        topology = analyse_sheet_folds(context.graph, features, gauge)
+        panels = topology.graph
+        ftg = topology.ftg
+
+        fold_count = sum(1 for f in features if f.type == FeatureType.BEND)
+        if fold_count == 0:
+            return []  # no fold, no bend program
+        linked = len(panels.links) + panels.collapsed_link_count
+        unlinked = len(panels.unlinked_folds)
+        merged = linked > 0 and ftg.bend_operations < linked
+        undetermined = ftg.verdict == INDETERMINATE
+        refusals = feature_fold_refusals(features)
+        complete = not topology.invisible and not refusals and unlinked == 0
+        if not merged and not undetermined and complete:
+            return []
+
+        parts: list[str] = []
+        if merged:
+            parts.append(
+                f"Bend program: {linked} recognized bends resolve to "
+                f"{ftg.bend_operations} press-brake operation(s) -- segments on "
+                "one fold line at one radius and one angle are formed in a "
+                "single hit, whichever panels they join. Treat that as a "
+                "minimum: segments folding in opposite directions are kept "
+                "apart wherever the direction is known, but a hem and a rolled "
+                "fold carry none, and no tooling clearance or bend sequence is "
+                "modelled."
+            )
+        if undetermined:
+            text = "Unfoldability cannot be decided for this part"
+            if ftg.invisible_fold_families:
+                text += (
+                    " -- it carries fold geometry this engine cannot read ("
+                    + ", ".join(ftg.invisible_fold_families)
+                    + "), so the bend census is incomplete"
+                )
+            elif unlinked > 0:
+                text += (
+                    f" -- {unlinked} recognized fold(s) have non-planar flange "
+                    "faces, so they are absent from the fold topology and the "
+                    "panels beyond them cannot be reached"
+                )
+            elif ftg.orphan_count > 0:
+                text += (
+                    f" -- {ftg.orphan_count} panel(s) are reached by no "
+                    "recognized fold, so there is metal here the fold census "
+                    "does not account for"
+                )
+            text += (
+                ". No flat-blank conclusion is drawn from an incomplete census: "
+                "an absent fold reads as foldable, and that is the one wrong "
+                "answer that reaches a price."
+            )
+            parts.append(text)
+        if not complete:
+            text = "Bend census incomplete. "
+            if refusals:
+                text += (
+                    "This part carries fold(s) this engine recognizes but cannot "
+                    "develop (" + ", ".join(refusals) + "). "
+                )
+            if unlinked > 0:
+                text += (
+                    f"{unlinked} of the {fold_count} recognized fold(s) are not "
+                    "in the fold topology at all -- their flange faces are not "
+                    "planar, so it cannot be walked across them. "
+                )
+            text += (
+                "No blank size, bend allowance or flip count is derived from "
+                "this part until every fold on it develops."
+            )
+            parts.append(text)
+
+        faces = [face_id for fold in topology.invisible for face_id in fold.faces]
+        return [
+            self.finding(
+                rule,
+                Severity.INFO,
+                f"{ftg.bend_operations} brake operation(s), {fold_count} fold(s)",
+                self.render(
+                    feedback,
+                    Severity.INFO,
+                    float(fold_count),
+                    0.0,
+                    0.0,
+                    "",
+                    " ".join(parts),
+                ),
+                faces=faces,
+                value=float(ftg.bend_operations),
             )
         ]
 

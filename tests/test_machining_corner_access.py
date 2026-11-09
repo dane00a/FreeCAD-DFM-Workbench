@@ -21,7 +21,9 @@ from OCP.TopoDS import TopoDS_Shape
 from OCP.gp import gp_Pnt
 
 from freecad.DFM.core.checks.machining.corner_access import (
+    EscapeVote,
     ShapeProbe,
+    escape_vote,
     is_cardinal,
     is_cutter_formed,
     is_reachable,
@@ -148,6 +150,85 @@ class ReachabilityTests(unittest.TestCase):
 
     def test_a_plain_block_has_no_concave_corner_to_judge(self):
         self.assertEqual(CornerCase(_box((0, 0, 0), (40, 40, 40))).square_corners(), [])
+
+
+class EscapeVoteTests(unittest.TestCase):
+    """The vote itself, on the two corners it exists to tell apart."""
+
+    @staticmethod
+    def _floor_lines(case, floor_z):
+        """Straight floor-to-wall corners lying on the given floor height."""
+        found = []
+        for edge, a, b, _ in case.square_corners():
+            if edge.edge_curve_type != "line" or edge.midpoint is None:
+                continue
+            if abs(edge.midpoint.Z() - floor_z) > 1.0e-6:
+                continue
+            found.append((edge, a, b))
+        return found
+
+    def test_an_open_slot_corner_escapes(self):
+        """A wide slot run right through the block.
+
+        Standing off its floor line, one ray goes down into the floor and
+        one into the wall -- the corner's own faces -- and every other one
+        gets away: up out of the slot, across the forty-millimetre width,
+        and out of either open end.
+        """
+        case = CornerCase(
+            _cut(_box((0, 0, 0), (80, 80, 40)), _box((-1, 20, 30), (81, 60, 41)))
+        )
+        corners = self._floor_lines(case, 30.0)
+        self.assertEqual(len(corners), 2, "two floor lines, one each side")
+        for edge, a, b in corners:
+            vote = escape_vote(case.probe, edge, a, b)
+            self.assertIsNotNone(vote, "a straight cardinal corner is voted on")
+            self.assertEqual(vote.samples, 5)
+            self.assertEqual(vote.confined, 0)
+            self.assertFalse(vote.is_confined)
+            self.assertTrue(is_reachable(case.probe, edge, a, b))
+
+    def test_a_blind_internal_corner_is_confined(self):
+        """A small blind recess: the far wall is inside cutter reach.
+
+        The same floor-to-wall corner as the slot's, but the opposite wall
+        is eight millimetres from the probe and the end walls closer still,
+        so the vote finds foreign material at every sample.
+        """
+        case = CornerCase(
+            _cut(_box((0, 0, 0), (80, 80, 40)), _box((34, 34, 28), (46, 46, 41)))
+        )
+        corners = self._floor_lines(case, 28.0)
+        self.assertEqual(len(corners), 4, "a square recess has four floor lines")
+        for edge, a, b in corners:
+            vote = escape_vote(case.probe, edge, a, b)
+            self.assertIsNotNone(vote)
+            self.assertEqual(vote.confined, vote.samples)
+            self.assertTrue(vote.is_confined)
+            self.assertLess(vote.worst_escape, 6)
+            self.assertFalse(is_reachable(case.probe, edge, a, b))
+
+    def test_a_small_face_is_not_voted_on(self):
+        """Below a fillet cutter's reach the vote has nothing to say.
+
+        A two-millimetre-wide ledge cannot take a standard fillet cutter
+        whatever surrounds it, so the corner stays reported without asking.
+        """
+        case = CornerCase(
+            _fuse(_box((0, 0, 0), (80, 80, 10)), _box((0, 0, 10), (2, 80, 12.5)))
+        )
+        voted = [
+            escape_vote(case.probe, edge, a, b)
+            for edge, a, b, _ in case.square_corners()
+            if min(second_smallest_extent(a), second_smallest_extent(b)) <= 3.0
+        ]
+        self.assertTrue(voted)
+        self.assertTrue(all(vote is None for vote in voted))
+
+    def test_one_confined_sample_is_end_noise(self):
+        self.assertFalse(EscapeVote(samples=5, confined=1, worst_escape=3).is_confined)
+        self.assertTrue(EscapeVote(samples=5, confined=2, worst_escape=3).is_confined)
+        self.assertTrue(EscapeVote(samples=1, confined=1, worst_escape=3).is_confined)
 
 
 class CutterFormedTests(unittest.TestCase):

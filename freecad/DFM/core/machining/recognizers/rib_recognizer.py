@@ -201,7 +201,7 @@ class RibRecognizer(FeatureRecognizer):
             # this direction does not matter.
             base_normal = _world_axis(curved_height_axis)
 
-        height, length = self._span(first, normal, base_normal)
+        height, length = self._span(first, normal, base_normal, second)
         if height / thickness < self.threshold(
             "rib_recognized_min_height_aspect", _MIN_HEIGHT_ASPECT
         ):
@@ -364,13 +364,25 @@ class RibRecognizer(FeatureRecognizer):
                 continue
             if node.area < wall.area * _CURVED_BASE_MIN_AREA_RATIO:
                 continue
-            midpoint = (
-                edge.midpoint.X(),
-                edge.midpoint.Y(),
-                edge.midpoint.Z(),
-            )
-            if abs(midpoint[axis] - root) > band:
-                continue
+            # The whole junction, not its midpoint. A full circle's
+            # parametric midpoint is set by where its range starts -- the
+            # seam -- so a turned land's ring junction read as a rib root on
+            # one seam and not on another. A base the rib grows out of meets
+            # it along the lower band everywhere; a ring junction spanning
+            # the whole wall fails whatever the seam.
+            if not edge.curve_box.IsVoid():
+                c_lo = edge.curve_box.Get()[:3]
+                c_hi = edge.curve_box.Get()[3:]
+                if c_hi[axis] - root > band or root - c_lo[axis] > band:
+                    continue
+            else:
+                midpoint = (
+                    edge.midpoint.X(),
+                    edge.midpoint.Y(),
+                    edge.midpoint.Z(),
+                )
+                if abs(midpoint[axis] - root) > band:
+                    continue
             if node.area > best_area:
                 best = node
                 best_area = node.area
@@ -380,13 +392,25 @@ class RibRecognizer(FeatureRecognizer):
 
     @staticmethod
     def _span(
-        wall: AagNode, normal: gp_Dir, base_normal: gp_Dir
+        wall: AagNode,
+        normal: gp_Dir,
+        base_normal: gp_Dir,
+        partner: Optional[AagNode] = None,
     ) -> tuple[float, float]:
         """How tall the rib stands and how far it runs.
 
         Measured along named axes rather than by sorting the bounding box: a
         long low rib has its run as the largest dimension, and sorting reports
         that as the height, which is the one number the rib rules read.
+
+        A wall is only as tall as it is two-sided. One face of the pair may
+        run far past the other, and where only one side exists there is
+        solid material behind it rather than a thin wall. Two relief pockets
+        cut from opposite faces with a web between them leave side walls
+        whose outer face spans the whole part and whose inner face spans one
+        pocket; measuring the outer face alone reported walls as tall as the
+        part. So the height is the overlap of the two faces along the height
+        axis, which changes nothing on an ordinary rib.
         """
         dx, dy, dz = wall.bbox_dims()
         along = gp_Vec(normal).Crossed(gp_Vec(base_normal))
@@ -402,6 +426,26 @@ class RibRecognizer(FeatureRecognizer):
             + abs(dz * base_normal.Z())
         )
         length = abs(dx * along.X()) + abs(dy * along.Y()) + abs(dz * along.Z())
+
+        if partner is not None and not wall.bbox.IsVoid() and not partner.bbox.IsVoid():
+            def span(box) -> tuple[float, float]:
+                xn, yn, zn, xx, yx, zx = box.Get()
+                low, high = 1e300, -1e300
+                for i in range(8):
+                    px = xx if i & 1 else xn
+                    py = yx if i & 2 else yn
+                    pz = zx if i & 4 else zn
+                    t = px * base_normal.X() + py * base_normal.Y() + pz * base_normal.Z()
+                    low, high = min(low, t), max(high, t)
+                return low, high
+
+            a_low, a_high = span(wall.bbox)
+            b_low, b_high = span(partner.bbox)
+            shared = min(a_high, b_high) - max(a_low, b_low)
+            # A degenerate or non-overlapping pair keeps the single-face
+            # height rather than reporting zero.
+            if 1e-6 < shared < height:
+                height = shared
         return height, length
 
     @staticmethod

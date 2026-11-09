@@ -207,23 +207,19 @@ class TestInternalGrooves(unittest.TestCase):
         self.assertEqual(len(found), 1)
         self.assertTrue(found[0].param("is_internal"))
 
-    def test_the_groove_carries_the_bore_it_is_cut_in(self):
-        # Grooves and holes overlap deliberately: the groove is part of the
-        # bore's geometry as well as a feature in its own right, so skipping
-        # faces the hole recognizer claimed would lose every internal groove.
-        #
-        # Which of the two survives is the resolver's call, and the groove
-        # family deliberately outranks the bore family: a groove owns its
-        # band, both shoulders and the bore either side of it, which is a
-        # superset of what the bore recognizer sees, so the bore is contained
-        # and drops out. Here that is the whole part -- there is nothing to
-        # the bore but the groove and its two stubs -- so the groove is left
-        # holding all five faces. On a real part the bore reaches an end of
-        # its own past the groove and both features survive.
+    def test_the_groove_leaves_the_bore_to_the_hole(self):
+        # The groove is its own band and two shoulders. The bore either side
+        # is what the groove interrupts and belongs to the hole: the groove
+        # used to claim those flanks as well, which put one face under a
+        # groove and a hole at once (reference 70efab906 changed this; the
+        # groove here used to hold all five faces).
         context = list(analyse(make_internal_groove()).values())[0]
         grooves = context.recognition.of_type(FeatureType.GROOVE)
         self.assertEqual(len(grooves), 1)
-        self.assertEqual(len(grooves[0].faces), 5)
+        self.assertEqual(len(grooves[0].faces), 3)
+        holes = context.recognition.of_type(FeatureType.THROUGH_HOLE)
+        self.assertEqual(len(holes), 1)
+        self.assertFalse(set(holes[0].faces) & set(grooves[0].faces))
 
 
 class TestFaceGlands(unittest.TestCase):
@@ -241,6 +237,21 @@ class TestFaceGlands(unittest.TestCase):
         self.assertEqual(len(found), 1)
         self.assertEqual(found[0].param("gland_shape"), "loop")
         self.assertAlmostEqual(found[0].number("width_mm"), 4.0, places=3)
+
+    def test_a_bore_crossing_the_loop_is_not_one_of_its_corners(self):
+        # A bolt hole drilled through the channel floor has its axis along
+        # the floor normal, like a corner radius, but runs the depth of the
+        # part rather than the depth of the channel. This one breaks through
+        # the inner wall and leaves a web against the outer one.
+        from freecad.DFM.core.machining import AagBuilder
+
+        shape = _cut(make_square_gasket_loop(), _cyl(14.5, 40, -1, 3.0, 70.0))
+        graph = AagBuilder(shape, FaceIndex(shape)).build()
+        found = grooves_in(shape)
+        self.assertEqual(len(found), 1)
+        for face_id in found[0].faces:
+            node = graph.node(face_id)
+            self.assertNotAlmostEqual(node.cyl_radius, 3.0, places=3)
 
 
 class TestGrooveRules(unittest.TestCase):
@@ -277,6 +288,164 @@ class TestGrooveRules(unittest.TestCase):
         self.assertEqual(
             rule_check(make_oring_gland(), Rulebook.THREAD_RELIEF_WIDTH), []
         )
+
+
+class TestReliefInterruptedPort(unittest.TestCase):
+    """A tapped port with a relief undercut part-way down is one hole.
+
+    Four M6 ports on a circle: a 5 mm tap drill with a 118 degree point, a
+    6.5 x 1.5 relief undercut part-way down and a 0.5 x 45 entry chamfer.
+    Each used to come back as a countersink (entry half), a blind hole (far
+    half) and a groove that also claimed both halves' bore faces, and the
+    pattern pass made two patterns where there is one.
+    """
+
+    @staticmethod
+    def make_ports() -> TopoDS_Shape:
+        import math
+
+        from OCP.BRepPrimAPI import BRepPrimAPI_MakeCone
+
+        part = _box((-40, -40, 0), (40, 40, 20))
+        cone_h = 2.5 / math.tan(math.radians(59.0))
+        up = gp_Dir(0, 0, 1)
+        for i in range(4):
+            th = i * math.pi / 2.0
+            cx, cy = 25.0 * math.cos(th), 25.0 * math.sin(th)
+            part = _cut(part, BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(cx, cy, -0.1), up), 2.5, 11.2).Shape())
+            part = _cut(part, BRepPrimAPI_MakeCone(gp_Ax2(gp_Pnt(cx, cy, 11.1), up), 2.5, 0.0, cone_h).Shape())
+            ring = _cut(
+                BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(cx, cy, 6.5), up), 3.25, 1.5).Shape(),
+                BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(cx, cy, 6.4), up), 2.5, 1.7).Shape(),
+            )
+            part = _cut(part, ring)
+            part = _cut(part, BRepPrimAPI_MakeCone(gp_Ax2(gp_Pnt(cx, cy, 0.0), up), 3.0, 2.5, 0.5).Shape())
+        return part
+
+    def test_each_port_is_one_hole_and_its_groove_claims_only_itself(self):
+        from collections import Counter
+
+        from freecad.DFM.core.machining import AagBuilder
+        from freecad.DFM.core.machining.aag import SurfaceType
+
+        shape = self.make_ports()
+        graph = AagBuilder(shape, FaceIndex(shape)).build()
+        context = list(analyse(shape).values())[0]
+        hole_types = {
+            FeatureType.COUNTERSINK,
+            FeatureType.BLIND_HOLE,
+            FeatureType.THROUGH_HOLE,
+            FeatureType.COUNTERBORE,
+            FeatureType.BREAKTHROUGH_HOLE,
+        }
+        ports = grooves = patterns = 0
+        owners: Counter = Counter()
+        for feature in context.recognition.features:
+            if feature.type == FeatureType.PATTERN:
+                patterns += 1
+                continue
+            owners.update(feature.faces)
+            if feature.type in GROOVE_TYPES:
+                grooves += 1
+            if feature.type in hole_types and abs((feature.number("diameter_mm") or 0.0) - 5.0) < 0.1:
+                ports += 1
+                self.assertFalse(feature.param("is_through"))
+                self.assertTrue(feature.param("relief_interrupted"))
+                cylinders = [
+                    f for f in feature.faces
+                    if graph.node(f).surface_type is SurfaceType.CYLINDER
+                ]
+                self.assertEqual(len(cylinders), 2)  # both halves of the bore
+        self.assertEqual(ports, 4)
+        self.assertEqual(grooves, 4)
+        self.assertEqual(patterns, 1)
+        for face_id, count in owners.items():
+            self.assertEqual(count, 1, f"face {face_id}")
+
+
+class TestInterruptedFaceGland(unittest.TestCase):
+    """A face gland ring cut into arcs by a cavity is still one gland.
+
+    An ID65 / OD70 x 2 ring around a 60 x 60 cavity whose corners reach past
+    it. Judged one wall fragment at a time each arc failed the full-ring
+    gate, nothing claimed the ring and the hole pass called its outer wall a
+    65 mm counterbore with a 70 mm outer.
+    """
+
+    @staticmethod
+    def make_ringed_cavity() -> TopoDS_Shape:
+        part = _box((0, 0, 0), (75, 75, 45))
+        part = _cut(part, _box((7.5, 7.5, 13), (67.5, 67.5, 45.001)))
+        ring = _cut(_cyl(37.5, 37.5, 43, 35.0, 2.1), _cyl(37.5, 37.5, 43, 32.5, 2.2))
+        return _cut(part, ring)
+
+    def test_the_ring_is_one_groove_and_no_hole(self):
+        from freecad.DFM.core.machining import AagBuilder
+        from freecad.DFM.core.machining.recognizers import GrooveRecognizer, HoleRecognizer
+
+        shape = self.make_ringed_cavity()
+        graph = AagBuilder(shape, FaceIndex(shape)).build()
+        holes = HoleRecognizer().recognize(graph, shape)
+        grooves = GrooveRecognizer().recognize(graph, shape, prior=holes)
+
+        glands = [
+            g
+            for g in grooves
+            if g.param("gland_orientation") == "face"
+            and abs((g.number("groove_diameter_mm") or 0.0) - 70.0) <= 0.1
+        ]
+        self.assertEqual(len(glands), 1)
+        self.assertAlmostEqual(glands[0].number("inner_diameter_mm"), 65.0, delta=0.1)
+        self.assertAlmostEqual(glands[0].number("width_mm"), 2.5, delta=0.1)
+        self.assertGreater(glands[0].param("ring_segments") or 1, 1)
+
+        # A 65 or 70 mm hole here is the gland read as a counterbore.
+        for hole in holes:
+            diameter = hole.number("diameter_mm") or 0.0
+            self.assertGreater(abs(diameter - 65.0), 0.5, hole.type)
+            self.assertGreater(abs(diameter - 70.0), 0.5, hole.type)
+
+
+class TestDin472Catalogue(unittest.TestCase):
+    """A retaining-ring groove is identified by the catalogue.
+
+    A ring groove and an O-ring gland are the same shape, and at real
+    hardware sizes their proportions overlap; a ring groove is cut to a
+    published row because the ring is a bought part, and every gland misses
+    its bore's row by millimetres.
+    """
+
+    @staticmethod
+    def grooved_bore(body_r, bore_r, groove_r, z, width) -> TopoDS_Shape:
+        part = _cyl(0, 0, 0, body_r, 30.0)
+        part = _cut(part, _cyl(0, 0, -0.1, bore_r, 30.2))
+        ring = _cut(_cyl(0, 0, z, groove_r, width), _cyl(0, 0, z - 0.1, bore_r, width + 0.2))
+        return _cut(part, ring)
+
+    @staticmethod
+    def grooves_at(shape, diameter):
+        from freecad.DFM.core.machining import AagBuilder
+        from freecad.DFM.core.machining.recognizers import GrooveRecognizer
+
+        graph = AagBuilder(shape, FaceIndex(shape)).build()
+        return [
+            g
+            for g in GrooveRecognizer().recognize(graph, shape)
+            if abs((g.number("groove_diameter_mm") or 0.0) - diameter) <= 0.1
+        ]
+
+    def test_a_din472_row_match_is_a_retaining_ring_groove(self):
+        # 58.0 x 2.2 in a 55 bore: ratio 1.47, inside the gland band, so
+        # only the catalogue can tell what this is.
+        found = self.grooves_at(self.grooved_bore(50.0, 27.5, 29.0, 10.0, 2.2), 58.0)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].type, FeatureType.RETAINING_RING_GROOVE)
+
+    def test_an_as568_gland_in_a_listed_bore_is_still_a_gland(self):
+        # 10.8 x 2.4 in an 8 bore, where DIN 472 says 8.4 x 0.9.
+        found = self.grooves_at(self.grooved_bore(20.0, 4.0, 5.4, 12.0, 2.4), 10.8)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].type, FeatureType.O_RING_GLAND)
 
 
 if __name__ == "__main__":

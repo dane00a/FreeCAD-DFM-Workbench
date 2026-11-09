@@ -341,3 +341,72 @@ class TestHoleIntersectsCavity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def make_fill_port(port_x: float, depth_past_ceiling: float = 2.0) -> TopoDS_Shape:
+    """A chamber inside the block, and a port drilled down into its ceiling.
+
+    The chamber runs from X=20; a 14 mm port centred at X=25 reaches X=18,
+    so the strip of the drill outside the chamber runs on into the wall
+    beside it and leaves a flat notch below the ceiling. At X=29 the port
+    clears the wall and breaks out cleanly.
+    """
+    chamber = _cavity((20, 20, 5), (80, 60, 25))
+    port = _cylinder(port_x, 40, 25 - depth_past_ceiling, 0, 0, 1, 7.0, 20.0)
+    return _cut(_cut(block(), chamber), port)
+
+
+class TestHoleBreakoutScar(unittest.TestCase):
+    RULE = Rulebook.HOLE_BREAKOUT_SCAR
+
+    def test_a_port_clipping_the_chamber_wall_is_reported(self):
+        findings = check(make_fill_port(25.0), self.RULE)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].severity, Severity.WARNING)
+        self.assertAlmostEqual(findings[0].value, 2.0, places=3)
+
+    def test_the_scar_is_recorded_on_a_through_hole(self):
+        holes = features_of(make_fill_port(25.0), FeatureType.THROUGH_HOLE)
+        self.assertEqual(len(holes), 1)
+        self.assertTrue(holes[0].param("breakout_scar_faces"))
+
+    def test_a_port_clear_of_the_wall_is_clean(self):
+        self.assertEqual(check(make_fill_port(29.0), self.RULE), [])
+
+    def test_an_ordinary_through_hole_is_clean(self):
+        self.assertEqual(check(make_bore(10.0), self.RULE), [])
+
+
+def make_drilled_fill_port(port_x: float) -> TopoDS_Shape:
+    """The fill port again, drilled with a 118 degree point.
+
+    The point clips the chamber wall beside the breakout and leaves a
+    conical crescent, which must not be read as the port's drill-point
+    floor.
+    """
+    from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
+
+    chamber = _cavity((20, 20, 5), (80, 60, 25))
+    radius = 7.0
+    point = radius / math.tan(math.radians(59.0))
+    body = _cylinder(port_x, 40, 24.0, 0, 0, 1, radius, 20.0)
+    tip = BRepPrimAPI_MakeCone(
+        gp_Ax2(gp_Pnt(port_x, 40, 24.0), gp_Dir(0, 0, -1)), radius, 0.0, point
+    ).Shape()
+    fuse = BRepAlgoAPI_Fuse(body, tip)
+    fuse.Build()
+    return _cut(_cut(block(), chamber), fuse.Shape())
+
+
+class TestHoleBreakoutScarConical(unittest.TestCase):
+    RULE = Rulebook.HOLE_BREAKOUT_SCAR
+
+    def test_a_drill_point_clipping_the_wall_is_a_through_hole_with_a_scar(self):
+        shape = make_drilled_fill_port(25.0)
+        holes = features_of(shape, FeatureType.THROUGH_HOLE, FeatureType.BLIND_HOLE)
+        self.assertEqual([h.type for h in holes], [FeatureType.THROUGH_HOLE])
+        self.assertTrue(holes[0].param("breakout_scar_conical"))
+        self.assertEqual(len(check(shape, self.RULE)), 1)
+
+    def test_a_drilled_port_clear_of_the_wall_is_clean(self):
+        self.assertEqual(check(make_drilled_fill_port(29.0), self.RULE), [])

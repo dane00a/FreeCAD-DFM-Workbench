@@ -191,10 +191,18 @@ class ConvergingFaceTests(unittest.TestCase):
         Neither face is opposed to the other, so the planar pass cannot see
         this at all -- and it is a real wall that gets thinner the further
         up it you cut.
+
+        The taper is short (15 mm), so the flanks lean at about 23 degrees
+        each and are not opposed (dot -0.68). A long gentle taper's flanks
+        are opposed (dot below -0.8) and belong to the planar pass, which,
+        like the reference's, qualifies a pair on the separation of its two
+        planes before measuring it: 60 mm of taper from 14 mm to 1 mm stands
+        about 7 mm apart, neither thin nor thin by aspect, and is not
+        reported.
         """
         wedge = BRepPrimAPI_MakeWedge(
             gp_Ax2(gp_Pnt(20.0, 0.0, 40.0), gp_Dir(0.0, 0.0, 1.0)),
-            14.0, 60.0, 30.0, 6.5, 0.0, 7.5, 60.0,
+            14.0, 15.0, 30.0, 6.5, 0.0, 7.5, 60.0,
         ).Shape()
         results = findings(_fuse(block((60.0, 60.0, 40.0)), wedge))
         self.assertTrue(results, "the top of the wedge is a millimetre thick")

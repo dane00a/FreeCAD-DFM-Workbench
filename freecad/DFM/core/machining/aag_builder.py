@@ -25,9 +25,12 @@ from OCP.BRepGProp import BRepGProp
 from OCP.BRepLProp import BRepLProp_SLProps
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
+from OCP.BndLib import BndLib_Add3dCurve
+from OCP.GeomAdaptor import GeomAdaptor_Curve
+from OCP.TopLoc import TopLoc_Location
 from OCP.GeomAbs import GeomAbs_CurveType, GeomAbs_SurfaceType
 from OCP.GProp import GProp_GProps
-from OCP.gp import gp_Ax1, gp_Dir, gp_Pnt, gp_Pnt2d, gp_Vec, gp_Vec2d
+from OCP.gp import gp_Ax1, gp_Dir, gp_Lin, gp_Pnt, gp_Pnt2d, gp_Vec, gp_Vec2d
 from OCP.ShapeAnalysis import ShapeAnalysis_Surface
 from OCP.TopAbs import (
     TopAbs_EDGE,
@@ -42,6 +45,7 @@ from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape
 from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
 
 from ..utils.geometry import FaceIndex
+from .canonical import apply_canonical_promotion, canonical_promotion_enabled
 from .aag import AagEdge, AagNode, AttributedAdjacencyGraph, Concavity, SurfaceType
 
 
@@ -131,6 +135,10 @@ class AagBuilder:
 
         if node.surface_type.is_freeform:
             self._sample_freeform_curvature(node, face)
+            # Opt-in, after the curvature sampling on purpose: the freeform
+            # statistics stay on a promoted face.
+            if canonical_promotion_enabled():
+                apply_canonical_promotion(face, node)
 
         return node
 
@@ -214,7 +222,19 @@ class AagBuilder:
         node.surface_type = surface_type
 
         if surface_type is SurfaceType.PLANE:
-            node.plane_normal = adaptor.Plane().Axis().Direction()
+            # The surface's own normal is D1U x D1V, which is the frame's main
+            # direction only on a right-handed frame. OCCT 7.8's
+            # BRepFilletAPI_MakeChamfer builds chamfer planes on left-handed
+            # frames, where the axis is minus the surface normal, so reading
+            # the axis alone turns every chamfer of a FreeCAD part inside out
+            # (false undercuts). The reference reads the axis as is, and on its
+            # kernel the same planes are right-handed: taking the surface
+            # normal gives the answer it gets there, on either kernel.
+            plane = adaptor.Plane()
+            normal = plane.Axis().Direction()
+            if not plane.Position().Direct():
+                normal = normal.Reversed()
+            node.plane_normal = normal
 
         elif surface_type is SurfaceType.CYLINDER:
             cylinder = adaptor.Cylinder()
@@ -364,6 +384,23 @@ class AagBuilder:
         attr.shared_edge_length = _polyline_length(curve, first, last)
         attr.midpoint = curve.Value((first + last) * 0.5)
         attr.is_inner_wire_edge = _is_inner_wire(face_a, edge) or _is_inner_wire(face_b, edge)
+        # Exact, parametrisation-free bounds of the edge curve. A full
+        # circle's parametric midpoint is set by where its range starts --
+        # the seam -- so a reader that needs where the edge lies reads this.
+        try:
+            BndLib_Add3dCurve.AddOptimal_s(
+                GeomAdaptor_Curve(curve), first, last, 0.0, attr.curve_box
+            )
+        except Exception:
+            attr.curve_box = Bnd_Box()
+        # The parametric seam, by the reference's test: IsClosed on either
+        # face (the same face on both sides never reaches here).
+        attr.is_seam = bool(
+            BRep_Tool.IsClosed_s(edge, face_a) or BRep_Tool.IsClosed_s(edge, face_b)
+        )
+        attr.is_surface_continuation = attr.is_seam or _same_surface_same_side(
+            face_a, face_b, edge
+        )
 
         angle = _dihedral_angle(edge, face_a, face_b, curve, first, last)
         if angle is None:
@@ -379,6 +416,115 @@ class AagBuilder:
         else:
             attr.concavity = Concavity.CONVEX
         return attr
+
+
+# -- surface continuation -----------------------------------------------------
+
+
+def _same_surface_same_side(
+    face_a: TopoDS_Face, face_b: TopoDS_Face, edge: TopoDS_Edge
+) -> bool:
+    """Whether two faces lie on one surface with the material on the same side.
+
+    True only when the two surfaces are the same geometric surface --
+    analytically (same plane, same axis line and radius, same apex and
+    half-angle, same centre and radius) or by sharing one surface object --
+    and the faces' outward normals agree at the shared edge. The second half
+    matters: two coincident planes facing opposite ways are the two sides of
+    a zero-thickness wall, not one face divided in two. The tolerances are
+    tight on purpose: a split the kernel made satisfies them to the last bit,
+    and anything needing more is two surfaces that happen to be close.
+    """
+    lin = 1.0e-6
+    ang = 1.0e-9
+
+    def outward_at_mid(face: TopoDS_Face) -> Optional[gp_Dir]:
+        pcurve = BRep_Tool.CurveOnSurface_s(edge, face, 0.0, 0.0)
+        if pcurve is None:
+            return None
+        try:
+            c0, c1 = BRep_Tool.Range_s(edge, face)
+        except Exception:
+            c0, c1 = BRep_Tool.Range_s(edge)
+        uv = pcurve.Value(0.5 * (c0 + c1))
+        adaptor = BRepAdaptor_Surface(face, False)
+        props = BRepLProp_SLProps(adaptor, uv.X(), uv.Y(), 1, 1.0e-9)
+        if not props.IsNormalDefined():
+            return None
+        normal = gp_Dir(props.Normal().XYZ())
+        if face.Orientation() == TopAbs_REVERSED:
+            normal.Reverse()
+        return normal
+
+    try:
+        same = False
+        loc_a = TopLoc_Location()
+        loc_b = TopLoc_Location()
+        surf_a = BRep_Tool.Surface_s(face_a, loc_a)
+        surf_b = BRep_Tool.Surface_s(face_b, loc_b)
+        if (
+            surf_a is not None
+            and surf_b is not None
+            and surf_a is surf_b
+            and loc_a.IsEqual(loc_b)
+        ):
+            same = True
+        else:
+            a = BRepAdaptor_Surface(face_a, False)
+            b = BRepAdaptor_Surface(face_b, False)
+            kind = a.GetType()
+            if kind != b.GetType():
+                return False
+
+            def same_line(x, y) -> bool:
+                return x.IsParallel(y, ang) and gp_Lin(x).Distance(y.Location()) < lin
+
+            if kind == GeomAbs_SurfaceType.GeomAbs_Plane:
+                pa, pb = a.Plane(), b.Plane()
+                same = (
+                    pa.Axis().IsParallel(pb.Axis(), ang)
+                    and pa.Distance(pb.Location()) < lin
+                )
+            elif kind == GeomAbs_SurfaceType.GeomAbs_Cylinder:
+                ca, cb = a.Cylinder(), b.Cylinder()
+                same = (
+                    same_line(ca.Axis(), cb.Axis())
+                    and abs(ca.Radius() - cb.Radius()) < lin
+                )
+            elif kind == GeomAbs_SurfaceType.GeomAbs_Cone:
+                # Same apex, same axis direction (the opposite direction is
+                # the other nappe), same half-angle.
+                ca, cb = a.Cone(), b.Cone()
+                same = (
+                    ca.Apex().Distance(cb.Apex()) < lin
+                    and ca.Axis().Direction().Dot(cb.Axis().Direction()) > 1.0 - ang
+                    and abs(ca.SemiAngle() - cb.SemiAngle()) < ang
+                )
+            elif kind == GeomAbs_SurfaceType.GeomAbs_Sphere:
+                sa, sb = a.Sphere(), b.Sphere()
+                same = (
+                    sa.Location().Distance(sb.Location()) < lin
+                    and abs(sa.Radius() - sb.Radius()) < lin
+                )
+            elif kind == GeomAbs_SurfaceType.GeomAbs_Torus:
+                ta, tb = a.Torus(), b.Torus()
+                same = (
+                    same_line(ta.Axis(), tb.Axis())
+                    and ta.Location().Distance(tb.Location()) < lin
+                    and abs(ta.MajorRadius() - tb.MajorRadius()) < lin
+                    and abs(ta.MinorRadius() - tb.MinorRadius()) < lin
+                )
+            else:
+                return False  # freeform: only a shared surface object qualifies
+        if not same:
+            return False
+        na = outward_at_mid(face_a)
+        nb = outward_at_mid(face_b)
+        if na is None or nb is None:
+            return False
+        return na.Dot(nb) > 1.0 - 1.0e-9
+    except Exception:
+        return False
 
 
 # -- dihedral -----------------------------------------------------------------

@@ -19,10 +19,11 @@ from typing import Optional
 from OCP.Bnd import Bnd_Box
 from OCP.gp import gp_Dir, gp_Pnt, gp_Vec
 
+from ...machining.face_extent import band_along
 from ...machining.context import MachiningContext
 from ...machining.aag import SurfaceType
 from ...machining.features import FeatureInstance, FeatureType
-from ...machining.process_classifier import axes_colinear
+from ...machining.process_classifier import PartProcessType, axes_colinear
 from ...models import CheckResult, Severity
 from ...registries import register_check
 from ...rules import Rulebook
@@ -32,9 +33,16 @@ from .base import MachiningCheck
 _BORE_TYPES = (
     FeatureType.THROUGH_HOLE,
     FeatureType.BLIND_HOLE,
+    FeatureType.BREAKTHROUGH_HOLE,
     FeatureType.COUNTERBORE,
     FeatureType.COUNTERSINK,
     FeatureType.THREADED_HOLE,
+)
+
+# A breakthrough hole is deliberately absent: it has no floor at all, so it
+# cannot have a flat one.
+_FLOORED_BORE_TYPES = tuple(
+    t for t in _BORE_TYPES if t != FeatureType.BREAKTHROUGH_HOLE
 )
 
 
@@ -49,26 +57,38 @@ def _axis_of(feature: FeatureInstance) -> Optional[gp_Dir]:
 
 
 def _is_on_part_axis(context: MachiningContext, feature: FeatureInstance) -> bool:
-    """Whether a bore runs down the turning axis of the part.
+    """Whether a bore runs down the turning axis of a turned part.
 
     Such a bore is made by a boring bar reaching in from the end, not by a
     drill, and a boring bar chatters at a much lower depth-to-diameter ratio.
+
+    Only on a part that is actually turned. A profile-extrusion blank keeps
+    its extrusion axis but is never rotated, so its on-axis bores are drilled
+    or reamed like any milled feature.
     """
-    part_axis = context.part_process.axis_of_revolution
+    process = context.part_process
+    if process.type not in (PartProcessType.TURNED, PartProcessType.MILL_TURN):
+        return False
+    part_axis = process.axis_of_revolution
     axis = _axis_of(feature)
     if part_axis is None or axis is None:
         return False
-    if abs(axis.Dot(part_axis.Direction())) < 0.996:  # within about 5 degrees
+    if abs(axis.Dot(part_axis.Direction())) < 0.99:
         return False
 
-    # The bore must also sit *on* the axis, not merely parallel to it.
+    # The bore must also sit *on* the axis, not merely parallel to it: a bolt
+    # circle on a turned face is live-tooled, not bored. Asked of the first
+    # cylinder or cone only, as the reference does.
     for face_id in feature.faces:
-        node = context.graph.node(face_id)
-        if node.cyl_cone_axis is None:
+        if not context.graph.has_node(face_id):
             continue
+        node = context.graph.node(face_id)
+        if node.surface_type not in (SurfaceType.CYLINDER, SurfaceType.CONE):
+            continue
+        if node.cyl_cone_axis is None:
+            return False
         offset = gp_Vec(part_axis.Location(), node.cyl_cone_axis.Location())
-        if offset.CrossMagnitude(gp_Vec(part_axis.Direction())) <= 1.0:
-            return True
+        return offset.Crossed(gp_Vec(part_axis.Direction())).Magnitude() < 1.0
     return False
 
 
@@ -193,7 +213,7 @@ class HoleFlatBottomCheck(MachiningCheck):
         severity = self.severity_from_rule_config(rule_config)
         results: list[CheckResult] = []
 
-        for hole in context.recognition.of_type(*_BORE_TYPES):
+        for hole in context.recognition.of_type(*_FLOORED_BORE_TYPES):
             if hole.param("is_through") or not hole.param("flat_bottom"):
                 continue
             if hole.param("terminates_in_cavity"):
@@ -276,29 +296,55 @@ class HoleEdgeDistanceCheck(MachiningCheck):
         dx, dy, dz = context.plane_bbox_dims()
         if min(dx, dy, dz) <= 0.0:
             return []
-        bounds = context.plane_bbox_bounds()
+        # Exact boxes on the planar faces, not the graph's padded ones: the
+        # padding of a plane bounded by arcs moves with the seam, and on
+        # euro_lock_cylinder it decided a wall built at exactly the 2.0 mm
+        # design value (the reference read 1.997 and 1.971 on one solid).
+        bounds = context.plane_bbox_bounds(exact=True)
         if bounds is None:
             return []
 
         results: list[CheckResult] = []
         for hole in context.recognition.of_type(*_BORE_TYPES):
-            wall = self._distance_to_outside(context, hole, bounds)
+            # Every cylinder level of the hole, not just the bore. A
+            # counterbore's seat is wider than its bore and so always the
+            # nearer thing to the edge; measuring the bore alone called a seat
+            # sitting on the edge comfortable. The worst level is reported.
+            wall: Optional[float] = None
+            worst: Optional[HoleLevel] = None
+            boundary: list[int] = []
+            for level in hole_levels(context.graph, hole, context.shape):
+                measured = self._measure(context, hole, bounds, level)
+                if measured is None:
+                    continue
+                distance, faces = measured
+                if wall is None or distance < wall:
+                    wall, worst, boundary = distance, level, faces
             if wall is None or wall >= limit:
                 continue
+            boundary = self._attribute(context, worst, wall, boundary)
 
-            severity = Severity.ERROR if wall <= 0.0 else Severity.WARNING
+            # On a counterbore it is usually a seat that runs out of wall,
+            # and naming the bore would send the operator to the wrong
+            # diameter.
+            what = "hole" if worst.is_bore else (
+                f"hole's {worst.radius * 2.0:.1f} mm seat"
+            )
+            # A warning either way, a bore-out included: the reference grades
+            # the condition by its message, not by its severity.
+            severity = Severity.WARNING
             if wall <= 0.0:
                 advice = (
-                    f"This hole breaks out through the side of the part by "
+                    f"This {what} breaks out through the side of the part by "
                     f"{abs(wall):.2f} mm. Either it is meant to be a slot open to "
                     "the edge, or it needs moving inboard."
                 )
             else:
                 advice = (
-                    f"Only {wall:.2f} mm of material separates this hole from the "
-                    f"outside of the part, below the {limit:.2f} mm minimum. The "
-                    "drill will push the thin wall outward and may break through; "
-                    "move the hole inboard or leave more stock."
+                    f"Only {wall:.2f} mm of material separates this {what} from "
+                    f"the outside of the part, below the {limit:.2f} mm minimum. "
+                    "The drill will push the thin wall outward and may break "
+                    "through; move the hole inboard or leave more stock."
                 )
 
             results.append(
@@ -307,7 +353,12 @@ class HoleEdgeDistanceCheck(MachiningCheck):
                     severity,
                     f"{wall:.2f} mm to edge",
                     self.render(feedback, severity, wall, limit, limit, "mm", advice),
-                    faces=hole.faces,
+                    # The boundary the hole is near, as the reference
+                    # attributes it, and nothing when none could be named --
+                    # which is also what decides whether a thin-wall finding
+                    # is the same gap (the hole's own wall would match every
+                    # thin-wall finding on that hole).
+                    faces=boundary,
                     value=wall,
                     limit=limit,
                     comparison="<",
@@ -317,54 +368,112 @@ class HoleEdgeDistanceCheck(MachiningCheck):
         return results
 
     @staticmethod
-    def _distance_to_outside(
-        context: MachiningContext, hole: FeatureInstance, bounds
-    ) -> Optional[float]:
-        """Smallest gap from the bore surface to the part's outer envelope.
+    def _attribute(
+        context: MachiningContext, level: "HoleLevel", wall: float, faces: list[int]
+    ) -> list[int]:
+        """The faces of the part the reported wall runs out to.
 
-        Faces of the envelope the bore runs roughly parallel to are skipped:
-        a vertical hole in a plate does not have an edge-distance problem
-        with the top and bottom faces it passes through.
+        A barrel already named itself. Otherwise the box distance is pinned to
+        the planes running alongside the level (the normal within 0.3 of
+        square to its axis) whose axis-to-plane wall matches the reported
+        one. Then every face coplanar with a winner joins it: a hole on an
+        edge splits the face bounding it into two coplanar halves, and naming
+        one highlights half the wall it is about to break out of.
         """
-        axis = _axis_of(hole)
-        radius = (hole.number("diameter_mm") or 0.0) / 2.0
-        if axis is None or radius <= 0.0:
-            return None
-
-        centre = None
-        for face_id in hole.faces:
-            node = context.graph.node(face_id)
-            if node.cyl_cone_axis is not None:
-                centre = node.cyl_cone_axis.Location()
+        axis = level.axis_dir
+        start = level.axis_pnt.Translated(gp_Vec(axis).Multiplied(level.lo))
+        length = level.hi - level.lo
+        winners = list(faces)
+        if not winners:
+            for node in context.graph.nodes:
+                if node.surface_type is not SurfaceType.PLANE or node.plane_normal is None:
+                    continue
+                if abs(node.plane_normal.Dot(axis)) > 0.3:
+                    continue
+                gap = _segment_to_plane(start, axis, length, node.centroid, node.plane_normal)
+                if abs(gap - level.radius - wall) > 0.05:
+                    continue
+                winners.append(node.face_id)
+        if not winners:
+            return []
+        extra: list[int] = []
+        for node in context.graph.nodes:
+            if node.surface_type is not SurfaceType.PLANE or node.plane_normal is None:
+                continue
+            if node.face_id in winners:
+                continue
+            for face_id in winners:
+                if not context.graph.has_node(face_id):
+                    continue
+                w = context.graph.node(face_id)
+                if w.surface_type is not SurfaceType.PLANE or w.plane_normal is None:
+                    continue
+                if abs(w.plane_normal.Dot(node.plane_normal)) < 0.999:
+                    continue
+                n = w.plane_normal
+                off_w = w.centroid.X() * n.X() + w.centroid.Y() * n.Y() + w.centroid.Z() * n.Z()
+                off_n = node.centroid.X() * n.X() + node.centroid.Y() * n.Y() + node.centroid.Z() * n.Z()
+                if abs(off_w - off_n) > 0.05:
+                    continue
+                extra.append(node.face_id)
                 break
-        if centre is None:
+        return winners + extra
+
+    @staticmethod
+    def _distance_to_outside(
+        context: MachiningContext,
+        hole: FeatureInstance,
+        bounds,
+        level: "Optional[HoleLevel]" = None,
+    ) -> Optional[float]:
+        """Smallest gap from one level's surface to the part's outer envelope.
+
+        Without a level, the bore's own level is measured.
+        """
+        if level is None:
+            levels = hole_levels(context.graph, hole, context.shape)
+            level = next((lv for lv in levels if lv.is_bore), None)
+            if level is None:
+                return None
+        measured = HoleEdgeDistanceCheck._measure(context, hole, bounds, level)
+        return None if measured is None else measured[0]
+
+    @staticmethod
+    def _measure(
+        context: MachiningContext, hole: FeatureInstance, bounds, level: "HoleLevel"
+    ) -> "Optional[tuple[float, list[int]]]":
+        """One level's gap to the outside, and the barrel faces that set it.
+
+        Sides of the envelope the hole enters or leaves by are skipped: a
+        vertical hole in a plate does not have an edge-distance problem with
+        the top and bottom faces it passes through. The faces list is empty
+        when the box gave the answer.
+        """
+        radius = level.radius
+        if radius <= 0.0:
             return None
+        # The level's own axis segment, bounded to its faces. Measured at both
+        # ends, since the distance to each side of the box is linear along
+        # the axis and its least is at an end.
+        axis = level.axis_dir
+        start = level.axis_pnt.Translated(gp_Vec(axis).Multiplied(level.lo))
+        length = level.hi - level.lo
+        centre = start.Translated(gp_Vec(axis).Multiplied(length * 0.5))
 
         lows, highs = bounds
-        components = (axis.X(), axis.Y(), axis.Z())
-        position = (centre.X(), centre.Y(), centre.Z())
-
-        best: Optional[float] = None
-        for index in range(3):
-            # The bore enters and leaves through faces it is normal to.
-            if abs(components[index]) > 0.85:
-                continue
-            # How far the bore reaches toward this face, allowing for tilt.
-            reach = radius * math.sqrt(max(0.0, 1.0 - components[index] ** 2))
-            for face_coordinate in (lows[index], highs[index]):
-                gap = abs(position[index] - face_coordinate) - reach
-                best = gap if best is None else min(best, gap)
+        best = _cylinder_to_box(start, axis, length, radius, lows, highs)
+        if best is None:
+            # Every side of the box is one the hole enters or leaves by; the
+            # reference stops there, barrel included.
+            return None
 
         # That box is built from the part's flat faces, and a round part has
         # none facing outward -- so a bolt circle set close to the rim of a
         # flange or an end cap is invisible to it. The wall that matters
         # there is to the outside diameter, and that is a cylinder.
-        against_od = HoleEdgeDistanceCheck._wall_to_containing_od(
-            context, hole, axis, centre, radius
+        return HoleEdgeDistanceCheck._wall_to_containing_od(
+            context, hole, axis, centre, radius, level, best
         )
-        if against_od is not None:
-            best = against_od if best is None else min(best, against_od)
-        return best
 
     @staticmethod
     def _wall_to_containing_od(
@@ -373,8 +482,15 @@ class HoleEdgeDistanceCheck(MachiningCheck):
         axis: gp_Dir,
         centre: gp_Pnt,
         radius: float,
-    ) -> Optional[float]:
+        level: "HoleLevel",
+        best: float,
+    ) -> "tuple[float, list[int]]":
         """The thinnest wall from this bore out to a barrel it sits inside.
+
+        Competes with ``best``, the box answer, and returns the winner with
+        the barrels that set it. A barrel tied with the box (within a
+        micron) wins the attribution, being the boundary that is physically
+        there; a strictly nearer one clears any earlier ties.
 
         A cylinder with its material on the inside is the outside of the
         part. For one running the same way as the bore, the wall between them
@@ -394,21 +510,13 @@ class HoleEdgeDistanceCheck(MachiningCheck):
         the part, and read as a barrel it puts every corner screw a
         millimetre from the edge.
         """
-        # The bore's own wall, for its extent along the axis. A bore that
-        # stops well short of the barrel it sits beside never breaks out into
-        # it, however close the two are in section: a tapped hole at one end
-        # of an end cap and a relief groove at the other are sixteen
-        # millimetres apart and have nothing to say about each other.
-        wall_face = None
-        for face_id in hole.faces:
-            node = context.graph.node(face_id)
-            if node.surface_type is SurfaceType.CYLINDER and node.is_internal:
-                if wall_face is None or node.cyl_radius < wall_face.cyl_radius:
-                    wall_face = node
-        if wall_face is None:
-            return None
+        # The level's own extent along the axis. A bore that stops well short
+        # of the barrel it sits beside never breaks out into it, however
+        # close the two are in section: a tapped hole at one end of an end
+        # cap and a relief groove at the other are sixteen millimetres apart
+        # and have nothing to say about each other.
 
-        best: Optional[float] = None
+        winners: list[int] = []
         own = set(hole.faces)
 
         for node in context.graph.nodes:
@@ -434,8 +542,8 @@ class HoleEdgeDistanceCheck(MachiningCheck):
             if axis_offset > node.cyl_radius + radius:
                 continue  # the bore is outside this barrel altogether
 
-            span = _axial_extent(node, origin, direction)
-            bore_span = _axial_extent(wall_face, origin, direction)
+            span = _axial_extent(node, origin, direction, context.shape)
+            bore_span = level.span_along(origin, direction)
             if span is None or bore_span is None:
                 continue
             if bore_span[1] < span[0] or bore_span[0] > span[1]:
@@ -464,8 +572,14 @@ class HoleEdgeDistanceCheck(MachiningCheck):
                         continue  # a corner radius, not a barrel
 
             wall = node.cyl_radius - axis_offset - radius
-            best = wall if best is None else min(best, wall)
-        return best
+            if wall < best + 1.0e-6:
+                if wall < best - 1.0e-6:
+                    best = wall
+                    winners = []
+                elif wall < best:
+                    best = wall
+                winners.append(node.face_id)
+        return best, winners
 
 
 @register_check(Rulebook.HOLE_WEB_THICKNESS)
@@ -509,6 +623,23 @@ class HoleWebThicknessCheck(MachiningCheck):
                     - (first.number("diameter_mm") or 0.0) / 2.0
                     - (second.number("diameter_mm") or 0.0) / 2.0
                 )
+                # Seats count too. The web between two counterbored holes is
+                # set by whatever is widest where they face each other. Bore
+                # against bore is measured as before; seat levels are added
+                # only where the two levels overlap along the axis, because a
+                # seat near the top face and a bore that exists only deeper
+                # share no material.
+                origin = axis_a.Location()
+                direction = axis_a.Direction()
+                for level_a in hole_levels(context.graph, first, context.shape):
+                    band_a = level_a.span_along(origin, direction)
+                    for level_b in hole_levels(context.graph, second, context.shape):
+                        if level_a.is_bore and level_b.is_bore:
+                            continue  # already measured
+                        band_b = level_b.span_along(origin, direction)
+                        if band_b[1] < band_a[0] - 0.05 or band_b[0] > band_a[1] + 0.05:
+                            continue
+                        web = min(web, separation - level_a.radius - level_b.radius)
                 if web < 0.0 or web >= limit:
                     continue
 
@@ -553,11 +684,129 @@ class HoleWebThicknessCheck(MachiningCheck):
         return None
 
 
-# How finely to walk two bore axes looking for their closest approach.
-_BORE_WALK_STEPS = 12
-
 # Two parallel axes nearer than this are the same axis.
 _COAXIAL_TOL_MM = 0.01
+
+
+def _cylinder_to_box(start: gp_Pnt, axis: gp_Dir, length: float, radius: float, lows, highs):
+    """Least gap from a bounded cylinder's side to the sides of a box.
+
+    The reference's measurement. Per side, the cylinder reaches toward it by
+    its radius times the sine of the axis's angle to that side's normal. A
+    side the axis runs nearly along is where the hole enters or leaves and is
+    skipped; so is one the axis segment straddles or touches, which is an
+    entry or exit too. An axis that crosses a side outright gives minus the
+    reach. ``None`` when every side was skipped.
+    """
+    end = start.Translated(gp_Vec(axis).Multiplied(length))
+    eps = 1e-2
+    components = (axis.X(), axis.Y(), axis.Z())
+    p0 = (start.X(), start.Y(), start.Z())
+    p1 = (end.X(), end.Y(), end.Z())
+    best: Optional[float] = None
+    for k in range(3):
+        reach = radius * math.sqrt(max(0.0, 1.0 - components[k] ** 2))
+        parallel = abs(components[k]) > 0.85
+        for d0, d1 in ((p0[k] - lows[k], p1[k] - lows[k]), (highs[k] - p0[k], highs[k] - p1[k])):
+            straddle = (d0 < -eps and d1 > eps) or (d0 > eps and d1 < -eps)
+            touches = abs(d0) <= eps or abs(d1) <= eps
+            if parallel or straddle or touches:
+                continue
+            if (d0 < 0.0 < d1) or (d1 < 0.0 < d0):
+                gap = -reach
+            else:
+                gap = min(abs(d0), abs(d1)) - reach
+            best = gap if best is None else min(best, gap)
+    return best
+
+
+def _segment_to_plane(start: gp_Pnt, axis: gp_Dir, length: float, point: gp_Pnt, normal: gp_Dir) -> float:
+    """Least distance from an axis segment to a plane; 0 if it crosses."""
+    end = start.Translated(gp_Vec(axis).Multiplied(length))
+    d0 = gp_Vec(point, start).Dot(gp_Vec(normal))
+    d1 = gp_Vec(point, end).Dot(gp_Vec(normal))
+    if (d0 < 0.0 < d1) or (d1 < 0.0 < d0):
+        return 0.0
+    return min(abs(d0), abs(d1))
+
+
+def _first_cylinder(context: MachiningContext, hole: FeatureInstance):
+    """The cylinder the reference reads a hole's axis and radius from.
+
+    It takes the first cylinder in the feature's face list, which there is
+    the seed the recognizer grew the hole from: the bore, smallest radius
+    first. Ours keeps face lists sorted by id, which on a counterbore can put
+    the seat first, so the seed is recovered as the smallest-radius cylinder
+    (lowest id on a tie).
+    """
+    best = None
+    for face_id in hole.faces:
+        if not context.graph.has_node(face_id):
+            continue
+        node = context.graph.node(face_id)
+        if node.surface_type is not SurfaceType.CYLINDER or node.cyl_cone_axis is None:
+            continue
+        if best is None or node.cyl_radius < best.cyl_radius - 1e-9:
+            best = node
+    return best
+
+
+def _bore_box(context: MachiningContext, hole: FeatureInstance) -> Optional[Bnd_Box]:
+    """The box round a hole's cylinders and cones, its caps left out."""
+    box = Bnd_Box()
+    found = False
+    for face_id in hole.faces:
+        if not context.graph.has_node(face_id):
+            continue
+        node = context.graph.node(face_id)
+        if node.surface_type not in (SurfaceType.CYLINDER, SurfaceType.CONE):
+            continue
+        if node.bbox.IsVoid():
+            continue
+        box.Add(node.bbox)
+        found = True
+    return box if found and not box.IsVoid() else None
+
+
+def _axis_segment(context: MachiningContext, node) -> tuple[gp_Pnt, float]:
+    """Start point and length of a cylinder's axis over the face's own span."""
+    anchor = node.cyl_cone_axis.Location()
+    direction = node.cyl_cone_axis.Direction()
+    _, low, high = band_along(context.shape, node.face_id, node.bbox, anchor, direction, 1e18, -1e18)
+    return anchor.Translated(gp_Vec(direction).Multiplied(low)), high - low
+
+
+def _segment_segment_distance(p0, u, length_p, q0, v, length_q) -> float:
+    """Closest approach of two bounded segments with unit directions.
+
+    The reference's closed form, clamping included, kept as is.
+    """
+    w = gp_Vec(q0, p0)
+    b = u.Dot(v)
+    d = u.XYZ().Dot(w.XYZ())
+    e = v.XYZ().Dot(w.XYZ())
+    denom = 1.0 - b * b
+    if denom < 1e-9:
+        t = 0.0
+        s = d if b > 0.0 else -d
+    else:
+        t = (b * e - d) / denom
+        s = (e - b * d) / denom
+    if t < 0.0:
+        t = 0.0
+        s = e
+    elif t > length_p:
+        t = length_p
+        s = e + b * length_p
+    if s < 0.0:
+        s = 0.0
+        t = min(max(-d, 0.0), length_p)
+    elif s > length_q:
+        s = length_q
+        t = min(max(-d + b * length_q, 0.0), length_p)
+    p = gp_Pnt(p0.X() + t * u.X(), p0.Y() + t * u.Y(), p0.Z() + t * u.Z())
+    q = gp_Pnt(q0.X() + s * v.X(), q0.Y() + s * v.Y(), q0.Z() + s * v.Z())
+    return p.Distance(q)
 
 
 @register_check(Rulebook.HOLE_INTERSECTING)
@@ -582,37 +831,10 @@ class HoleIntersectingCheck(MachiningCheck):
         pairs: list[tuple[FeatureInstance, FeatureInstance, float]] = []
 
         for index, first in enumerate(holes):
-            axis_a = HoleWebThicknessCheck._axis_line(context, first)
-            radius_a = (first.number("diameter_mm") or 0.0) / 2.0
             for second in holes[index + 1 :]:
-                axis_b = HoleWebThicknessCheck._axis_line(context, second)
-                radius_b = (second.number("diameter_mm") or 0.0) / 2.0
-                if axis_a is None or axis_b is None:
-                    continue
-                if abs(axis_a.Direction().Dot(axis_b.Direction())) > 0.99:
-                    # Parallel bores can still break into each other -- two
-                    # dowel holes drilled a little too close is exactly the
-                    # case, and the drill wanders into the first one just as
-                    # readily as a cross bore would. Only two arrangements
-                    # are not a breakthrough: one bore up the middle of the
-                    # other, which is a stepped cavity, and one wholly
-                    # inside the other, which is a counterbore.
-                    if self._coaxial_or_nested(axis_a, axis_b, radius_a, radius_b):
-                        continue
-
-                # Bounded to each bore rather than taken as infinite lines.
-                # Two holes drilled from opposite faces of a block can have
-                # axes that pass within a radius of each other and bores
-                # that stop half the part apart, and an infinite line cannot
-                # tell those from a real crossing.
-                distance = self._bore_gap(context, first, second, axis_a, axis_b)
-                if distance is None or distance > radius_a + radius_b + 0.1:
-                    continue
-                if not self._spans_overlap(context, first, second, axis_a, axis_b):
-                    continue
-                if self._one_milled_opening(first, second, context):
-                    continue
-                pairs.append((first, second, distance))
+                gap = self._pair_gap(context, first, second)
+                if gap is not None:
+                    pairs.append((first, second, gap))
 
         if not pairs:
             return []
@@ -662,7 +884,11 @@ class HoleIntersectingCheck(MachiningCheck):
                     0.0,
                     0.0,
                     "mm",
-                    "These two holes break into one another. The second drill "
+                    # Named, as the reference names the pair in its details:
+                    # two pairs at the same gap are two findings, not one
+                    # finding twice.
+                    f"Holes {a.instance_id} and {b.instance_id} break into one "
+                    "another. The second drill "
                     "enters the side of the first bore with nothing to centre on, "
                     "so it will deflect and may grab. Drill the larger passage "
                     "first, feed lightly through the breakout, and expect to "
@@ -675,21 +901,6 @@ class HoleIntersectingCheck(MachiningCheck):
             )
             for a, b, distance in pairs
         ]
-
-    @staticmethod
-    def _coaxial_or_nested(axis_a, axis_b, radius_a: float, radius_b: float) -> bool:
-        """Whether two parallel bores are one cavity rather than two holes.
-
-        Coaxial is a stepped bore -- a counterbore over its pilot, a reamed
-        section under a drilled one -- and nothing breaks into anything.
-        Nested is the same idea off-centre: the smaller bore lies wholly
-        within the larger, so there is no wall between them to break.
-        """
-        offset = gp_Vec(axis_a.Location(), axis_b.Location())
-        perpendicular = gp_Vec(axis_a.Direction()).Crossed(offset).Magnitude()
-        if perpendicular < _COAXIAL_TOL_MM:
-            return True
-        return perpendicular + min(radius_a, radius_b) < max(radius_a, radius_b)
 
     @staticmethod
     def _one_milled_opening(first, second, context) -> bool:
@@ -713,65 +924,65 @@ class HoleIntersectingCheck(MachiningCheck):
         return True
 
     @classmethod
-    def _bore_gap(cls, context, first, second, axis_a, axis_b):
-        """Closest approach of two bores, each bounded to its own length."""
-        span_a = cls._axis_span(context, first, axis_a)
-        span_b = cls._axis_span(context, second, axis_b)
-        if span_a is None or span_b is None:
-            # Nothing to bound them with; the infinite-line answer is the
-            # honest one and errs toward reporting.
-            return cls._axis_distance(axis_a, axis_b)
+    def _pair_gap(cls, context, first, second) -> Optional[float]:
+        """Whether two holes break into one another, and how near their axes run.
 
-        # Walked rather than solved. The closed form for segment-to-segment
-        # distance has several degenerate cases -- parallel, touching,
-        # zero-length -- and this is a gate on a comparison that is already
-        # generous by a tenth of a millimetre, so a coarse walk is accurate
-        # enough and has nothing to get wrong.
-        origin_a, direction_a, low_a, high_a = span_a
-        origin_b, direction_b, low_b, high_b = span_b
-        best = None
-        for i in range(_BORE_WALK_STEPS + 1):
-            point_a = origin_a.Translated(
-                direction_a * (low_a + (high_a - low_a) * i / _BORE_WALK_STEPS)
-            )
-            for j in range(_BORE_WALK_STEPS + 1):
-                point_b = origin_b.Translated(
-                    direction_b * (low_b + (high_b - low_b) * j / _BORE_WALK_STEPS)
-                )
-                gap = point_a.Distance(point_b)
-                if best is None or gap < best:
-                    best = gap
-        return best
+        ``None`` when they do not. The reference's test, in its order:
 
-    @staticmethod
-    def _axis_span(context, feature, axis):
-        """How far a bore runs along its own axis.
+        1. Parallel bores that share an axis are a stepped cavity, and one
+           wholly inside the other is a nest; neither is a breakthrough.
+        2. The boxes round the two bores' curved faces must overlap. Planar
+           caps are left out: a counterbore's shoulder can run right across
+           the part and drag a box with it.
+        3. Their axis segments, each bounded to its own face, must come within
+           the sum of the radii (and a tenth). Bounded rather than infinite:
+           two holes from opposite faces can have axes passing within a radius
+           and bores that stop half the part apart.
+        4. Two bores both shallower than about three quarters of their
+           diameter are one milled opening, a keyhole or an obround cut in a
+           single contour, with no drill plunging into a void.
 
-        Measured from the cylindrical and conical faces only. A hole's entry
-        lip or counterbore face is planar and sprawls across the part, and
-        including it would stretch the bore to the width of the block.
+        The measured gap is reported as 0 when step 3 could not be asked.
         """
-        origin = axis.Location()
-        direction = gp_Vec(axis.Direction())
-        low, high = None, None
-        for face_id in feature.faces:
-            if not context.graph.has_node(face_id):
-                continue
-            node = context.graph.node(face_id)
-            if node.surface_type not in (SurfaceType.CYLINDER, SurfaceType.CONE):
-                continue
-            if node.bbox.IsVoid():
-                continue
-            xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()
-            for x in (xmin, xmax):
-                for y in (ymin, ymax):
-                    for z in (zmin, zmax):
-                        along = gp_Vec(origin, gp_Pnt(x, y, z)).Dot(direction)
-                        low = along if low is None else min(low, along)
-                        high = along if high is None else max(high, along)
-        if low is None:
+        ca = _first_cylinder(context, first)
+        cb = _first_cylinder(context, second)
+        if ca is not None and cb is not None:
+            da = ca.cyl_cone_axis.Direction()
+            db = cb.cyl_cone_axis.Direction()
+            if abs(da.Dot(db)) > 0.99:
+                offset = gp_Vec(ca.cyl_cone_axis.Location(), cb.cyl_cone_axis.Location())
+                perpendicular = gp_Vec(da).Crossed(offset).Magnitude()
+                if perpendicular < _COAXIAL_TOL_MM:
+                    return None
+                larger = max(ca.cyl_radius, cb.cyl_radius)
+                smaller = min(ca.cyl_radius, cb.cyl_radius)
+                if perpendicular + smaller < larger:
+                    return None
+
+        box_a, box_b = _bore_box(context, first), _bore_box(context, second)
+        if box_a is None or box_b is None:
             return None
-        return origin, direction, low, high
+        ax1, ay1, az1, ax2, ay2, az2 = box_a.Get()
+        bx1, by1, bz1, bx2, by2, bz2 = box_b.Get()
+        if not (
+            ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1 and az1 < bz2 and az2 > bz1
+        ):
+            return None
+
+        gap = 0.0
+        if ca is not None and cb is not None:
+            a_start, a_len = _axis_segment(context, ca)
+            b_start, b_len = _axis_segment(context, cb)
+            gap = _segment_segment_distance(
+                a_start, ca.cyl_cone_axis.Direction(), a_len,
+                b_start, cb.cyl_cone_axis.Direction(), b_len,
+            )
+            if gap > ca.cyl_radius + cb.cyl_radius + 0.1:
+                return None
+
+        if cls._one_milled_opening(first, second, context):
+            return None
+        return gap
 
     @staticmethod
     def _axis_distance(axis_a, axis_b) -> Optional[float]:
@@ -821,8 +1032,95 @@ class HoleIntersectingCheck(MachiningCheck):
         return not box_a.IsOut(box_b)
 
 
-def _axial_extent(node, origin, direction) -> "Optional[tuple[float, float]]":
-    """How far a face reaches along a direction, from a point on it."""
+class HoleLevel:
+    """One distinct cylinder radius of a hole, and the axial band it covers.
+
+    A hole is not always one cylinder. A counterbore is a bore plus one or
+    more wider coaxial seats, and every seat is nearer to whatever the hole
+    is near than the bore is -- which is the point of a seat. The kernel
+    splits a wall at seams and at intersecting geometry, so one level can
+    own several faces. `is_bore` marks the level carrying the feature's own
+    diameter.
+    """
+
+    def __init__(self, radius: float, axis_pnt: gp_Pnt, axis_dir: gp_Dir, lo: float, hi: float):
+        self.radius = radius
+        self.axis_pnt = axis_pnt
+        self.axis_dir = axis_dir
+        self.lo = lo
+        self.hi = hi
+        self.is_bore = False
+        self.faces: list = []
+
+    def span_along(self, origin: gp_Pnt, direction: gp_Dir) -> "tuple[float, float]":
+        """The level's band measured along `direction` from `origin`."""
+        shift = gp_Vec(origin, self.axis_pnt).Dot(gp_Vec(direction))
+        sense = 1.0 if self.axis_dir.Dot(direction) >= 0.0 else -1.0
+        ends = (shift + sense * self.lo, shift + sense * self.hi)
+        return (min(ends), max(ends))
+
+
+def hole_levels(graph, hole: FeatureInstance, shape=None) -> "list[HoleLevel]":
+    """The distinct cylinder levels of a hole feature, from its own faces.
+
+    Works off the faces rather than parameter names, so stacked seats,
+    double-ended seats and anything later shaped like them are covered.
+    Each level's axial band is the face's real span along its axis when the
+    shape is given; the box projection overstates it on any tilted bore, by
+    an amount that moves with the seam.
+    """
+    levels: list[HoleLevel] = []
+    bore_radius = 0.5 * (hole.number("diameter_mm") or 0.0)
+    for face_id in hole.faces:
+        if not graph.has_node(face_id):
+            continue
+        node = graph.node(face_id)
+        if node.surface_type is not SurfaceType.CYLINDER or node.cyl_radius <= 0.0:
+            continue
+        if node.cyl_cone_axis is None or node.bbox.IsVoid():
+            continue
+        anchor = node.cyl_cone_axis.Location()
+        direction = node.cyl_cone_axis.Direction()
+        low, high = _axial_extent(node, anchor, direction, shape)
+
+        into = None
+        for level in levels:
+            if abs(level.radius - node.cyl_radius) > 1.0e-3:
+                continue
+            if abs(level.axis_dir.Dot(direction)) < 0.99:
+                continue
+            offset = gp_Vec(level.axis_pnt, anchor)
+            if gp_Vec(level.axis_dir).Crossed(offset).Magnitude() > 0.5:
+                continue
+            into = level
+            break
+        if into is None:
+            level = HoleLevel(node.cyl_radius, anchor, direction, low, high)
+            level.is_bore = bore_radius > 0.0 and abs(node.cyl_radius - bore_radius) < 1.0e-3
+            level.faces.append(face_id)
+            levels.append(level)
+            continue
+        # Re-measured against the level's own anchor so bands from
+        # differently anchored faces compare.
+        shift = gp_Vec(into.axis_pnt, anchor).Dot(gp_Vec(into.axis_dir))
+        into.lo = min(into.lo, low + shift)
+        into.hi = max(into.hi, high + shift)
+        into.faces.append(face_id)
+    return levels
+
+
+def _axial_extent(node, origin, direction, shape=None) -> "Optional[tuple[float, float]]":
+    """How far a face reaches along a direction, from a point on it.
+
+    Measured on the face when the shape is given (band_along), with the
+    bounding-box projection as the fallback.
+    """
+    if shape is not None:
+        ok, low, high = band_along(
+            shape, node.face_id, node.bbox, origin, direction, math.inf, -math.inf
+        )
+        if ok and high > low:
+            return (low, high)
     if node.bbox.IsVoid():
         return None
     xmin, ymin, zmin, xmax, ymax, zmax = node.bbox.Get()

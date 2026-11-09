@@ -18,12 +18,9 @@ the second one stays an advisory and the machined verdict stands.
 
 from __future__ import annotations
 
-from OCP.Bnd import Bnd_Box
-from OCP.gp import gp_Vec
-
-from ...machining.aag import Concavity, SurfaceType
-from ...machining.features import SHEET_TYPES, FeatureType
+from ...machining.features import FeatureType
 from ...machining.process_classifier import PartProcessType, detect_sharp_fold_shell
+from ...machining.sheet_folds import detect_sharp_folds
 from ...models import CheckResult, Severity
 from ...registries import register_check
 from ...rules import Rulebook
@@ -32,32 +29,21 @@ from .base import (
     SHEET_MAX_THICKNESS_ALU_MM,
     SHEET_MIN_THICKNESS_MM,
     SheetCheck,
-    gauge_thin_face,
+    features_with_sharp_folds,
     material_declared,
     material_is_aluminium,
     max_thickness_mm,
-    sorted_features,
     threshold,
 )
-
-
-# Two planes are back to back when their outward normals are this close to
-# opposed, and one gauge apart when their separation lands within this slack.
-_ANTI_PARALLEL_MAX_DOT = -0.999
-_SKIN_SEPARATION_TOL_MM = 0.25
-
-# A panel is many gauges across; below this it is a sliver, an engraved stroke
-# or an outline fragment, and a junction it takes part in is not a fold.
-_MIN_PANEL_AREA_GAUGES = 25.0
-
-# Two skins of clearly different orientation. Anything closer to parallel than
-# this is the same panel seen twice rather than a corner between two.
-_FOLD_ORIENTATION_MAX_DOT = 0.7
 
 
 # =============================================================================
 # Gauge range
 # =============================================================================
+
+
+#: Slack on the measured gauge before it is called out of range.
+_GAUGE_MEASUREMENT_SLACK_MM = 0.05
 
 
 @register_check(Rulebook.SHEET_THICKNESS_OUT_OF_RANGE)
@@ -92,7 +78,12 @@ class SheetThicknessRangeCheck(SheetCheck):
         if maximum is None:
             maximum = max_thickness_mm(family, context)
 
-        if minimum <= gauge <= maximum:
+        # The measured gauge carries tessellation noise: a 0.125 in plate
+        # reads 3.1767 against a 3.175 ceiling, which is nobody's
+        # manufacturing problem. Five hundredths of slack at each end sits
+        # well below any real gauge step (30 ga to 29 ga is 0.08 mm).
+        slack = _GAUGE_MEASUREMENT_SLACK_MM
+        if minimum - slack <= gauge <= maximum + slack:
             return []
 
         declared = material_declared(family)
@@ -174,10 +165,26 @@ class SheetFeatureComplexityCheck(SheetCheck):
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
         bends = hems = formed = holes = tapped = tabs = notches = 0
+        conical = rolled = sharp = 0
         radii: set[int] = set()
 
-        for feature in sorted_features(context):
+        features = sorted(features_with_sharp_folds(context), key=lambda f: f.instance_id)
+        for feature in features:
             if feature.type == FeatureType.BEND:
+                # Only a press-brake fold is a brake stroke. A conical flange
+                # needs a tapered die, a rolled section a roll pass, and a
+                # sharp fold was never formed at all; each is named and none
+                # is costed as a stroke.
+                family = str(feature.param("bend_family") or "cylindrical")
+                if family == "conical":
+                    conical += 1
+                    continue
+                if family == "rolled":
+                    rolled += 1
+                    continue
+                if family == "sharp":
+                    sharp += 1
+                    continue
                 if feature.param("is_hem"):
                     hems += 1
                 else:
@@ -217,6 +224,22 @@ class SheetFeatureComplexityCheck(SheetCheck):
             if tapped
             else ""
         )
+        unpriced = ""
+        if conical + rolled + sharp > 0:
+            unpriced = (
+                f" Besides those, {conical} conical bend(s), {rolled} rolled "
+                f"section(s) and {sharp} sharp zero-radius fold(s) are not "
+                "press-brake strokes and are left out of that estimate."
+            )
+            if rolled + sharp > 0:
+                unpriced += " The bend-program finding says what each one blocks."
+            else:
+                unpriced += (
+                    " The conical folds are fully recognized, but a tapered "
+                    "flange has no single bend radius, so no developed length "
+                    "comes from one either -- price the tapered die from the "
+                    "drawing."
+                )
         return [
             self.finding(
                 rule,
@@ -229,14 +252,19 @@ class SheetFeatureComplexityCheck(SheetCheck):
                     target if target is not None else float(operations),
                     limit if limit is not None else float(operations),
                     "",
-                    f"This part carries {bends} bend(s) and {hems} hem(s) across "
+                    # "press-brake bend(s)", not "bend(s)": the count is the
+                    # cylindrical folds that cost a stroke only. On a part
+                    # whose one fold is sharp, "0 bend(s) ... plus 1 sharp
+                    # fold" contradicted the feature list it sat beside.
+                    f"This part carries {bends} press-brake bend(s) and {hems} hem(s) across "
                     f"{len(radii)} distinct bend radii, {formed} formed feature(s), "
                     f"{holes} hole(s) of which {tapped} are tapped, {tabs} tab(s) "
                     f"and {notches} notch(es). That prices as one cut profile plus "
                     f"{strokes} brake stroke(s) plus {formed} forming station(s)"
                     f"{tapping} -- about {operations} operations. Each distinct bend "
                     "radius is its own punch and a tool change, so consolidating "
-                    "radii is usually the cheapest saving on a part like this.",
+                    "radii is usually the cheapest saving on a part like this."
+                    + unpriced,
                 ),
                 value=float(operations),
                 limit=threshold_value,
@@ -270,139 +298,62 @@ class SheetSharpFoldCheck(SheetCheck):
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
         gauge = self.gauge(context)
-        claimed = {
-            face_id
+        # The one walk the bend census and this rule share, so the two cannot
+        # disagree about what a sharp fold is. Handed the recognized features,
+        # not the list with the sharp BENDs added: those own no faces, so the
+        # exclusions come out the same either way.
+        # The closing comparison is only made when there is something to
+        # compare against: on a part whose only fold is this sharp one, "unlike
+        # the bends elsewhere" sent a reader looking for geometry that does not
+        # exist. Count the folds that carry a radius.
+        modelled_bends = sum(
+            1
             for feature in context.recognition.features
-            if feature.type in SHEET_TYPES
-            for face_id in feature.faces
-        }
-
-        skins, partner_of = self._skins(context, gauge, claimed)
-        if not skins:
-            return []
-
-        min_area = _MIN_PANEL_AREA_GAUGES * gauge * gauge
-        seen: set[tuple[int, int]] = set()
-        results: list[CheckResult] = []
-
-        for node in skins:
-            if node.area < min_area:
-                continue
-            normal = node.outward_normal
-            if normal is None:
-                continue
-            for edge in sorted(
-                context.graph.edges_of(node.face_id),
-                key=lambda e: (e.face_id_a, e.face_id_b),
-            ):
-                if edge.concavity is Concavity.TANGENT:
-                    continue
-                other_id = edge.other_face(node.face_id)
-                if other_id not in partner_of or other_id in claimed:
-                    continue
-                other = context.graph.node(other_id)
-                if other.area < min_area:
-                    continue
-                other_normal = other.outward_normal
-                if other_normal is None:
-                    continue
-                if abs(other_normal.Dot(normal)) > _FOLD_ORIENTATION_MAX_DOT:
-                    continue
-
-                # Both skins of the joining slab meet the panel, so the same
-                # fold arrives twice. Naming each side by the lower id of its
-                # own skin pair collapses the two into one finding.
-                key = tuple(
-                    sorted(
-                        (
-                            min(node.face_id, partner_of[node.face_id]),
-                            min(other_id, partner_of[other_id]),
-                        )
-                    )
-                )
-                if key in seen:
-                    continue
-                seen.add(key)
-
-                where = ""
-                if edge.midpoint is not None:
-                    where = (
-                        f" The fold is at ({edge.midpoint.X():.1f}, "
-                        f"{edge.midpoint.Y():.1f}, {edge.midpoint.Z():.1f})."
-                    )
-                results.append(
-                    self.finding(
-                        rule,
-                        Severity.WARNING,
-                        "zero-radius fold",
-                        self.render(
-                            feedback,
-                            Severity.WARNING,
-                            0.0,
-                            gauge,
-                            gauge,
-                            "mm",
-                            "Two panels meet here at a sharp, zero-radius fold. A "
-                            "press brake always forms a radius -- about one gauge "
-                            f"on the inside, {gauge:.2f} mm here -- so as drawn "
-                            "this corner cannot be folded. Model the bend radius. "
-                            "Until it is modelled this fold carries no geometry to "
-                            "check, unlike the bends elsewhere on the part."
-                            + where,
-                        ),
-                        faces=[node.face_id, other_id],
-                        value=0.0,
-                        limit=gauge,
-                        comparison="<",
-                    )
-                )
-        return results
-
-    @staticmethod
-    def _skins(context, gauge: float, claimed: set[int]):
-        """Planar faces that are one skin of a gauge-thick slab, and their partners.
-
-        A sheared edge strip can pick up a "partner" of its own -- any cutout
-        wall sitting one gauge inboard of the outline -- but the corner between
-        a panel and its own cut edge is not a fold, so strips are excluded
-        before the pairing starts.
-        """
-        planes = sorted(
-            context.graph.nodes_by_surface_type(SurfaceType.PLANE),
-            key=lambda n: n.face_id,
+            if feature.type == FeatureType.BEND
+            and str(feature.param("bend_family") or "cylindrical") != "sharp"
         )
-        skins = []
-        partner_of: dict[int, int] = {}
-
-        for node in planes:
-            if gauge_thin_face(node, gauge) or node.face_id in claimed:
-                continue
-            normal = node.outward_normal
-            if normal is None:
-                continue
-            for candidate in planes:
-                if candidate.face_id == node.face_id:
-                    continue
-                other_normal = candidate.outward_normal
-                if other_normal is None or other_normal.Dot(normal) > _ANTI_PARALLEL_MAX_DOT:
-                    continue
-                separation = abs(
-                    gp_Vec(node.centroid, candidate.centroid).Dot(gp_Vec(normal))
+        if modelled_bends > 0:
+            sharp_tail = (
+                f" Unlike the {modelled_bends} modelled bend(s) elsewhere on this "
+                "part, it carries no bend geometry to check."
+            )
+        else:
+            sharp_tail = (
+                " It carries no bend geometry to check, and this part has no "
+                "modelled bend to compare it against."
+            )
+        results: list[CheckResult] = []
+        for fold in detect_sharp_folds(context.graph, gauge, context.recognition.features):
+            where = ""
+            point = fold.crease_midpoint
+            if point is not None:
+                where = f" The fold is at ({point.X():.1f}, {point.Y():.1f}, {point.Z():.1f})."
+            results.append(
+                self.finding(
+                    rule,
+                    Severity.WARNING,
+                    "zero-radius fold",
+                    self.render(
+                        feedback,
+                        Severity.WARNING,
+                        0.0,
+                        gauge,
+                        gauge,
+                        "mm",
+                        "Two panels meet here at a sharp, zero-radius fold. A "
+                        "press brake always forms a radius -- about one gauge "
+                        f"on the inside, {gauge:.2f} mm here -- so as drawn "
+                        "this corner cannot be folded. Model the bend radius."
+                        + sharp_tail
+                        + where,
+                    ),
+                    faces=[fold.panel_a, fold.panel_b],
+                    value=0.0,
+                    limit=gauge,
+                    comparison="<",
                 )
-                if abs(separation - gauge) > _SKIN_SEPARATION_TOL_MM:
-                    continue
-                if node.bbox.IsVoid() or candidate.bbox.IsVoid():
-                    continue
-                reach = Bnd_Box()
-                reach.Add(node.bbox)
-                reach.Enlarge(gauge + 0.5)
-                if reach.IsOut(candidate.bbox):
-                    continue
-                skins.append(node)
-                partner_of[node.face_id] = candidate.face_id
-                break
-
-        return skins, partner_of
+            )
+        return results
 
 
 @register_check(Rulebook.SHEET_INTENT_SHARP_CORNERS)
@@ -452,5 +403,8 @@ class SheetIntentSharpCornersCheck(MachiningCheck):
                 limit=gauge,
                 comparison="",
                 unit="mm",
+                # A machined part that should have been sheet is a process
+                # advisory in the reference ("process"), not a sheet finding.
+                category="process",
             )
         ]

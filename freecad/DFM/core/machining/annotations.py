@@ -9,41 +9,23 @@ frame, the datums it measures from, a general finish note, a per-face Ra
 requirement: none of these are geometry, and none of them can be recovered by
 looking at the shape. They have to be carried alongside it.
 
-**Nothing supplies them today, and that is deliberate.** A FreeCAD document
-has nowhere to keep a feature control frame, so :func:`annotations_for`
-returns an empty set for every part, and every rule that reads it is silent.
-The rules are written, registered and tested anyway, so that the policy is
-already in place -- and already editable by the shop -- on the day the
-annotations arrive, rather than being a second project stacked on top of the
-first.
+**Where they come from.** A STEP file's semantic PMI is read on import by
+:mod:`.pmi` -- the reference engine's XDE path, ported -- and handed to the
+machining analyzer as its ``annotations`` argument, which puts it on the
+:class:`~.context.MachiningContext` that :func:`annotations_for` reads first.
+The baseline harness does that for the STEP fixtures today; a FreeCAD STEP
+import that kept the file path could do the same. A FreeCAD document has
+nowhere to keep a feature control frame, so a document part carries none,
+:func:`annotations_for` returns an empty set for it, and every rule reading it
+is silent.
 
-Where they would come from
---------------------------
-Two sources are plausible, and neither needs this module to change shape:
-
-*STEP PMI on import.* AP242 carries semantic PMI, and OpenCascade's XDE layer
-already reads most of it: ``XCAFDoc_DimTolTool`` yields the dimension and
-geometric-tolerance entities and their datum associations,
-``XCAFDoc_NotesTool`` yields free-text notes, and the AP242
-``SURFACE_TEXTURE_REQUIREMENT`` entities carry Ra. Wiring that up means
-walking the XDE document at import time, translating each entity into the
-dataclasses below, and mapping every referenced ``TopoDS_Face`` back to a
-one-based id through :class:`~...utils.geometry.FaceIndex` -- the same ids
-the adjacency graph and every finding already use.
-
-*A FreeCAD annotation object.* A part toleranced inside FreeCAD rather than
-imported would keep its callouts on a document object -- a TechDraw GD&T
-view, or a scripted object holding one frame per row. Reading that means the
-same translation step against ``Part::TopoShape`` sub-element names, which
-are already one-based ``FaceN`` strings.
-
-What would have to change to light these rules up
--------------------------------------------------
-1. Write the translator, wherever the callouts are coming from.
-2. Call :func:`set_annotation_source` once at start-up with a callable that
-   takes a :class:`~.context.MachiningContext` and returns an
-   :class:`AnnotationSet` for that part (or ``None`` when it has none).
-3. List the GD&T rules in the process definitions that should run them.
+The other source still open is a FreeCAD annotation object: a part
+toleranced inside FreeCAD rather than imported would keep its callouts on a
+document object -- a TechDraw GD&T view, or a scripted object holding one
+frame per row. Reading that means translating against ``Part::TopoShape``
+sub-element names, which are already one-based ``FaceN`` strings, and either
+passing the result as ``annotations`` or installing it with
+:func:`set_annotation_source`.
 
 No rule and no check signature changes. The checks already read this module's
 entry point, so supplying a source is the whole of the integration.
@@ -77,9 +59,11 @@ class ToleranceType:
     FLATNESS = "flatness"
     CIRCULARITY = "circularity"
     CYLINDRICITY = "cylindricity"
-    # Profile -- controls a whole surface against its true profile.
-    PROFILE_OF_A_LINE = "profile_of_a_line"
-    PROFILE_OF_A_SURFACE = "profile_of_a_surface"
+    # Profile -- controls a whole surface against its true profile. Spelled
+    # the reference engine's way, because the spelling is what a baseline
+    # counts ("tol_profile_surface").
+    PROFILE_OF_A_LINE = "profile_line"
+    PROFILE_OF_A_SURFACE = "profile_surface"
     # Orientation -- an angle held relative to a datum.
     ANGULARITY = "angularity"
     PERPENDICULARITY = "perpendicularity"
@@ -91,6 +75,15 @@ class ToleranceType:
     # Runout -- what a dial indicator sees as the part turns.
     CIRCULAR_RUNOUT = "circular_runout"
     TOTAL_RUNOUT = "total_runout"
+    # Not GD&T as such, but read alongside it from the same PMI: a size or
+    # location dimension, with its value when the model carries one.
+    DIMENSION_LINEAR = "dimension_linear"
+    DIMENSION_ANGULAR = "dimension_angular"
+    DIMENSION_DIAMETER = "dimension_diameter"
+    DIMENSION_RADIAL = "dimension_radial"
+    # A presentation label the importer could not classify -- a note, a
+    # section symbol. Surfaced rather than mislabelled; no rule keys on it.
+    UNKNOWN = "unknown"
 
 
 class ToleranceCategory:
@@ -106,6 +99,8 @@ class ToleranceCategory:
     ORIENTATION = "orientation"
     LOCATION = "location"
     RUNOUT = "runout"
+    DIMENSION = "dimension"
+    OTHER = "other"
 
 
 _CATEGORY_BY_TYPE: dict[str, str] = {
@@ -123,6 +118,11 @@ _CATEGORY_BY_TYPE: dict[str, str] = {
     ToleranceType.SYMMETRY: ToleranceCategory.LOCATION,
     ToleranceType.CIRCULAR_RUNOUT: ToleranceCategory.RUNOUT,
     ToleranceType.TOTAL_RUNOUT: ToleranceCategory.RUNOUT,
+    ToleranceType.DIMENSION_LINEAR: ToleranceCategory.DIMENSION,
+    ToleranceType.DIMENSION_ANGULAR: ToleranceCategory.DIMENSION,
+    ToleranceType.DIMENSION_DIAMETER: ToleranceCategory.DIMENSION,
+    ToleranceType.DIMENSION_RADIAL: ToleranceCategory.DIMENSION,
+    ToleranceType.UNKNOWN: ToleranceCategory.OTHER,
 }
 
 
@@ -130,7 +130,8 @@ class MaterialCondition:
     """The modifier inside the circle after the tolerance value.
 
     Empty means regardless of feature size, which is the default when a
-    drawing says nothing.
+    drawing says nothing. A STEP import spells that default out as "RFS",
+    which means the same.
     """
 
     RFS = ""
@@ -156,6 +157,12 @@ class FeatureControlFrame:
     the source could work that out. ``face_ids`` are the faces the frame
     points at, one-based as everywhere else in the workbench. Either may be
     empty: a frame read from a drawing may name neither.
+
+    A STEP import also carries its dimensions and unclassified presentation
+    labels as frames (see :class:`ToleranceType`), because the rules that
+    judge a tolerance's capability judge a valued dimension the same way.
+    ``details`` holds what the importer knew beyond that -- tolerance limits,
+    whether a dimension's value is on the drawing only.
     """
 
     annotation_id: str
@@ -166,6 +173,8 @@ class FeatureControlFrame:
     material_condition: str = MaterialCondition.RFS
     feature_id: str = ""
     face_ids: list[int] = field(default_factory=list)
+    tolerance_zone: str = ""
+    details: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # The family follows from the characteristic, so a source that knows
@@ -199,6 +208,7 @@ class Datum:
     label: str = ""
     face_ids: list[int] = field(default_factory=list)
     is_target: bool = False
+    target_type: str = ""
 
 
 @dataclass
@@ -213,6 +223,7 @@ class SurfaceFinishNote:
     note_id: str
     text: str = ""
     face_ids: list[int] = field(default_factory=list)
+    source: str = ""
 
 
 @dataclass
@@ -232,6 +243,23 @@ class SurfaceFinish:
 
 
 @dataclass
+class ThreadCallout:
+    """A thread designation the PMI attaches to a face.
+
+    The reference's ``FaceThreadPmi``: what a dimension's semantic name,
+    presentation name or description says about the thread on the cylinder
+    it points at ("M8x1.25"). Recorded per face; nominal and pitch are zero
+    when the thread table does not know the designation.
+    """
+
+    designation: str
+    nominal_mm: float = 0.0
+    pitch_mm: float = 0.0
+    thread_depth_mm: float = 0.0
+    source: str = ""
+
+
+@dataclass
 class AnnotationSet:
     """Every callout attached to one part.
 
@@ -243,6 +271,13 @@ class AnnotationSet:
     datums: list[Datum] = field(default_factory=list)
     notes: list[SurfaceFinishNote] = field(default_factory=list)
     surface_finishes: list[SurfaceFinish] = field(default_factory=list)
+    #: Whether the source carried any PMI at all. Distinct from
+    #: :attr:`is_empty`: a file can declare PMI and have every element of it
+    #: filtered out as a duplicate.
+    has_pmi: bool = False
+    #: Thread callouts by one-based face id. Read for the hole recognizer's
+    #: benefit rather than any GD&T rule; see :class:`ThreadCallout`.
+    threads: dict = field(default_factory=dict)
 
     @property
     def is_empty(self) -> bool:
@@ -262,8 +297,27 @@ class AnnotationSet:
         return sorted(self.surface_finishes, key=lambda s: s.surface_finish_id)
 
     def frames_for(self, feature_id: str) -> list[FeatureControlFrame]:
-        """Frames attached to one recognized feature."""
+        """Frames attached to one recognized feature by its id."""
         return [f for f in self.sorted_frames() if f.feature_id == feature_id]
+
+    def frames_on(self, feature) -> list[FeatureControlFrame]:
+        """Frames attached to a feature, the way the reference attaches them.
+
+        A frame belongs to every feature that owns any of its faces -- one
+        position callout on a bore that two features share lands on both --
+        and, failing faces, to the feature it names. In source order, because
+        that is the order the reference walks them in.
+        """
+        faces = set(getattr(feature, "faces", ()) or ())
+        instance_id = getattr(feature, "instance_id", "")
+        out = []
+        for frame in self.frames:
+            if frame.face_ids:
+                if faces.intersection(frame.face_ids):
+                    out.append(frame)
+            elif frame.feature_id and frame.feature_id == instance_id:
+                out.append(frame)
+        return out
 
     def cited_datum_labels(self) -> set[str]:
         """Every datum letter some frame actually references.
@@ -353,11 +407,18 @@ def annotation_source() -> Optional[AnnotationSource]:
 def annotations_for(context: "MachiningContext") -> AnnotationSet:
     """Every tolerance and finish callout on this part.
 
-    Returns an empty set when no source is installed, which is every part
-    today -- so a rule reading this finds nothing to judge rather than being
-    switched off. A source that raises is treated as having nothing to say:
-    a broken PMI translator must not take the whole analysis down with it.
+    Callouts handed to the analysis itself come first: a part read from a
+    STEP file with PMI carries its own (see :mod:`.pmi`), and they reach the
+    context through the analyzer's ``annotations`` argument. Otherwise the
+    installed source is asked. With neither, the set is empty -- which is a
+    FreeCAD document part today -- so a rule reading this finds nothing to
+    judge rather than being switched off. A source that raises is treated as
+    having nothing to say: a broken PMI translator must not take the whole
+    analysis down with it.
     """
+    carried = getattr(context, "annotations", None)
+    if isinstance(carried, AnnotationSet):
+        return carried
     source = _source
     if source is None:
         return AnnotationSet()

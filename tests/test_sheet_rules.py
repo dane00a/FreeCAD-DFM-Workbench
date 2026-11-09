@@ -487,9 +487,19 @@ class TestClosedFlangeLoop(SheetCase):
     def test_an_open_profile_is_clean(self):
         self.assertEqual(check(bracket(), self.RULE), [])
 
-    def test_a_tray_is_still_an_open_profile(self):
-        """Four flanges off one base is a star, not a ring."""
-        self.assertEqual(check(tray(), self.RULE), [])
+    def test_a_relieved_tray_is_still_an_open_profile(self):
+        """Four flanges off one base is a star, not a ring, once the corners
+        are cut back so the walls do not meet."""
+        self.assertEqual(check(relieved_tray(), self.RULE), [])
+
+    def test_a_tray_with_square_corners_is_a_closed_section(self):
+        """The fold census now counts zero-radius folds (reference 6a8338369),
+        so the four square wall-to-wall corners of an unrelieved tray are
+        folds too, and the four walls joined by them turn a full 360 degrees
+        about the vertical: a closed ring that needs its corners seamed. The
+        rule reads the fold topology rather than the brake bends alone."""
+        findings = check(tray(), self.RULE)
+        self.assertEqual(severities(findings), [Severity.WARNING])
 
     def test_two_bends_joining_the_same_pair_of_panels_close_a_loop(self):
         context = self.assert_sheet(sheet_context(hemmed_bracket()))

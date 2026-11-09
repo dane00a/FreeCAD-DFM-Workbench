@@ -10,11 +10,29 @@ the shop can hold them. A tolerance tighter than the machine's own error
 budget is not a defect in the geometry; it is a first article that will fail
 and a second, tighter process nobody quoted.
 
-All of them are dormant. Callouts reach them through
-:func:`~...machining.annotations.annotations_for`, and nothing supplies any
-today, so on a real part every rule here returns nothing -- because there is
-genuinely nothing to judge, not because the rule is a stub. That module's
-docstring says what would have to be wired up to change that.
+Callouts reach them through
+:func:`~...machining.annotations.annotations_for`. A part read from a STEP
+file with PMI carries its own (:mod:`...machining.pmi`); a FreeCAD document
+part carries none, and on it every rule here returns nothing -- because there
+is genuinely nothing to judge, not because the rule is a stub.
+
+How a callout reaches a feature is the reference engine's: a frame belongs to
+every recognized feature that owns any of its faces
+(``attach_gdt_to_features``), and the four feature-level rules below walk
+features first and their frames second. A frame on faces no feature owns is
+judged by none of them. Dimensions travel with the frames, as they do in the
+reference, so a valued dimension is held to the capability budget too.
+
+Every finding's wording depends only on the callout, never on which feature
+it was reached through. That is deliberate: the reference de-duplicates
+findings on their details, which name the annotation and not the feature, so
+one frame on faces two features share is one finding there -- and the
+aggregation pass here collapses it the same way only if the two findings
+read identically.
+
+GD&T rules keep running on a part classified as sheet metal. They judge the
+annotation data, which does not depend on how the part is made; the
+reference mutes every other machining family there and exempts this one.
 """
 
 from __future__ import annotations
@@ -32,7 +50,7 @@ from ...machining.annotations import (
 )
 from ...machining.config import MachiningConfig
 from ...machining.context import MachiningContext
-from ...machining.features import BORE_TYPES, FeatureInstance, FeatureType
+from ...machining.features import HOLE_TYPES, FeatureInstance, FeatureType
 from ...models import CheckResult, Severity
 from ...registries import register_check
 from ...rules import Rulebook
@@ -49,30 +67,26 @@ _MACHINE_MODE_LABEL = {
 
 # Feature types carrying an intrinsic size dimension -- a diameter, a width, a
 # thickness -- that a position tolerance can legitimately locate, at MMC or
-# LMC or neither (ASME Y14.5). Anything else has no size to depart from.
+# LMC or neither (ASME Y14.5). The reference's two lists exactly: its holes
+# (``is_hole_type``) and the rest of its features of size
+# (``is_feature_of_size_type``).
 #
-#   BORE_TYPES     -- holes of every kind, plus the partial bore. A sub-180
-#                     degree cradle is strictly not a feature of size, but a
-#                     line-bore is routinely located by position and flagging
-#                     that would be noise.
-#   EXTERNAL_THREAD - located on its pitch diameter.
+#   HOLE_TYPES     -- holes of every kind.
 #   PATTERN        -- inherits its member holes' size ("4X dia 6 ...").
 #   BOSS           -- an external pad, located by its own size.
-#   SLOT / CHANNEL / BROACHED_SLOT / THROUGH_CAVITY -- the width is the size.
-#                     CHANNEL is this workbench's name for a slot that runs
-#                     off both ends of the part; its width is a size like any
-#                     other slot's.
+#   SLOT / BROACHED_SLOT / THROUGH_CAVITY -- the width is the size.
 #   RIB            -- a standing wall whose thickness is a width-type feature
 #                     of size, so position locating its centre plane is valid.
 #
 # What is left -- a fillet, a chamfer, a plain pocket or planar face, a
-# spherical pocket -- has nothing for a position zone to locate.
-_FEATURE_OF_SIZE_TYPES = BORE_TYPES | {
-    FeatureType.EXTERNAL_THREAD,
+# spherical pocket -- has nothing for a position zone to locate. The partial
+# bore, the external thread and the channel are on neither of the reference's
+# lists, so they are questioned like any other; this port does not
+# second-guess that.
+_FEATURE_OF_SIZE_TYPES = HOLE_TYPES | {
     FeatureType.PATTERN,
     FeatureType.BOSS,
     FeatureType.SLOT,
-    FeatureType.CHANNEL,
     FeatureType.BROACHED_SLOT,
     FeatureType.THROUGH_CAVITY,
     FeatureType.RIB,
@@ -148,6 +162,7 @@ def _ra_verdict(ra_um: float, thresholds) -> tuple[Severity, str]:
     )
 
 
+
 def _frame_faces(frame: FeatureControlFrame, feature: Optional[FeatureInstance]):
     """Geometry to highlight for a frame: its own faces, else its feature's."""
     if frame.face_ids:
@@ -155,22 +170,46 @@ def _frame_faces(frame: FeatureControlFrame, feature: Optional[FeatureInstance])
     return sorted(feature.faces) if feature is not None else []
 
 
-def _feature_index(context: MachiningContext) -> dict[str, FeatureInstance]:
-    return {feature.instance_id: feature for feature in context.recognition.features}
-
-
-def _describe(frame: FeatureControlFrame, feature: Optional[FeatureInstance]) -> str:
-    """How to name what a frame is attached to, in a machinist's terms."""
-    if feature is not None:
-        return f"{feature.type.lower().replace('_', ' ')} {feature.instance_id}"
+def _describe(frame: FeatureControlFrame) -> str:
+    """How to name a callout in a finding: by its id, and what it covers."""
     if frame.face_ids:
         count = len(frame.face_ids)
-        return f"{count} face{'' if count == 1 else 's'}"
-    return "the part"
+        return f"{frame.label} on {count} face{'' if count == 1 else 's'}"
+    return frame.label
+
+
+def _control(frame: FeatureControlFrame) -> str:
+    return frame.type.replace("_", " ")
 
 
 def _callouts(context: MachiningContext) -> AnnotationSet:
     return annotations_for(context)
+
+
+def _attached(context: MachiningContext, callouts: AnnotationSet):
+    """(feature, frame) for every frame on every feature, in the reference's order.
+
+    Features in recognition order, each feature's frames in source order --
+    the walk the reference's feature-level GD&T rules make over the
+    ``gdt_annotations`` attached to each feature.
+    """
+    for feature in context.recognition.features:
+        for frame in callouts.frames_on(feature):
+            yield feature, frame
+
+
+class _GdtCheck(MachiningCheck):
+    """A GD&T rule: runs on every part the machining analysis classifies.
+
+    Sheet metal included, where every other machining rule stands down -- a
+    datum that points at nothing is as much a problem on a bracket as on a
+    billet.
+    """
+
+    def applies_to(self, context: MachiningContext) -> bool:
+        if not self.applicable_processes:
+            return True
+        return context.process_type in self.applicable_processes
 
 
 # =============================================================================
@@ -179,13 +218,15 @@ def _callouts(context: MachiningContext) -> AnnotationSet:
 
 
 @register_check(Rulebook.GDT_TOLERANCE_ACHIEVABLE)
-class GdtToleranceAchievableCheck(MachiningCheck):
+class GdtToleranceAchievableCheck(_GdtCheck):
     """A tolerance the machine cannot hold is a first article that fails.
 
     Location tolerances are judged against the machine's positioning budget
     and everything else against its form budget, because those two errors
     come from different places: one from the fixture and the re-clamps, the
-    other from the spindle and the way the tool deflects.
+    other from the spindle and the way the tool deflects. Anything with a
+    value is judged -- a dimension too, against the form budget, as in the
+    reference.
     """
 
     @property
@@ -205,10 +246,8 @@ class GdtToleranceAchievableCheck(MachiningCheck):
         form_limit = override if override is not None else _form_limit(context.config)
         mode = _mode_label(context.config)
 
-        features = _feature_index(context)
         results: list[CheckResult] = []
-
-        for frame in callouts.sorted_frames():
+        for feature, frame in _attached(context, callouts):
             tolerance = float(frame.tolerance_value_mm)
             if tolerance <= 0.0:
                 continue  # no zone stated, nothing to compare
@@ -218,8 +257,6 @@ class GdtToleranceAchievableCheck(MachiningCheck):
             if tolerance >= limit:
                 continue
 
-            feature = features.get(frame.feature_id)
-            subject = _describe(frame, feature)
             budget = (
                 "once the fixture, the tool offsets and every re-clamp are "
                 "counted"
@@ -227,7 +264,6 @@ class GdtToleranceAchievableCheck(MachiningCheck):
                 else "once spindle runout and tool deflection are counted"
             )
             severity = Severity.WARNING
-
             results.append(
                 self.finding(
                     rule,
@@ -240,7 +276,7 @@ class GdtToleranceAchievableCheck(MachiningCheck):
                         limit,
                         limit,
                         "mm",
-                        f"The {frame.type.replace('_', ' ')} callout on {subject} "
+                        f"The {_control(frame)} callout {_describe(frame)} "
                         f"asks for {tolerance:.3f} mm. A {mode} machine holds about "
                         f"{limit:.3f} mm on this kind of control {budget}, so as "
                         "drawn the part cannot be shown capable off this machine -- "
@@ -265,14 +301,14 @@ class GdtToleranceAchievableCheck(MachiningCheck):
 
 
 @register_check(Rulebook.GDT_DATUM_VALID)
-class GdtDatumValidCheck(MachiningCheck):
+class GdtDatumValidCheck(_GdtCheck):
     """A reference frame needs real surfaces to sit on.
 
-    Counted rather than matched by letter: nothing in the model carries datum
-    labels, so the question this can honestly answer is whether the part even
-    has enough substantial flats to build the frame the drawing describes.
-    Three datums called up on a part with one usable flat is a fixture
-    problem before it is an inspection problem.
+    Counted rather than matched by letter, as the reference does: the
+    question answered is whether the part even has enough substantial flats
+    to build the frame the drawing describes. Three datums called up on a
+    part with one usable flat is a fixture problem before it is an
+    inspection problem.
     """
 
     @property
@@ -292,16 +328,14 @@ class GdtDatumValidCheck(MachiningCheck):
         ]
         available = len(candidates)
 
-        features = _feature_index(context)
         severity = self.severity_from_rule_config(rule_config)
         results: list[CheckResult] = []
 
-        for frame in callouts.sorted_frames():
-            refs = [ref for ref in frame.datum_refs if ref]
+        for _feature, frame in _attached(context, callouts):
+            refs = list(frame.datum_refs)
             if not refs or available >= len(refs):
                 continue
 
-            feature = features.get(frame.feature_id)
             listed = ", ".join(refs)
             results.append(
                 self.finding(
@@ -315,9 +349,9 @@ class GdtDatumValidCheck(MachiningCheck):
                         float(len(refs)),
                         float(len(refs)),
                         "",
-                        f"The {frame.type.replace('_', ' ')} callout on "
-                        f"{_describe(frame, feature)} is measured from {len(refs)} "
-                        f"datums ({listed}), but the part carries only {available} "
+                        f"The {_control(frame)} callout {_describe(frame)} is "
+                        f"measured from {len(refs)} datums ({listed}), but the "
+                        f"part carries only {available} "
                         f"flat face{'' if available == 1 else 's'} of at least "
                         f"{minimum_area:.0f} mm2 to establish them on. There is not "
                         "enough surface to build the reference frame, so the "
@@ -335,7 +369,7 @@ class GdtDatumValidCheck(MachiningCheck):
 
 
 @register_check(Rulebook.GDT_DATUM_UNRESOLVED)
-class GdtDatumUnresolvedCheck(MachiningCheck):
+class GdtDatumUnresolvedCheck(_GdtCheck):
     """A datum letter that points at nothing.
 
     The letter parses, the geometry link does not -- the datum is a symbol on
@@ -413,7 +447,7 @@ class GdtDatumUnresolvedCheck(MachiningCheck):
 
 
 @register_check(Rulebook.GDT_SURFACE_FINISH_CONFLICT)
-class GdtSurfaceFinishConflictCheck(MachiningCheck):
+class GdtSurfaceFinishConflictCheck(_GdtCheck):
     """A form tolerance tight enough to demand a second machine.
 
     Form and profile control the surface itself, so a very tight one carries
@@ -439,10 +473,8 @@ class GdtSurfaceFinishConflictCheck(MachiningCheck):
         grinding = thresholds.tol_grinding_max_mm
         lapping = thresholds.tol_lapping_max_mm
 
-        features = _feature_index(context)
         results: list[CheckResult] = []
-
-        for frame in callouts.sorted_frames():
+        for feature, frame in _attached(context, callouts):
             tolerance = float(frame.tolerance_value_mm)
             if tolerance <= 0.0:
                 continue
@@ -451,15 +483,14 @@ class GdtSurfaceFinishConflictCheck(MachiningCheck):
             if tolerance >= grinding:
                 continue
 
-            feature = features.get(frame.feature_id)
-            subject = _describe(frame, feature)
-            control = frame.type.replace("_", " ")
+            subject = _describe(frame)
+            control = _control(frame)
 
             if tolerance < lapping:
                 severity = Severity.ERROR
                 limit = lapping
                 advice = (
-                    f"The {control} callout on {subject} holds the surface to "
+                    f"The {control} callout {subject} holds the surface to "
                     f"{tolerance:.4f} mm. A milled face does not stay that flat "
                     "once it comes off the cutter and relaxes, and no finish pass "
                     "recovers it -- this is lapping or super-finishing work on a "
@@ -470,7 +501,7 @@ class GdtSurfaceFinishConflictCheck(MachiningCheck):
                 severity = Severity.WARNING
                 limit = grinding
                 advice = (
-                    f"The {control} callout on {subject} holds the surface to "
+                    f"The {control} callout {subject} holds the surface to "
                     f"{tolerance:.4f} mm. That is below what milling reliably "
                     "leaves, so plan on grinding the face after machining. Leave "
                     "grind stock on it, and expect the extra operation in the "
@@ -499,7 +530,7 @@ class GdtSurfaceFinishConflictCheck(MachiningCheck):
 
 
 @register_check(Rulebook.GDT_FEATURE_TOLERANCE_MISMATCH)
-class GdtFeatureToleranceMismatchCheck(MachiningCheck):
+class GdtFeatureToleranceMismatchCheck(_GdtCheck):
     """True position on something that has no size.
 
     Position locates a feature of size -- a hole, a slot, a boss, a tab. On a
@@ -525,52 +556,51 @@ class GdtFeatureToleranceMismatchCheck(MachiningCheck):
         severity = self.severity_from_rule_config(rule_config)
         results: list[CheckResult] = []
 
-        for feature in sorted(
-            context.recognition.features, key=lambda f: f.instance_id
-        ):
+        for feature, frame in _attached(context, callouts):
             if feature.type in _FEATURE_OF_SIZE_TYPES:
                 continue
+            if frame.type != ToleranceType.POSITION:
+                continue
 
+            # Named by the callout and the KIND of feature, never the feature
+            # itself: the reference's finding details carry the type and not
+            # the id, so one frame over two pockets is one finding there.
             kind = feature.type.lower().replace("_", " ")
-            for frame in callouts.frames_for(feature.instance_id):
-                if frame.type != ToleranceType.POSITION:
-                    continue
-
-                if frame.has_material_modifier:
-                    modifier = frame.material_condition
-                    advice = (
-                        f"The position callout on {feature.instance_id} carries a "
-                        f"{modifier} modifier, but the feature under it was "
-                        f"recognized as a {kind}. {modifier} trades size departure "
-                        "for position, so it only means anything on a feature of "
-                        "size -- a hole, a slot, a boss, a tab. A "
-                        f"{kind} is not one. Far more likely a feature of size was "
-                        "read wrongly here -- an obround slot taken for a fillet, "
-                        "say -- than that the drawing toleranced a "
-                        f"{kind} at {modifier}. Check the geometry before quoting."
-                    )
-                    overview = f"{frame.material_condition} on a {kind}"
-                else:
-                    advice = (
-                        f"A position tolerance is applied to {feature.instance_id}, "
-                        f"recognized as a {kind}. True position locates a feature "
-                        "of size -- a hole, a slot, a boss, a tab -- by surrounding "
-                        f"its axis or centre plane. A {kind} has neither, so there "
-                        "is nothing for the zone to be about. Confirm this is what "
-                        "the drawing intends; profile of a surface is usually the "
-                        "control that was wanted."
-                    )
-                    overview = f"position on a {kind}"
-
-                results.append(
-                    self.finding(
-                        rule,
-                        severity,
-                        overview,
-                        self.render(feedback, severity, 0.0, 0.0, 0.0, "", advice),
-                        faces=_frame_faces(frame, feature),
-                    )
+            if frame.has_material_modifier:
+                modifier = frame.material_condition
+                advice = (
+                    f"The position callout {_describe(frame)} carries a "
+                    f"{modifier} modifier, but the feature under it was "
+                    f"recognized as a {kind}. {modifier} trades size departure "
+                    "for position, so it only means anything on a feature of "
+                    "size -- a hole, a slot, a boss, a tab. A "
+                    f"{kind} is not one. Far more likely a feature of size was "
+                    "read wrongly here -- an obround slot taken for a fillet, "
+                    "say -- than that the drawing toleranced a "
+                    f"{kind} at {modifier}. Check the geometry before quoting."
                 )
+                overview = f"{modifier} on a {kind}"
+            else:
+                advice = (
+                    f"The position tolerance {_describe(frame)} is applied to a "
+                    f"feature recognized as a {kind}. True position locates a "
+                    "feature of size -- a hole, a slot, a boss, a tab -- by "
+                    f"surrounding its axis or centre plane. A {kind} has "
+                    "neither, so there is nothing for the zone to be about. "
+                    "Confirm this is what the drawing intends; profile of a "
+                    "surface is usually the control that was wanted."
+                )
+                overview = f"position on a {kind}"
+
+            results.append(
+                self.finding(
+                    rule,
+                    severity,
+                    overview,
+                    self.render(feedback, severity, 0.0, 0.0, 0.0, "", advice),
+                    faces=_frame_faces(frame, feature),
+                )
+            )
         return results
 
 
@@ -580,7 +610,7 @@ class GdtFeatureToleranceMismatchCheck(MachiningCheck):
 
 
 @register_check(Rulebook.NOTE_SURFACE_FINISH_DEMANDING)
-class NoteSurfaceFinishDemandingCheck(MachiningCheck):
+class NoteSurfaceFinishDemandingCheck(_GdtCheck):
     """An Ra buried in the general notes still has to be cut.
 
     The usual place a demanding finish hides: "ALL SURFACES Ra 0.4 UNLESS
@@ -640,7 +670,7 @@ class NoteSurfaceFinishDemandingCheck(MachiningCheck):
 
 
 @register_check(Rulebook.SURFACE_FINISH_PER_FACE_DEMANDING)
-class SurfaceFinishPerFaceDemandingCheck(MachiningCheck):
+class SurfaceFinishPerFaceDemandingCheck(_GdtCheck):
     """A finish requirement pinned to particular faces.
 
     The same bands as the note rule, reported against the feature that owns

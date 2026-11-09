@@ -16,19 +16,24 @@ matter. Holes carry their own access rules.
 
 from __future__ import annotations
 
+import math
 from typing import Optional, Sequence
 
 from OCP.gp import gp_Dir
 
 from ..aag import AagNode, AttributedAdjacencyGraph, SurfaceType
-from ..features import BORE_TYPES, FeatureInstance, FeatureType
+from ..features import HOLE_TYPES, FeatureInstance, FeatureType
 from .base import FeatureRecognizer
-from .reachability import CARDINAL_DIRECTIONS, Reachability
+from .reachability import Reachability
 
 
 # A curved face is reachable when some external surface faces within this of
 # its axis. Generous, because the test is a screen rather than a simulation.
-_CURVED_ACCESS_COS = 0.866  # 30 degrees
+_CURVED_ACCESS_RAD = math.radians(30.0)
+
+# An outer cylinder's axis component below this counts as square to that
+# cardinal, so the cardinal pair along it is an approach.
+_CARDINAL_AXIS_TOL = 0.05
 
 
 class UndercutRecognizer(FeatureRecognizer):
@@ -52,10 +57,13 @@ class UndercutRecognizer(FeatureRecognizer):
 
         # A bore is unreachable from the side by nature. Reporting that would
         # drown the real undercuts, and the hole rules cover access anyway.
+        # Only the six drilled-hole types: a PARTIAL_BORE, pocket, slot or
+        # boss face is still tested -- a slot's walls can be genuine
+        # undercut shoulders (T-slot, dovetail) nothing else reports.
         excluded = {
             face_id
             for feature in (prior or ())
-            if feature.type in BORE_TYPES
+            if feature.type in HOLE_TYPES
             for face_id in feature.faces
         }
 
@@ -107,54 +115,112 @@ class UndercutRecognizer(FeatureRecognizer):
 
         features = []
         for key in sorted(blocked):
-            nodes = blocked[key]
-            normal = nodes[0].outward_normal
-            features.append(
-                FeatureInstance(
-                    instance_id=self.instance_id(0),
-                    type=FeatureType.UNDERCUT,
-                    faces=sorted(n.face_id for n in nodes),
-                    parameters={
-                        "surface_type": "PLANAR",
-                        "face_count": len(nodes),
-                        "blocked_tad": key,
-                        "face_normal": (
-                            round(normal.X(), 6),
-                            round(normal.Y(), 6),
-                            round(normal.Z(), 6),
-                        )
-                        if normal
-                        else (0.0, 0.0, 0.0),
-                    },
-                )
-            )
+            bucket = blocked[key]
+            normal = bucket[0].outward_normal
+            for nodes in self._connected_groups(graph, bucket):
+                features.append(self._planar_feature(nodes, key, normal))
         return features
+
+    @staticmethod
+    def _connected_groups(
+        graph: AttributedAdjacencyGraph, bucket: list[AagNode]
+    ) -> list[list[AagNode]]:
+        """Split one direction's faces into the separate undercuts they are.
+
+        Facing the same way does not make two faces one undercut: a step at
+        an angled hole's entry and a tilted counterbore a long way off came
+        back as one. Two faces are one undercut when they touch, or share at
+        least TWO neighbouring faces -- a T-slot's shoulders do not touch
+        (the neck is between them) but both border the slot's walls. Faces
+        that share only the one host face they are cut into are separate.
+        """
+        count = len(bucket)
+        parent = list(range(count))
+
+        def root(a: int) -> int:
+            while parent[a] != a:
+                parent[a] = parent[parent[a]]
+                a = parent[a]
+            return a
+
+        neighbours = [
+            {edge.other_face(node.face_id) for edge in graph.edges_of(node.face_id)}
+            for node in bucket
+        ]
+        for a in range(count):
+            for c in range(a + 1, count):
+                join = bucket[c].face_id in neighbours[a]
+                if not join:
+                    join = len(neighbours[a] & neighbours[c]) >= 2
+                if join:
+                    parent[root(a)] = root(c)
+
+        # Components in order of their root, members in bucket order, as
+        # the reference's ordered map lays them out.
+        components: dict[int, list[AagNode]] = {}
+        for k in range(count):
+            components.setdefault(root(k), []).append(bucket[k])
+        return [components[r] for r in sorted(components)]
+
+    def _planar_feature(self, nodes: list[AagNode], key, normal) -> FeatureInstance:
+        return FeatureInstance(
+            instance_id=self.instance_id(0),
+            type=FeatureType.UNDERCUT,
+            faces=sorted(n.face_id for n in nodes),
+            parameters={
+                "surface_type": "PLANAR",
+                "face_count": len(nodes),
+                "blocked_tad": key,
+                "face_normal": (
+                    round(normal.X(), 6),
+                    round(normal.Y(), 6),
+                    round(normal.Z(), 6),
+                )
+                if normal
+                else (0.0, 0.0, 0.0),
+            },
+        )
 
     # -- curved -------------------------------------------------------------
 
     def _curved_undercuts(
         self, graph: AttributedAdjacencyGraph, excluded: set[int]
     ) -> list[FeatureInstance]:
-        """Internal cylinders and tori with no approach along their axis.
+        """Cylinders and tori with no approach along their axis.
 
-        No rays here. A curved internal surface is cut by a tool coming in
+        No rays here. A curved surface in a recess is cut by a tool coming in
         along its axis, so the question is whether any external face of the
         part looks that way -- which is answered from the graph.
+
+        A candidate is any cylinder or torus with a concave neighbour, as the
+        reference selects them. Its axis is read from `cyl_cone_axis` for
+        both kinds: the reference never fills that field on a torus, so every
+        torus is tested along the default +Z axis. That looks like a
+        reference slip; it is ported as it stands.
         """
         external = self._external_directions(graph)
+        if not external:
+            return []
         features = []
 
         for node in graph.nodes:
-            if node.face_id in excluded or not node.is_internal:
+            if node.surface_type not in (SurfaceType.CYLINDER, SurfaceType.TORUS):
+                continue
+            if node.concave_neighbor_count == 0:
+                continue
+            if node.face_id in excluded:
                 continue
             if node.surface_type is SurfaceType.CYLINDER and node.cyl_cone_axis is not None:
                 axis = node.cyl_cone_axis.Direction()
-            elif node.surface_type is SurfaceType.TORUS and node.torus_axis is not None:
-                axis = node.torus_axis.Direction()
             else:
-                continue
+                axis = gp_Dir(0, 0, 1)
 
-            if any(abs(axis.Dot(direction)) >= _CURVED_ACCESS_COS for direction in external):
+            # Reachable when some external direction lies strictly within
+            # thirty degrees of the axis, either way along it.
+            if any(
+                math.acos(min(1.0, abs(axis.Dot(direction)))) < _CURVED_ACCESS_RAD
+                for direction in external
+            ):
                 continue
 
             dims = node.bbox_dims()
@@ -175,32 +241,28 @@ class UndercutRecognizer(FeatureRecognizer):
 
     @staticmethod
     def _external_directions(graph: AttributedAdjacencyGraph) -> list[gp_Dir]:
-        """Directions the outside of the part faces.
+        """Directions a tool can come from, read off the outside of the part.
 
-        Flat outer faces contribute their own normal. An outer cylinder is
-        approachable from anywhere around it, so it contributes the cardinals
-        square to its axis.
+        A flat face with a convex neighbour contributes its outward normal.
+        A cylinder with a convex neighbour is approachable from anywhere
+        around it, so it contributes the cardinals square to its axis -- but
+        only for an axis that is itself near-cardinal: each axis component
+        under 0.05 adds that axis's pair of cardinals.
         """
         directions: list[gp_Dir] = []
-
-        def add(direction: gp_Dir) -> None:
-            if not any(existing.Dot(direction) > 0.99 for existing in directions):
-                directions.append(direction)
-
         for node in graph.nodes:
             if node.convex_neighbor_count == 0:
                 continue
             if node.surface_type is SurfaceType.PLANE:
                 normal = node.outward_normal
                 if normal is not None:
-                    add(normal)
-            elif (
-                node.surface_type is SurfaceType.CYLINDER
-                and not node.is_internal
-                and node.cyl_cone_axis is not None
-            ):
+                    directions.append(normal)
+            elif node.surface_type is SurfaceType.CYLINDER and node.cyl_cone_axis is not None:
                 axis = node.cyl_cone_axis.Direction()
-                for cardinal in CARDINAL_DIRECTIONS:
-                    if abs(axis.Dot(cardinal)) < 0.3:
-                        add(cardinal)
+                if abs(axis.X()) < _CARDINAL_AXIS_TOL:
+                    directions.extend((gp_Dir(1, 0, 0), gp_Dir(-1, 0, 0)))
+                if abs(axis.Y()) < _CARDINAL_AXIS_TOL:
+                    directions.extend((gp_Dir(0, 1, 0), gp_Dir(0, -1, 0)))
+                if abs(axis.Z()) < _CARDINAL_AXIS_TOL:
+                    directions.extend((gp_Dir(0, 0, 1), gp_Dir(0, 0, -1)))
         return directions

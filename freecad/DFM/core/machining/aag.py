@@ -140,6 +140,12 @@ class AagNode:
     freeform_normal_spread_deg: float = 0.0
     freeform_mean_normal: Optional[gp_Dir] = None
 
+    # Canonical promotion (see `canonical`): set only when a freeform face was
+    # rewritten as the primitive it fits. Off unless DFM_CANONICAL_PROMOTION.
+    canonical_promoted: bool = False
+    canonical_native_type: Optional[SurfaceType] = None
+    canonical_deviation_mm: float = 0.0
+
     # Filled by AttributedAdjacencyGraph.finalize()
     concave_neighbor_count: int = 0
     convex_neighbor_count: int = 0
@@ -192,6 +198,30 @@ class AagEdge:
     # for example the rim of a pocket opening cut into a host face. Used for
     # topological questions only; it carries no sign correction.
     is_inner_wire_edge: bool = False
+
+    # True on a parametric seam: the edge a closed face meets itself along,
+    # found the same way the reference finds it (BRep_Tool::IsClosed on
+    # either face). A seam is an artefact of how a closed surface was
+    # parametrised, not a boundary of anything, so nothing that measures the
+    # part may count it -- the same reason inner wires do not vote. Where the
+    # kernel puts it depends only on which way the modeller's X axis pointed,
+    # and output must not move with it.
+    is_seam: bool = False
+
+    # True when the same surface carries on across this edge, of which a
+    # seam is one case. After a boolean, a land the seam crosses can come
+    # back as two faces on one cylinder joined by an ordinary edge that no
+    # seam test can see; this says the edge divides a surface rather than
+    # bounds one. Set when ``is_seam``, or when both faces lie on one
+    # geometric surface with their material on the same side. Deliberately
+    # not read by every reader of ``is_seam``: the slot recogniser's floor
+    # vote keys on ``is_seam`` alone, because coplanar fragments are common
+    # and changing that vote is a reclassification, not a seam fix.
+    is_surface_continuation: bool = False
+
+    # Exact, parametrisation-free bounds of the edge curve
+    # (BndLib_Add3dCurve::AddOptimal). Void when not computed.
+    curve_box: Bnd_Box = field(default_factory=Bnd_Box)
 
     def other_face(self, face_id: int) -> int:
         """The face at the far end of this edge."""

@@ -1165,12 +1165,13 @@ class TestTheHolePassReadsTheEvidence(unittest.TestCase):
         found = _holes_with(blind_tap_drill_hole(), evidence)
         self.assertEqual(found[0].type, FeatureType.BLIND_HOLE)
 
-    def test_a_modelled_helix_still_speaks_for_itself(self):
-        # The oldest source has to keep working on a part with no document
-        # behind it at all.
-        from tests.test_machining_threads import tapped_blind_hole
+    def test_a_modelled_thread_still_speaks_for_itself(self):
+        # The geometric source has to keep working on a part with no document
+        # behind it at all. Its signature is the reference's: spline edges on
+        # the bore wall.
+        from tests.test_machining_threads import spline_seamed_tap_drill_hole
 
-        found = _holes_with(tapped_blind_hole(), ThreadEvidence())
+        found = _holes_with(spline_seamed_tap_drill_hole(), ThreadEvidence())
         threaded = [f for f in found if f.type == FeatureType.THREADED_HOLE]
         self.assertEqual(len(threaded), 1)
         self.assertEqual(threaded[0].param("thread_evidence"), MODELLED_HELIX)

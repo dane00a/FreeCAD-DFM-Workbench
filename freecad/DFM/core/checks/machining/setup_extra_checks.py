@@ -44,35 +44,6 @@ _CARDINALS = (
 # square as a sawn billet face is going to be.
 _PERPENDICULAR_TOL = 0.1
 
-# Feature types that carry a real approach direction. A fillet or a chamfer
-# is cut by whatever tool made the feature it runs along, so it costs no
-# setup of its own.
-_COSTS_A_SETUP = frozenset(
-    {
-        FeatureType.THROUGH_HOLE,
-        FeatureType.BLIND_HOLE,
-        FeatureType.COUNTERBORE,
-        FeatureType.COUNTERSINK,
-        FeatureType.THREADED_HOLE,
-        FeatureType.PARTIAL_BORE,
-        FeatureType.POCKET,
-        FeatureType.SLOT,
-        FeatureType.CHANNEL,
-        FeatureType.THROUGH_CAVITY,
-        FeatureType.SPHERICAL_POCKET,
-        FeatureType.BOSS,
-        FeatureType.STEP,
-        FeatureType.GROOVE,
-        FeatureType.O_RING_GLAND,
-        FeatureType.RETAINING_RING_GROOVE,
-        FeatureType.THREAD_RELIEF_GROOVE,
-        FeatureType.EXTERNAL_THREAD,
-        FeatureType.FLEXURE_SLIT,
-        FeatureType.BROACHED_SLOT,
-    }
-)
-
-
 #: A sculpted face whose normals disagree by more than this across it has no
 #: one direction a tool comes from.
 _SCULPTED_MAX_SPREAD_DEG = 45.0
@@ -103,8 +74,12 @@ class SetupCountCheck(MachiningCheck):
         thresholds = context.config.thresholds
         target = self.safe_float(rule_config.target)
         limit = self.safe_float(rule_config.limit)
+        # The process file states the band as "routine up to `target`, an
+        # error from `limit`". The bands are inclusive at the top, as the
+        # reference grades them: four setups is already the very-high error
+        # (setup_count_error = 4), not the last warning before it.
         if target is None:
-            target = float(thresholds.setup_count_warn)
+            target = float(thresholds.setup_count_warn - 1)
         if limit is None:
             limit = float(thresholds.setup_count_error)
         cluster_deg = thresholds.tad_angular_cluster_deg
@@ -118,13 +93,14 @@ class SetupCountCheck(MachiningCheck):
         setups = max(1, _cluster(directions, cluster_deg))
         count = float(setups)
 
-        graded = self.graded(count, target, limit, "max")
-        if graded is not None:
-            severity, threshold = graded
-            advice = (
-                "Bringing features onto shared faces, or accepting a fourth "
-                "axis, is what reduces this."
-            )
+        advice = (
+            "Bringing features onto shared faces, or accepting a fourth "
+            "axis, is what reduces this."
+        )
+        if count >= limit - 1e-9:
+            severity, threshold = Severity.ERROR, limit
+        elif count > target + 1e-9:
+            severity, threshold = Severity.WARNING, target
         elif setups >= thresholds.setup_count_info_min:
             # Two setups is routine -- almost every turned part needs a
             # sub-spindle hand-off and many milled parts need a flip for the
@@ -178,15 +154,34 @@ class SetupCountCheck(MachiningCheck):
         compressor disk with work on both faces read as a single setup.
         """
         directions: list[tuple[gp_Dir, bool]] = []
+        # Faces of every feature that declared its own approach. Those faces
+        # are the shape of that feature's cut, so they must not also buy a
+        # sculpted setup each: a real font's B-spline glyph walls curve in
+        # plan, and one engraving read as eleven setups. Only an owner that
+        # actually SPOKE silences its faces, so unclaimed sculpting still
+        # counts.
+        spoken_for: set[int] = set()
         for feature in context.recognition.features:
-            if feature.type not in _COSTS_A_SETUP:
+            # Every feature is asked, whatever its type: the reference keys
+            # this on which parameters a feature carries, not on what it is.
+            # Something that stores neither an axis, a floor normal nor a
+            # planar host face (a STEP's wall `normal`, a fillet, a chamfer)
+            # has said nothing about how it is reached, so it costs no setup.
+            #
+            # An axis is read first. A bore is reversible unless something
+            # closes one end, which the recognizer records as `axis_signed`.
+            axis = _stored_direction(feature, "axis")
+            if axis is not None:
+                directions.append((axis, bool(feature.param("axis_signed", False))))
+                spoken_for.update(feature.faces)
                 continue
 
             # A cavity is reached from the side its floor points to, and that
             # side only.
-            floor = feature.direction("floor_normal")
+            floor = _stored_direction(feature, "floor_normal")
             if floor is not None:
                 directions.append((floor, True))
+                spoken_for.update(feature.faces)
                 continue
 
             # A feature applied onto a face -- engraving, marking -- can only
@@ -194,20 +189,13 @@ class SetupCountCheck(MachiningCheck):
             host = SetupCountCheck._host_face_normal(context, feature)
             if host is not None:
                 directions.append((host, True))
-                continue
+                spoken_for.update(feature.faces)
 
-            axis = feature.direction("axis")
-            if axis is None:
-                axis = feature.direction("normal")
-            if axis is not None:
-                # A bore is reversible unless something closes one end.
-                directions.append((axis, bool(feature.param("axis_signed"))))
-
-        directions.extend(SetupCountCheck._sculpted_approaches(context))
+        directions.extend(SetupCountCheck._sculpted_approaches(context, spoken_for))
         return directions
 
     @staticmethod
-    def _sculpted_approaches(context) -> "list[tuple[gp_Dir, bool]]":
+    def _sculpted_approaches(context, spoken_for=frozenset()) -> "list[tuple[gp_Dir, bool]]":
         """The faces a ball-nose has to come down onto, and from where.
 
         A styled surface is machined along its own normal, so it costs a
@@ -234,6 +222,8 @@ class SetupCountCheck(MachiningCheck):
         found: list[tuple[gp_Dir, bool]] = []
         for node in context.graph.nodes:
             if not node.has_freeform_curvature:
+                continue
+            if node.face_id in spoken_for:
                 continue
             if node.concave_neighbor_count == 0:
                 continue
@@ -380,16 +370,36 @@ class ToolAccessSpecialSetupCheck(MachiningCheck):
 
         cluster_deg = context.config.thresholds.tad_angular_cluster_deg
         tolerance = math.cos(math.radians(cluster_deg))
+        shaped_tol = context.config.thresholds.shaped_cutter_angle_tol_deg
 
         results: list[CheckResult] = []
         for feature in context.recognition.features:
-            if feature.type not in _COSTS_A_SETUP:
-                continue
-            axis = feature.direction("axis")
+            # Every feature that names a direction is asked, under whichever
+            # name its recognizer stores it: holes and bosses an `axis`,
+            # cavities a `floor_normal`, undercuts the `blocked_tad` they
+            # could not be reached along. Alignment is sign-blind, so which
+            # way the stored vector points does not matter.
+            axis = _access_axis(feature)
             if axis is None or _is_cardinal(axis, tolerance):
                 continue
 
             tilt = math.degrees(math.acos(min(1.0, _best_cardinal_dot(axis))))
+
+            # Where the direction is a planar wall's NORMAL rather than a
+            # symmetry axis, a wall tilted to exactly a catalogue form
+            # cutter's angle is what that cutter makes feeding straight down
+            # a cardinal -- a chamfer mill, a V-bit, a dovetail. No special
+            # setup exists. A tilted bore is never rescued this way.
+            if feature.type in _NORMAL_BEARING and _shaped_cutter_for_wall_tilt(tilt, shaped_tol):
+                continue
+
+            kind = str(feature.type).replace("_", " ").lower()
+            # The axis is part of what the finding says: identical findings
+            # merge into one row, and the reference merges these only when
+            # type and axis agree to four decimals.
+            axis_text = "(" + ", ".join(
+                f"{round(c, 4) + 0.0:g}" for c in (axis.X(), axis.Y(), axis.Z())
+            ) + ")"
             results.append(
                 self.finding(
                     rule,
@@ -402,13 +412,14 @@ class ToolAccessSpecialSetupCheck(MachiningCheck):
                         0.0,
                         0.0,
                         "deg",
-                        f"This {feature.type.replace('_', ' ').lower()} lies "
+                        f"This {kind} (axis {axis_text}) lies "
                         f"{tilt:.0f} degrees off every direction a three-axis "
                         "machine can approach from. It is not unmachinable -- "
                         "the part gets tipped in a fixture, or it goes on a "
-                        "machine that can index -- but that is an extra setup "
-                        "and a fixture to build, and neither will have been "
-                        "in the quote.",
+                        "machine that can index, or a shaped cutter (V-bit, "
+                        "chamfer mill, dovetail) comes at it from a cardinal "
+                        "direction -- but check it against the machining "
+                        "strategy before quoting.",
                     ),
                     faces=feature.faces,
                     value=tilt,
@@ -449,7 +460,7 @@ def _cluster(directions: list[tuple[gp_Dir, bool]], cluster_deg: float) -> int:
             alignment = direction.Dot(existing)
             if not (fixed and existing_fixed):
                 alignment = abs(alignment)
-            if alignment > tolerance:
+            if alignment >= tolerance:
                 if fixed and not existing_fixed:
                     # The cluster was free to be approached either way and
                     # is not any more.
@@ -462,12 +473,62 @@ def _cluster(directions: list[tuple[gp_Dir, bool]], cluster_deg: float) -> int:
     return len(clusters)
 
 
+#: Features whose stored direction is a planar wall's normal, not a symmetry
+#: axis -- the only ones a form cutter can produce from a cardinal.
+_NORMAL_BEARING = frozenset(
+    {
+        FeatureType.UNDERCUT,
+        FeatureType.V_GROOVE,
+        FeatureType.CHAMFER,
+        FeatureType.DRAFT_FACE,
+    }
+)
+
+#: Catalogue form cutters by cutting-edge half-angle from the feed axis:
+#: V-bits (60/90/120 included), chamfer mills (30/45/60), dovetail cutters
+#: (45/60) and spot drills (90/120 included). Only the angles matter here.
+_SHAPED_CUTTER_HALF_ANGLES_DEG = (30.0, 45.0, 60.0, 30.0, 45.0, 60.0, 45.0, 60.0, 45.0, 60.0)
+
+
+def _shaped_cutter_for_wall_tilt(normal_tilt_deg: float, tol_deg: float) -> bool:
+    """Whether some form cutter makes a wall whose normal is tilted this far.
+
+    A cutter of half-angle h leaves a wall h from the feed axis, whose
+    normal is (90 - h) from it.
+    """
+    wanted = 90.0 - normal_tilt_deg
+    return any(abs(h - wanted) <= tol_deg for h in _SHAPED_CUTTER_HALF_ANGLES_DEG)
+
+
+def _stored_direction(feature, key: str) -> "gp_Dir | None":
+    """A stored direction triple, or None when absent or of zero length."""
+    raw = feature.parameters.get(key)
+    if not isinstance(raw, (list, tuple)) or len(raw) < 3:
+        return None
+    try:
+        x, y, z = (float(raw[0]), float(raw[1]), float(raw[2]))
+    except (TypeError, ValueError):
+        return None
+    if math.sqrt(x * x + y * y + z * z) < 1e-9:
+        return None
+    return gp_Dir(x, y, z)
+
+
+def _access_axis(feature) -> "gp_Dir | None":
+    """The first stored direction among axis, floor normal and blocked TAD."""
+    for key in ("axis", "floor_normal", "blocked_tad"):
+        direction = _stored_direction(feature, key)
+        if direction is not None:
+            return direction
+    return None
+
+
 def _best_cardinal_dot(axis: gp_Dir) -> float:
     return max(abs(axis.Dot(cardinal)) for cardinal in _CARDINALS)
 
 
 def _is_cardinal(axis: gp_Dir, tolerance: float) -> bool:
-    return _best_cardinal_dot(axis) > tolerance
+    return _best_cardinal_dot(axis) >= tolerance
 
 
 def _has_orthogonal_trio(normals) -> bool:

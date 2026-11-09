@@ -1537,6 +1537,9 @@ class ThreadEvidence:
     object_name: str = ""
     declarations: tuple[ThreadDeclaration, ...] = ()
     confirmations: ConfirmationStore = field(default_factory=ConfirmationStore)
+    #: Thread callouts the imported PMI links to faces: face id ->
+    #: :class:`~.annotations.ThreadCallout` (the reference's FaceThreadPmiMap).
+    pmi: dict = field(default_factory=dict)
 
     def key_for(
         self,
@@ -1578,7 +1581,9 @@ class ThreadEvidence:
         )
 
     def __bool__(self) -> bool:
-        return bool(self.declarations) or bool(len(self.confirmations))
+        return (
+            bool(self.declarations) or bool(len(self.confirmations)) or bool(self.pmi)
+        )
 
 
 def thread_evidence_for(target, frames: Optional[Callable] = None) -> ThreadEvidence:

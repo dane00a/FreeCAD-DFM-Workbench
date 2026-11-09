@@ -208,6 +208,13 @@ def classify_part_process(
         # every fold. Better to recognize the intent and report the sharp
         # folds as the defect.
         gauge = detect_sharp_fold_shell(graph)
+    if gauge is None:
+        # Third route: a constant-gauge plate with no folds at all is a flat
+        # blank, cut and never formed. Both routes above hunt for folds, so a
+        # part laser-cut and left flat never reached sheet metal. The
+        # solid-stock veto downstream decides whether it really was made that
+        # way.
+        gauge = detect_flat_blank(graph)
     if gauge is not None:
         result.type = PartProcessType.SHEET_METAL
         result.blank = "sheet_metal"
@@ -282,6 +289,152 @@ def classify_part_process(
     return result
 
 
+# A flat blank thinner than this is foil, not a cut blank.
+_BLANK_MIN_GAUGE_MM = 0.4
+# The skin (planes facing along the thin axis) against the whole part's area.
+_BLANK_SKIN_SHARE_MIN = 0.50
+# A plane standing across the thin axis bigger than this share is a wall.
+_BLANK_WALL_SHARE_MAX = 0.05
+
+
+def detect_flat_blank(graph: AttributedAdjacencyGraph) -> Optional[float]:
+    """The gauge of a flat blank -- sheet cut and never formed -- or nothing.
+
+    Geometry alone cannot finish this argument: a flat plate of constant
+    thickness is the same B-rep whether it left a laser or a mill. What
+    settles it is that nothing on it needs a spindle, and that test already
+    exists downstream as the solid-stock veto. So this only has to recognise
+    the blank, narrowed two ways read off inner wires: it has been CUT (a
+    featureless rectangle is stock, and the clamping rules exist for it), and
+    the cut goes THROUGH (a hole leaves an inner wire on both skins;
+    engraving leaves one on the face it was cut into and nothing behind).
+    """
+    # The part box is built from PLANE faces only. OCCT pads a curved face's
+    # box -- a B-spline's is its control hull -- so lofted walls report an
+    # envelope larger than the part: a 1.2 mm panel with pads 0.7 mm proud
+    # read 2.17 mm instead of 1.9.
+    total = 0.0
+    part = Bnd_Box()
+    for node in graph.nodes:
+        total += node.area
+        if node.surface_type is not SurfaceType.PLANE or node.bbox.IsVoid():
+            continue
+        xn, yn, zn, xx, yx, zx = node.bbox.Get()
+        part.Update(xn, yn, zn)
+        part.Update(xx, yx, zx)
+    if total < 1e-6 or part.IsVoid():
+        return None
+
+    pxn, pyn, pzn, pxx, pyx, pzx = part.Get()
+    dims = (pxx - pxn, pyx - pyn, pzx - pzn)
+    thin = 0
+    for i in (1, 2):
+        if dims[i] < dims[thin]:
+            thin = i
+    # The ENVELOPE along the thin axis, which is not the gauge (that is
+    # measured below). It only shows the part fits a thin box at all.
+    envelope = dims[thin]
+    widest = max(dims)
+    if envelope < _BLANK_MIN_GAUGE_MM or envelope > _SHEET_MAX_GAUGE_MM:
+        return None
+    if widest < 1e-6 or envelope / widest > _SHEET_GAUGE_MAX_REL:
+        return None
+
+    axis = gp_Vec(
+        1.0 if thin == 0 else 0.0,
+        1.0 if thin == 1 else 0.0,
+        1.0 if thin == 2 else 0.0,
+    )
+    skin = 0.0
+    developable = 0.0
+    cut_front = 0
+    cut_back = 0
+    # One record per skin face for the gauge measurement: where it sits along
+    # the thin axis, which way it faces, its area, centroid and half its
+    # widest extent across the axis.
+    skins: list[tuple[float, float, float, gp_Pnt, float]] = []
+    for node in graph.nodes:
+        if node.surface_type in (
+            SurfaceType.PLANE,
+            SurfaceType.CYLINDER,
+            SurfaceType.CONE,
+            SurfaceType.EXTRUDED,
+        ):
+            developable += node.area
+        if node.surface_type is not SurfaceType.PLANE or node.plane_normal is None:
+            continue
+        along = abs(gp_Vec(node.plane_normal.XYZ()).Dot(axis))
+        if along > 0.9:
+            skin += node.area
+            # Which side of the sheet, so a cut can be shown to go through.
+            outward = node.outward_normal
+            facing_front = gp_Vec(outward.XYZ()).Dot(axis) > 0.0
+            if facing_front:
+                cut_front += node.inner_loop_count
+            else:
+                cut_back += node.inner_loop_count
+            ext = node.bbox_dims()
+            lateral = max(ext[i] for i in range(3) if i != thin)
+            skins.append(
+                (
+                    gp_Vec(node.centroid.XYZ()).Dot(axis),
+                    1.0 if facing_front else -1.0,
+                    node.area,
+                    node.centroid,
+                    0.5 * lateral,
+                )
+            )
+        elif node.area > total * _BLANK_WALL_SHARE_MAX:
+            # A big plane standing across the thin axis is a fold or a milled
+            # wall; either way not a flat blank, and the fold routes own folds.
+            return None
+    if cut_front < 1 or cut_back < 1:
+        return None
+    if skin / total < _BLANK_SKIN_SHARE_MIN:
+        return None
+    if developable / total < _SHEET_DEVELOPABLE_MIN:
+        return None
+
+    # THE GAUGE IS MEASURED, never read off the envelope: a 1.2 mm panel with
+    # a 0.7 mm emboss has a 1.9 mm envelope. The error hides itself -- the
+    # wrong gauge makes the formed pass's skin test reject every pair, so the
+    # very features that inflated the envelope vanish. For each skin face, the
+    # nearest opposed skin on its material side; then the area-weighted
+    # median, so a pad's crest cannot outvote the deck and one bad pair cannot
+    # move the answer. The lateral gate uses the SMALLER face's reach: with
+    # the larger's, a deck pairs with a small pad ceiling far across the part.
+    thick_area: list[tuple[float, float]] = []
+    for i, (at_i, sign_i, area_i, centre_i, half_i) in enumerate(skins):
+        best = 1.0e18
+        for j, (at_j, sign_j, _area_j, centre_j, half_j) in enumerate(skins):
+            if i == j or sign_i * sign_j > 0.0:
+                continue
+            gap = (at_i - at_j) * sign_i  # j on i's material side
+            if gap <= 0.01:
+                continue
+            d = gp_Vec(centre_i, centre_j)
+            lateral = (d - axis * d.Dot(axis)).Magnitude()
+            if lateral > min(half_i, half_j):
+                continue
+            best = min(best, gap)
+        if best < 1.0e17:
+            thick_area.append((best, area_i))
+    if not thick_area:
+        return None
+    thick_area.sort()
+    paired = sum(area for _, area in thick_area)
+    gauge = thick_area[-1][0]
+    acc = 0.0
+    for thickness, area in thick_area:
+        acc += area
+        if acc >= 0.5 * paired:
+            gauge = thickness
+            break
+    if gauge < _BLANK_MIN_GAUGE_MM or gauge > _SHEET_MAX_GAUGE_MM:
+        return None
+    return gauge
+
+
 def detect_sheet_metal(
     graph: AttributedAdjacencyGraph, shape=None  # noqa: ARG001 - kept for parity
 ) -> Optional[float]:
@@ -328,8 +481,11 @@ def detect_sheet_metal(
         sculpted <= 0.0 or (developable + sculpted) / total < _SHEET_DEVELOPABLE_MIN
     ):
         return None
-    if areas.get(SurfaceType.CYLINDER, 0.0) <= 0.0:
-        return None  # no bends and no holes: nothing was formed here
+    # A fold band is a cylinder OR a cone: a tapered flange folds on a cone
+    # pair, and a cylinder-only gate left a part whose only fold is conical
+    # classified milled, with the bend pass never run on it.
+    if areas.get(SurfaceType.CYLINDER, 0.0) + areas.get(SurfaceType.CONE, 0.0) <= 0.0:
+        return None  # no fold band and no hole: nothing was formed here
 
     gauge = _median_gauge(graph)
     if gauge is None or gauge > _SHEET_MAX_GAUGE_MM:
@@ -365,8 +521,19 @@ def _area_by_surface_type(
 
 
 def _part_extents(graph: AttributedAdjacencyGraph) -> Optional[tuple]:
+    """The part's extent, measured from its PLANE faces only.
+
+    OpenCascade pads a curved face's box to its control hull rather than to
+    the surface, so a box over every face is larger than the part, and the
+    larger the box the more permissive the gauge-to-size gate it feeds.
+    ``detect_flat_blank`` already builds its box this way; both sheet
+    detectors now agree. A sheet part always has planar skins on both sides,
+    so the plane-only box is the part.
+    """
     box = Bnd_Box()
     for node in graph.nodes:
+        if node.surface_type is not SurfaceType.PLANE:
+            continue
         if not node.bbox.IsVoid():
             box.Add(node.bbox)
     if box.IsVoid():
@@ -421,7 +588,10 @@ def _median_gauge(graph: AttributedAdjacencyGraph) -> Optional[float]:
             if gap <= 0.01:
                 continue
             sideways = offset - outward * offset.Dot(outward)
-            if sideways.Magnitude() > skin.reach:
+            # Both faces' reach, not this one's alone. The one-sided test
+            # admits more candidate pairs, and since the gauge is the
+            # NEAREST of them it could only ever read the gauge too small.
+            if sideways.Magnitude() > min(skin.reach, other.reach):
                 continue  # not actually across from one another
             nearest = min(nearest, gap)
         if nearest < math.inf:
@@ -456,13 +626,18 @@ def _has_concentric_bend(graph: AttributedAdjacencyGraph, gauge: float) -> bool:
     """Whether the part carries at least one genuine formed bend.
 
     The discriminator against a thin milled shell. A bend is two coaxial
-    cylinders one gauge apart -- the inside and outside of the same fold --
-    with two flats among their neighbours that are at an angle to each other.
-    A fillet has one cylinder, so it never matches.
+    developable bands one gauge apart -- the inside and outside of the same
+    fold -- with two flats among their neighbours that are at an angle to
+    each other. A fillet has one cylinder, so it never matches.
+
+    A band is a cylinder or a cone, never one against the other. The cone
+    test is the bend recognizer's own conical predicate, gap measured normal
+    to the surface; change one and change the other, or the recognizer never
+    runs on the part at all.
     """
     bends: list[tuple] = []
     for node in graph.nodes:
-        if node.surface_type is not SurfaceType.CYLINDER:
+        if node.surface_type not in (SurfaceType.CYLINDER, SurfaceType.CONE):
             continue
         if node.cyl_cone_axis is None:
             continue
@@ -477,13 +652,15 @@ def _has_concentric_bend(graph: AttributedAdjacencyGraph, gauge: float) -> bool:
             normal = other.outward_normal
             if normal is not None:
                 flats.append(normal)
-        bends.append((node.cyl_cone_axis, node.cyl_radius, flats))
+        bends.append((node.cyl_cone_axis, node, flats))
 
-    for index, (axis, radius, flats) in enumerate(bends):
-        for other_axis, other_radius, other_flats in bends[index + 1 :]:
+    for index, (axis, node, flats) in enumerate(bends):
+        for other_axis, other_node, other_flats in bends[index + 1 :]:
             if not axes_colinear(axis, other_axis):
                 continue
-            separation = abs(radius - other_radius)
+            separation = _band_separation(node, other_node)
+            if separation is None:
+                continue
             if not 0.5 * gauge <= separation <= 1.5 * gauge:
                 continue
             joined = flats + other_flats
@@ -492,6 +669,37 @@ def _has_concentric_bend(graph: AttributedAdjacencyGraph, gauge: float) -> bool:
                     if abs(first.Dot(second)) < _BEND_NON_PARALLEL_DOT:
                         return True
     return False
+
+
+def _band_separation(a: AagNode, b: AagNode) -> Optional[float]:
+    """Radial separation of two coaxial fold bands, or None if they cannot pair.
+
+    Cylinders: the difference of radii. Cones: equal half-angles, overlapping
+    along the axis, and the radius gap at the middle of the overlap times
+    cos(half-angle) -- two cones one gauge apart differ in RADIUS by
+    gauge / cos(half-angle), out by 41% at a 45-degree taper.
+    """
+    from .sheet_folds import band_axial_span, cone_radius_at, cone_semi_angle_along
+
+    if a.surface_type is not b.surface_type:
+        return None  # never a cone against a cylinder
+    if a.surface_type is SurfaceType.CYLINDER:
+        return abs(a.cyl_radius - b.cyl_radius)
+    direction = a.cyl_cone_axis.Direction()
+    origin = a.cyl_cone_axis.Location()
+    semi_a = cone_semi_angle_along(a, direction)
+    if abs(semi_a - cone_semi_angle_along(b, direction)) > 0.02:
+        return None
+    a_lo, a_hi = band_axial_span(a, origin, direction)
+    b_lo, b_hi = band_axial_span(b, origin, direction)
+    s_lo = max(a_lo, b_lo)
+    s_hi = min(a_hi, b_hi)
+    if s_hi < s_lo + 0.5:
+        return None
+    s = 0.5 * (s_lo + s_hi)
+    return abs(
+        cone_radius_at(b, origin, direction, s) - cone_radius_at(a, origin, direction, s)
+    ) * math.cos(semi_a)
 
 
 # =============================================================================
@@ -521,6 +729,7 @@ _SOLID_STOCK_TYPES = frozenset(
     {
         FeatureType.BLIND_HOLE,
         FeatureType.COUNTERBORE,
+        FeatureType.BREAKTHROUGH_HOLE,
         FeatureType.POCKET,
         FeatureType.SPHERICAL_POCKET,
         FeatureType.O_RING_GLAND,
@@ -542,6 +751,7 @@ _FORMABLE_TYPES = frozenset(
         FeatureType.POCKET,
         FeatureType.SPHERICAL_POCKET,
         FeatureType.BLIND_HOLE,
+        FeatureType.BREAKTHROUGH_HOLE,
         FeatureType.STEP,
         FeatureType.GROOVE,
         FeatureType.O_RING_GLAND,
@@ -673,9 +883,11 @@ def _confirm_sheet(
 
         # A bore that stops in open air and is no deeper than a couple of
         # gauges is a punched hole, not a drilling. Sheet is too thin to
-        # hold a real blind hole anyway.
+        # hold a real blind hole anyway. Such a bore now carries its own
+        # type, so it is asked of a breakthrough hole: a blind hole can no
+        # longer also terminate in a cavity.
         if (
-            feature.type == FeatureType.BLIND_HOLE
+            feature.type == FeatureType.BREAKTHROUGH_HOLE
             and feature.param("terminates_in_cavity", False)
             and (feature.number("depth_mm") or 1e9) <= 2.0 * gauge
         ):
@@ -711,14 +923,25 @@ def _confirm_sheet(
     return base
 
 
-def _carries_skin(feature, graph, gauge: float, shape=None) -> bool:
-    """Whether any face of a feature has material exactly one gauge behind it.
+def _carries_skin(feature, graph, gauge: float, shape=None) -> bool:  # noqa: ARG001
+    """Whether any face of a feature has a constant-gauge skin partner.
 
     Any face is enough, not the largest: a step whose shear wall outweighs
     its skinned terrace would otherwise be missed.
+
+    The partner is the analytic one the formed-feature pass uses: an
+    anti-parallel plane, a concentric sphere or a coaxial cylinder exactly
+    one gauge away (within 0.25 mm), footprints touching. Nothing is sampled
+    and the solid is not probed, as in the reference's veto: a shallow gland
+    in a thick plate has the bottom face a little under one gauge behind its
+    floor, and only the exact-offset test keeps that from reading as formed.
+    ``shape`` is accepted and ignored so callers need not change.
     """
     if graph is None or gauge <= 0.0:
         return False
+    # Imported here: the formed-feature recognizer imports this module.
+    from .recognizers.sheet_formed_recognizer import _gauge_skin_partner
+
     for face_id in feature.faces:
         if not graph.has_node(face_id):
             continue
@@ -729,120 +952,9 @@ def _carries_skin(feature, graph, gauge: float, shape=None) -> bool:
             SurfaceType.CYLINDER,
         ):
             continue
-        if has_constant_gauge_skin(graph, node, gauge, shape):
+        if _gauge_skin_partner(graph, node, gauge) is not None:
             return True
     return False
-
-
-def has_constant_gauge_skin(
-    graph: AttributedAdjacencyGraph, node: AagNode, gauge: float, shape=None
-) -> bool:
-    """Whether a face has material exactly one gauge behind it.
-
-    That is what makes a feature formed rather than cut. Drawn sheet keeps
-    its thickness, so the plateau of an emboss has its own back face one
-    gauge behind it, and a dimple has a matching bulge on the far side. A
-    milled pad sits on solid stock with no partner at any distance.
-
-    Each surface asks the question in its own terms, because "one gauge
-    behind" means something different for each. A flat face steps inward
-    along its normal. A sphere and a cylinder are concentric with their far
-    skin, so the question is whether a second one exists a gauge away -- and
-    those two cases matter: a drawn dimple is a sphere and a swept louver
-    hood is a cylinder, and without them every formed part vetoes to milled.
-    """
-    if gauge <= 0.0:
-        return False
-
-    # Given the solid, ask the material directly: metal at half a gauge
-    # behind the face and air at one and a half. That is what forming leaves
-    # and machining does not, and it is the only test that separates the two
-    # -- a gland milled into a thick flange has a face a gauge behind it
-    # just as an emboss plateau does, and looking only for that face reads a
-    # machined enclosure as formed.
-    if shape is not None:
-        probed = _probe_gauge_skin(node, gauge, shape)
-        if probed is not None:
-            return probed
-
-    if node.surface_type is SurfaceType.SPHERE:
-        return _concentric_partner(
-            graph, node, gauge, SurfaceType.SPHERE, node.sphere_center, node.sphere_radius
-        )
-
-    if node.surface_type is SurfaceType.CYLINDER and node.cyl_cone_axis is not None:
-        for other in graph.nodes:
-            if other.face_id == node.face_id:
-                continue
-            if other.surface_type is not SurfaceType.CYLINDER:
-                continue
-            if other.cyl_cone_axis is None:
-                continue
-            if not axes_colinear(other.cyl_cone_axis, node.cyl_cone_axis):
-                continue
-            if _about_one_gauge(abs(other.cyl_radius - node.cyl_radius), gauge):
-                return True
-        return False
-
-    normal = node.outward_normal
-    if normal is None or node.centroid is None:
-        return False
-
-    # One gauge in from the face, which is where the far skin should be.
-    behind = node.centroid.Translated(gp_Vec(normal).Multiplied(-gauge))
-
-    for other in graph.nodes:
-        if other.face_id == node.face_id:
-            continue
-        other_normal = other.outward_normal
-        if other_normal is None or other.bbox.IsVoid():
-            continue
-        if normal.Dot(other_normal) > _ANTI_PARALLEL_DOT:
-            continue
-        # Reached by position, not by comparing centroids: the back of an
-        # emboss is often not a face of its own but part of the large bottom
-        # skin, whose centre is somewhere else entirely.
-        if not other.bbox.IsOut(behind):
-            return True
-        if _distance_to_box(other.bbox, behind) <= 0.35 * gauge:
-            return True
-    return False
-
-
-def _concentric_partner(
-    graph: AttributedAdjacencyGraph,
-    node: AagNode,
-    gauge: float,
-    kind: SurfaceType,
-    centre,
-    radius: float,
-) -> bool:
-    """Whether a concentric surface sits one gauge away."""
-    if centre is None or radius <= 0.0:
-        return False
-    for other in graph.nodes:
-        if other.face_id == node.face_id or other.surface_type is not kind:
-            continue
-        if other.sphere_center is None:
-            continue
-        if other.sphere_center.Distance(centre) > 0.5:
-            continue
-        if _about_one_gauge(abs(other.sphere_radius - radius), gauge):
-            return True
-    return False
-
-
-def _about_one_gauge(separation: float, gauge: float) -> bool:
-    return 0.7 * gauge <= separation <= 1.3 * gauge
-
-
-def _distance_to_box(box, point) -> float:
-    """How far a point lies outside an axis-aligned box."""
-    xmin, ymin, zmin, xmax, ymax, zmax = box.Get()
-    dx = max(xmin - point.X(), 0.0, point.X() - xmax)
-    dy = max(ymin - point.Y(), 0.0, point.Y() - ymax)
-    dz = max(zmin - point.Z(), 0.0, point.Z() - zmax)
-    return math.sqrt(dx * dx + dy * dy + dz * dz)
 
 
 def freeform_skin_area(
@@ -1123,42 +1235,6 @@ def _folds_rather_than_carvings(graph, groups) -> bool:
         return False
     # Three joined pairs is a carved corner, not a folded blank.
     return connected_pairs < 3
-
-
-def _probe_gauge_skin(node: AagNode, gauge: float, shape) -> Optional[bool]:
-    """Whether the material behind a face is exactly one gauge thick.
-
-    Returns None when the face cannot be sampled, so the caller falls back
-    to the topological test rather than treating "cannot tell" as "not
-    formed".
-    """
-    from OCP.BRepClass3d import BRepClass3d_SolidClassifier
-    from OCP.TopAbs import TopAbs_IN
-
-    from .aag_builder import _face_sample_point
-
-    try:
-        face_index = FaceIndex(shape)
-        face = face_index.face_at(node.face_id)
-    except Exception:
-        return None
-    sample = _face_sample_point(face)
-    if sample is None:
-        return None
-    point, normal = sample
-    if node.is_reversed:
-        normal.Reverse()
-
-    inward = gp_Vec(normal).Multiplied(-1.0)
-    try:
-        classifier = BRepClass3d_SolidClassifier(shape)
-        classifier.Perform(point.Translated(inward.Multiplied(0.5 * gauge)), 1e-6)
-        near_inside = classifier.State() == TopAbs_IN
-        classifier.Perform(point.Translated(inward.Multiplied(1.5 * gauge)), 1e-6)
-        far_inside = classifier.State() == TopAbs_IN
-    except Exception:
-        return None
-    return near_inside and not far_inside
 
 
 # =============================================================================

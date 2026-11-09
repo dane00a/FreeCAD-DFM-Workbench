@@ -23,6 +23,7 @@ from .base import MachiningCheck
 _SPEAKS_FOR_ITSELF = CAVITY_TYPES | {
     FeatureType.THROUGH_HOLE,
     FeatureType.BLIND_HOLE,
+    FeatureType.BREAKTHROUGH_HOLE,
     FeatureType.COUNTERBORE,
     FeatureType.COUNTERSINK,
     FeatureType.THREADED_HOLE,
@@ -45,11 +46,9 @@ class UndercutPresentCheck(MachiningCheck):
         return "Undercut Check"
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
-        # On a five-axis machine the tool can tilt, so most of these stop
-        # being undercuts at all.
-        if context.config.machine_mode == "5axis":
-            return []
-
+        # Asked whatever the machine: the recognizer only produces these
+        # faces when no cardinal approach reaches them, and the reference
+        # reports every one it is handed.
         severity = self.severity_from_rule_config(rule_config)
         results: list[CheckResult] = []
         sealed = _sealed_cavity_faces(context)
@@ -80,6 +79,12 @@ class UndercutPresentCheck(MachiningCheck):
 
             count = int(undercut.param("face_count", len(undercut.faces)) or 1)
             plural = "surfaces" if count != 1 else "surface"
+            # Which way it faces belongs in the sentence. Identical findings
+            # are merged into one row, and the reference merges only those
+            # whose recorded details -- face normal, blocked approach, axis --
+            # agree to four decimals: two shoulders facing opposite ways are
+            # two undercuts, not one said twice.
+            orientation = _orientation(undercut)
             results.append(
                 self.finding(
                     rule,
@@ -92,9 +97,10 @@ class UndercutPresentCheck(MachiningCheck):
                         0.0,
                         0.0,
                         "",
-                        f"{count} {plural} here sit behind other geometry, so a "
-                        "cutter coming straight down cannot reach them with the "
-                        f"part fixtured as it is. {remedy}",
+                        f"{count} {plural} here{orientation} sit behind other "
+                        "geometry, so a cutter coming straight down cannot "
+                        "reach them with the part fixtured as it is. "
+                        f"{remedy}",
                     ),
                     faces=undercut.faces,
                     value=float(count),
@@ -118,7 +124,10 @@ class ToolAccessBlockedCheck(MachiningCheck):
         return "Unreachable Feature Check"
 
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
-        if context.config.machine_mode == "5axis":
+        # Only a three-axis machine is limited to the cardinal approaches the
+        # undercut faces were tested against; anything that can index reaches
+        # them.
+        if context.config.machine_mode != "3axis":
             return []
 
         unreachable = context.recognition.faces_of_type(FeatureType.UNDERCUT)
@@ -158,6 +167,30 @@ class ToolAccessBlockedCheck(MachiningCheck):
                 )
             )
         return results
+
+
+def _vector_text(raw) -> str:
+    """A stored direction to four decimals, the precision findings merge at."""
+    parts = []
+    for value in raw:
+        rounded = round(float(value), 4) + 0.0  # no "-0"
+        parts.append(f"{rounded:g}")
+    return "(" + ", ".join(parts) + ")"
+
+
+def _orientation(undercut) -> str:
+    """The direction details of an undercut, as words in its message."""
+    words = []
+    normal = undercut.param("face_normal")
+    if isinstance(normal, (list, tuple)) and len(normal) >= 3:
+        words.append(f"facing {_vector_text(normal[:3])}")
+    blocked = undercut.param("blocked_tad")
+    if isinstance(blocked, (list, tuple)) and len(blocked) >= 3:
+        words.append(f"approached along {_vector_text(blocked[:3])}")
+    axis = undercut.param("axis")
+    if isinstance(axis, (list, tuple)) and len(axis) >= 3:
+        words.append(f"on axis {_vector_text(axis[:3])}")
+    return (" (" + ", ".join(words) + ")") if words else ""
 
 
 def _sealed_cavity_faces(context) -> set[int]:

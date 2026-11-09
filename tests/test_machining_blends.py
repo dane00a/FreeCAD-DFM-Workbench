@@ -220,6 +220,25 @@ class TestNotFillets(unittest.TestCase):
     def test_a_turned_shaft_is_not_a_fillet(self):
         self.assertEqual(blends_in(BRepPrimAPI_MakeCylinder(20.0, 60.0).Shape()), [])
 
+    def test_the_end_radius_of_a_slot_is_not_a_fillet(self):
+        """A half-cylinder joining two walls that face each other closes the
+        channel; it does not round an edge (reference 69d25dd51)."""
+        slot = _fuse(
+            BRepPrimAPI_MakeBox(gp_Pnt(30, 30, 20), gp_Pnt(60, 40, 41)).Shape(),
+            BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(60, 35, 20), gp_Dir(0, 0, 1)), 5.0, 21.0).Shape(),
+        )
+        shape = _cut(block(), slot)
+        fillets = [f for f in blends_in(shape) if f.type == FeatureType.FILLET]
+        self.assertEqual(fillets, [])
+
+    def test_every_blend_carries_its_network(self):
+        """Tool paths, not faces: each blend is stamped with the network of
+        tangent-connected same-type blends it belongs to (adfd217e4)."""
+        found = blends_in(_fillet(block(), 3.0, upright))
+        self.assertTrue(found)
+        for feature in found:
+            self.assertIsInstance(feature.parameters.get("blend_network"), int)
+
 
 class TestChamfers(unittest.TestCase):
     def test_edge_breaks_are_found(self):
@@ -303,6 +322,45 @@ class TestNotChamfers(unittest.TestCase):
         # Every dihedral square, nothing oblique anywhere on the part.
         step = _cut(block(), BRepPrimAPI_MakeBox(gp_Pnt(60, -1, 25), gp_Pnt(101, 81, 41)).Shape())
         self.assertEqual(blends_in(step), [])
+
+
+class TestFreeformFillets(unittest.TestCase):
+    def test_a_bspline_fillet_at_a_pipe_tee_is_a_fillet(self):
+        # A rolling-ball blend between two curved faces is written out as a
+        # B-spline patch; seeding only cylinders and tori left it as a
+        # freeform face with no feature. A filleted pipe tee makes the kernel
+        # emit exactly such a blend at the junction.
+        from OCP.Geom import Geom_Circle, Geom_Line
+
+        tee = _fuse(
+            BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(-40, 0, 0), gp_Dir(1, 0, 0)), 10.0, 80.0).Shape(),
+            BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), 7.0, 40.0).Shape(),
+        )
+        builder = BRepFilletAPI_MakeFillet(tee)
+        for edge in _edges(tee):
+            curve = BRep_Tool.Curve_s(edge, 0.0, 0.0)
+            if curve is None:
+                continue
+            # The junction curve is the only edge neither a circle nor a line.
+            if isinstance(curve, (Geom_Circle, Geom_Line)):
+                continue
+            builder.Add(2.0, edge)
+        builder.Build()
+        self.assertTrue(builder.IsDone())
+        part = builder.Shape()
+
+        graph = AagBuilder(part, FaceIndex(part)).build()
+        freeform_fillet_faces = 0
+        for feature in BlendRecognizer().recognize(graph, part):
+            if feature.type != FeatureType.FILLET:
+                continue
+            for face_id in feature.faces:
+                if graph.node(face_id).has_freeform_curvature:
+                    freeform_fillet_faces += 1
+                    self.assertAlmostEqual(feature.number("radius_mm"), 2.0, delta=0.2)
+        # Fails if the kernel ever writes this blend as an analytic torus,
+        # which would pass without exercising the freeform path at all.
+        self.assertGreaterEqual(freeform_fillet_faces, 1)
 
 
 class TestReporting(unittest.TestCase):

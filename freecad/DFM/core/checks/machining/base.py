@@ -97,6 +97,7 @@ class MachiningCheck(BaseCheck):
         limit: float = 0.0,
         comparison: str = "",
         unit: str = "",
+        category: str = "",
     ) -> CheckResult:
         """Assemble a finding, referencing geometry by adjacency-graph id.
 
@@ -116,6 +117,7 @@ class MachiningCheck(BaseCheck):
             limit=round(float(limit), 4),
             comparison=comparison,
             unit=unit,
+            category=category,
             failing_geometry=geometry,
         )
 

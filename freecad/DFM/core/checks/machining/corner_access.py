@@ -47,10 +47,12 @@ of those the midpoint happens to sit in.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Optional, Sequence
 
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.BRep import BRep_Tool
+from OCP.Bnd import Bnd_Box
 from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
 from OCP.GeomAbs import GeomAbs_Plane
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
@@ -84,6 +86,13 @@ _REACHABLE_FACE_MM = 3.0
 # The floor a tool rides on has to be wide enough for the smallest end mill
 # in anybody's library.
 _MIN_FLOOR_MM = 1.0
+
+# The cutter-formed test is a different question from the vote and keeps its
+# own range: the spindle comes from outside the part, so anything up to ten
+# part diagonals away is still in the tool's path, and only a hit nearer than
+# a tenth of a millimetre is the ray grazing the face it left.
+_FORMED_MIN_MM = 0.1
+_FORMED_REACH_DIAGONALS = 10.0
 
 # How closely a normal has to line up with an axis to be reachable in a
 # three-axis setup.
@@ -148,6 +157,23 @@ def is_cardinal(direction: Optional[gp_Dir]) -> bool:
     )
 
 
+def graph_diagonal(graph) -> float:
+    """The part's diagonal, from the union of every face's box.
+
+    Not the tight box: each face's box is padded to its control hull, and the
+    reference measures this one the same way, so both engines draw the line
+    for "longer than the part" and "far beyond the part" in the same place.
+    """
+    total = Bnd_Box()
+    for node in graph.nodes:
+        if not node.bbox.IsVoid():
+            total.Add(node.bbox)
+    if total.IsVoid():
+        return 0.0
+    xmin, ymin, zmin, xmax, ymax, zmax = total.Get()
+    return math.sqrt((xmax - xmin) ** 2 + (ymax - ymin) ** 2 + (zmax - zmin) ** 2)
+
+
 def _cylinder_normal_at(node: AagNode, point: gp_Pnt) -> Optional[gp_Dir]:
     """A cylinder's outward normal at a point, taken radially from its axis.
 
@@ -164,7 +190,10 @@ def _cylinder_normal_at(node: AagNode, point: gp_Pnt) -> Optional[gp_Dir]:
     if radial.Magnitude() <= 1.0e-6:
         return None
     normal = gp_Dir(radial)
-    if node.is_reversed:
+    # A bore's outward normal points at its axis. Asked of `is_internal`
+    # rather than the orientation flag, which only means that for a solid
+    # built with OpenCascade's own conventions.
+    if node.is_internal:
         normal.Reverse()
     return normal
 
@@ -195,6 +224,7 @@ class ShapeProbe:
             self._faces.append(TopoDS.Face_s(explorer.Current()))
             explorer.Next()
         self._surfaces: dict[int, object] = {}
+        self.diagonal = graph_diagonal(graph)
 
     # -- face access --------------------------------------------------------
 
@@ -287,12 +317,16 @@ class ShapeProbe:
     # -- ray casting --------------------------------------------------------
 
     def first_hit(
-        self, origin: gp_Pnt, direction: gp_Dir, maximum: float
+        self,
+        origin: gp_Pnt,
+        direction: gp_Dir,
+        maximum: float,
+        minimum: float = _PROBE_MIN_MM,
     ) -> Optional[TopoDS_Face]:
         """The nearest face a ray meets, or None if it gets away.
 
-        Hits closer than half a millimetre are the ray grazing whatever it
-        started next to rather than meeting anything.
+        Hits closer than `minimum` are the ray grazing whatever it started
+        next to rather than meeting anything.
         """
         try:
             intersector = BRepIntCurveSurface_Inter()
@@ -303,14 +337,20 @@ class ShapeProbe:
         best_face = None
         while intersector.More():
             distance = intersector.W()
-            if _PROBE_MIN_MM < distance < maximum and distance < best_distance:
+            if minimum < distance < maximum and distance < best_distance:
                 best_distance = distance
                 best_face = intersector.Face()
             intersector.Next()
         return best_face
 
-    def escapes(self, origin: gp_Pnt, direction: gp_Dir, maximum: float) -> bool:
-        return self.first_hit(origin, direction, maximum) is None
+    def escapes(
+        self,
+        origin: gp_Pnt,
+        direction: gp_Dir,
+        maximum: float,
+        minimum: float = _PROBE_MIN_MM,
+    ) -> bool:
+        return self.first_hit(origin, direction, maximum, minimum) is None
 
 
 # ---------------------------------------------------------------------------
@@ -375,7 +415,7 @@ def is_cutter_formed(
         edge.midpoint.Z() + 0.6 * bisector.Z(),
     )
 
-    reach = _CUTTER_REACH_MM * 40.0  # the spindle comes from outside the part
+    reach = probe.diagonal * _FORMED_REACH_DIAGONALS
     formed = False
     for floor, wall, direction in (
         (first, second, normal_a),
@@ -391,7 +431,7 @@ def is_cutter_formed(
             continue
         if second_smallest_extent(wall) < minimum_feature_mm:
             continue
-        if probe.escapes(origin, direction, reach):
+        if probe.escapes(origin, direction, reach, _FORMED_MIN_MM):
             formed = True
             break
 
@@ -408,7 +448,7 @@ def is_cutter_formed(
     along.Normalize()
     for sign in (-1.0, 1.0):
         direction = gp_Dir(sign * along.X(), sign * along.Y(), sign * along.Z())
-        hit = probe.first_hit(origin, direction, reach)
+        hit = probe.first_hit(origin, direction, reach, _FORMED_MIN_MM)
         if hit is None:
             continue
         try:
@@ -538,8 +578,35 @@ def _uniform_junction_normals(probe, edge, first, second):
     return middle
 
 
-def is_reachable(probe: ShapeProbe, edge, first: AagNode, second: AagNode) -> bool:
-    """Whether a fillet cutter could get to this corner from open space.
+@dataclass(frozen=True)
+class EscapeVote:
+    """What the accessibility vote saw along one edge.
+
+    `samples` points were probed and `confined` of them were hemmed in;
+    `worst_escape` is the fewest of the six rays that got away at any
+    confined point (six when none was confined).
+    """
+
+    samples: int
+    confined: int
+    worst_escape: int
+
+    @property
+    def is_confined(self) -> bool:
+        """Whether enough of the edge is hemmed in to report it.
+
+        One confined sample is usually the probe near an end seeing the wall
+        that terminates the edge; two or more is a real stretch of corner.
+        An edge probed at one point only keeps one-of-one.
+        """
+        needed = _MIN_CONFINED_SAMPLES if self.samples >= 2 else 1
+        return self.confined >= needed
+
+
+def escape_vote(
+    probe: ShapeProbe, edge, first: AagNode, second: AagNode
+) -> Optional[EscapeVote]:
+    """Probe a corner for confinement, or None if it cannot be voted on.
 
     Stand five millimetres off the corner along the bisector of its two
     faces, and cast six rays down the machine axes. Anything they hit within
@@ -553,14 +620,22 @@ def is_reachable(probe: ShapeProbe, edge, first: AagNode, second: AagNode) -> bo
     they close over it, and four own-face blocks means enclosed rather than
     open.
 
-    Sampled along the edge, and confined only if at least two samples are.
-    One is usually the probe near an end seeing the wall that terminates the
-    edge, which is a corner of the part rather than a property of this one.
+    Sampled along the edge at up to five points, recomputing the bisector at
+    each so the probe on the far side of a boss base circle does not land
+    inside the boss.
     """
     normals = _eligible_normals(probe, edge, first, second)
     if normals is None:
-        return False  # not a shape this test can speak about; report it
+        return None
 
+    fallback = gp_Vec(normals[0]) + gp_Vec(normals[1])
+    if fallback.Magnitude() <= 1.0e-6:
+        return None
+    fallback.Normalize()
+
+    # OpenCascade splits a cylinder at its seam and a plane at tangent lines,
+    # so the corner's wall is often several faces of one surface while the
+    # edge names one of them. A hit on a sibling piece is the corner's own.
     own_faces = {first.face_id, second.face_id}
     for node in probe.graph.nodes:
         if node.face_id in own_faces:
@@ -570,16 +645,12 @@ def is_reachable(probe: ShapeProbe, edge, first: AagNode, second: AagNode) -> bo
     own_shapes = [probe.face(face_id) for face_id in sorted(own_faces)]
     own_shapes = [face for face in own_shapes if face is not None]
 
-    fallback = gp_Vec(normals[0]) + gp_Vec(normals[1])
-    if fallback.Magnitude() <= 1.0e-6:
-        return False
-    fallback.Normalize()
-
     samples = probe.sample_points(first.face_id, edge.midpoint)
     if not samples:
-        return False
+        return None
 
     confined = 0
+    worst_escape = len(_CARDINALS)
     for point in samples:
         bisector = gp_Vec(fallback.X(), fallback.Y(), fallback.Z())
         local_a = probe.local_normal(first, point)
@@ -596,17 +667,27 @@ def is_reachable(probe: ShapeProbe, edge, first: AagNode, second: AagNode) -> bo
             point.Z() + _PROBE_STANDOFF_MM * bisector.Z(),
         )
 
-        foreign = own = 0
+        escaped = foreign = own = 0
         for direction in _CARDINALS:
             hit = probe.first_hit(origin, direction, _CUTTER_REACH_MM)
             if hit is None:
-                continue
-            if any(hit.IsSame(face) for face in own_shapes):
+                escaped += 1
+            elif any(hit.IsSame(face) for face in own_shapes):
                 own += 1
             else:
                 foreign += 1
         if foreign >= 1 or own >= 4:
             confined += 1
+            worst_escape = min(worst_escape, escaped)
 
-    needed = _MIN_CONFINED_SAMPLES if len(samples) >= 2 else 1
-    return confined < needed
+    return EscapeVote(len(samples), confined, worst_escape)
+
+
+def is_reachable(probe: ShapeProbe, edge, first: AagNode, second: AagNode) -> bool:
+    """Whether a fillet cutter could get to this corner from open space.
+
+    False both for a corner the vote found confined and for one the vote
+    cannot speak about at all -- either way the corner stays reported.
+    """
+    vote = escape_vote(probe, edge, first, second)
+    return vote is not None and not vote.is_confined

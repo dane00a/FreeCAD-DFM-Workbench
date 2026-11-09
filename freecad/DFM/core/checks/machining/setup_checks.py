@@ -42,10 +42,18 @@ def _is_small_part(context: MachiningContext) -> bool:
     return all(dimension < limit for dimension in context.bbox_dims())
 
 
-def _has_parallel_datum_pair(context: MachiningContext) -> bool:
-    """Whether two opposed outward faces could be gripped by vise jaws."""
+def _lacks_parallel_datum_pair(context: MachiningContext) -> bool:
+    """Whether vise jaws have no two opposed outward faces to grip.
+
+    False -- no concern -- when there is no outward flat of usable size at
+    all: that is `no_datum_face`'s finding, and this one stands down rather
+    than repeat it. A small part with nothing flat over the datum area is
+    therefore not a holding note either, exactly as the reference grades it.
+    """
     thresholds = context.config.thresholds
     candidates = context.external_planar_faces(min_area=thresholds.datum_face_min_area_mm2)
+    if not candidates:
+        return False
 
     for index, first in enumerate(candidates):
         normal_a = first.outward_normal
@@ -53,7 +61,7 @@ def _has_parallel_datum_pair(context: MachiningContext) -> bool:
             continue
         for second in candidates[index + 1 :]:
             normal_b = second.outward_normal
-            if normal_b is None or normal_a.Dot(normal_b) >= -0.95:
+            if normal_b is None or normal_a.Dot(normal_b) > -0.95:
                 continue  # not facing away from each other
             separation = abs(
                 (second.centroid.X() - first.centroid.X()) * normal_a.X()
@@ -61,8 +69,8 @@ def _has_parallel_datum_pair(context: MachiningContext) -> bool:
                 + (second.centroid.Z() - first.centroid.Z()) * normal_a.Z()
             )
             if separation >= thresholds.min_jaw_separation_mm:
-                return True
-    return False
+                return False
+    return True
 
 
 # =============================================================================
@@ -127,7 +135,7 @@ class NoParallelDatumPairCheck(MachiningCheck):
     def evaluate(self, context, rule_config, rule, feedback) -> list[CheckResult]:
         # A part too small for a vise is held another way; the small-part rule
         # carries that concern instead of this one firing spuriously.
-        if _is_small_part(context) or _has_parallel_datum_pair(context):
+        if _is_small_part(context) or not _lacks_parallel_datum_pair(context):
             return []
 
         thresholds = context.config.thresholds
@@ -221,7 +229,7 @@ class SmallPartHoldingCheck(MachiningCheck):
         # otherwise every small part collects a note that adds nothing.
         thresholds = context.config.thresholds
         smallest, _, _ = context.sorted_bbox_dims()
-        if _has_parallel_datum_pair(context) and smallest >= thresholds.min_clamping_thickness_mm:
+        if not _lacks_parallel_datum_pair(context) and smallest >= thresholds.min_clamping_thickness_mm:
             return []
 
         dx, dy, dz = context.bbox_dims()

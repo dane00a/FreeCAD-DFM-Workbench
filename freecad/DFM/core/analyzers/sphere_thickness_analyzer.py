@@ -8,10 +8,11 @@ from typing import Any, Optional, Callable
 from OCP.BRep import BRep_Builder
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape, BRepExtrema_IsInFace
-from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+from freecad.DFM.core.utils.occt import BRepTopAdaptor_FClass2d
 from OCP.gp import gp_Pnt, gp_Lin, gp_Vec, gp_Dir
 from OCP.IntCurvesFace import IntCurvesFace_ShapeIntersector
-from OCP.TopoDS import TopoDS_Shape, TopoDS_Face, TopoDS_Compound, TopoDS
+from OCP.TopoDS import TopoDS_Shape, TopoDS_Face, TopoDS_Compound
+from freecad.DFM.core.utils.occt import TopoDS
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopAbs import TopAbs_FACE
 

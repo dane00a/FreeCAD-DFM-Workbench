@@ -34,8 +34,9 @@ from OCP.GProp import GProp_GProps
 from OCP.IntCurvesFace import IntCurvesFace_ShapeIntersector
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
 from OCP.TopExp import TopExp
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopTools_IndexedDataMapOfShapeListOfShape
+from OCP.TopoDS import TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
 
 from ...core.base.base_analyzer import BaseAnalyzer
 from ...core.recognition import options_from_prefs

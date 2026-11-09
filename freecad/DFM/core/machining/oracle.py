@@ -32,7 +32,8 @@ from OCP.GeomLProp import GeomLProp_SLProps
 from OCP.gp import gp_Dir, gp_Pnt, gp_Pnt2d, gp_Vec
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_IN, TopAbs_ON
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape
+from OCP.TopoDS import TopoDS_Edge, TopoDS_Face, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
 
 from .aag import AttributedAdjacencyGraph, Concavity
 

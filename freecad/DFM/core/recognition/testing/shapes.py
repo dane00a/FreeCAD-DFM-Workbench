@@ -27,8 +27,9 @@ from OCP.BRepTools import BRepTools
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
 from OCP.TopExp import TopExp
-from OCP.TopTools import TopTools_IndexedMapOfShape, TopTools_ListOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape, TopTools_ListOfShape
+from OCP.TopoDS import TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
 from OCP.gp import gp_Ax1, gp_Ax2, gp_Dir, gp_Pnt, gp_Trsf, gp_Vec
 
 Vec = tuple[float, float, float]

@@ -20,7 +20,8 @@ from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepTools import BRepTools
 from OCP.TopAbs import TopAbs_EDGE
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Edge, TopoDS_Shape
+from OCP.TopoDS import TopoDS_Compound, TopoDS_Edge, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
 
 from .geometry import FaceIndex
 

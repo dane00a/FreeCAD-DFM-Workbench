@@ -399,7 +399,7 @@ class BossWallTests(unittest.TestCase):
         from OCP.BRepFilletAPI import BRepFilletAPI_MakeChamfer
         from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
         from OCP.TopExp import TopExp_Explorer
-        from OCP.TopoDS import TopoDS
+        from freecad.DFM.core.utils.occt import TopoDS
         from OCP.Bnd import Bnd_Box
         from OCP.BRepBndLib import BRepBndLib
 

@@ -25,8 +25,9 @@ from typing import Any, Optional
 from OCP.BRep import BRep_Tool
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
 from OCP.TopExp import TopExp
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopTools_IndexedDataMapOfShapeListOfShape
+from OCP.TopoDS import TopoDS_Edge, TopoDS_Face, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
 from OCP.gp import gp_Dir
 
 from ...core.base.base_analyzer import BaseAnalyzer

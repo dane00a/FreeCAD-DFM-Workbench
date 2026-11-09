@@ -5,7 +5,8 @@
 import math
 from typing import Any, Callable, Optional
 
-from OCP.TopoDS import TopoDS_Shape, TopoDS_Face, TopoDS_Edge, TopoDS
+from OCP.TopoDS import TopoDS_Shape, TopoDS_Face, TopoDS_Edge
+from freecad.DFM.core.utils.occt import TopoDS
 from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier

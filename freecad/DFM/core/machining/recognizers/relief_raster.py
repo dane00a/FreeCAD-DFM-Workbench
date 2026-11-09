@@ -37,7 +37,7 @@ from OCP.GeomAbs import GeomAbs_Plane
 from OCP.GProp import GProp_GProps
 from OCP.TopAbs import TopAbs_REVERSED, TopAbs_VERTEX, TopAbs_WIRE
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS
+from freecad.DFM.core.utils.occt import TopoDS
 
 from ..aag import AagNode, SurfaceType
 from .marking.model import add, cross, dot, neg, norm, pnt, scale, sub, unit

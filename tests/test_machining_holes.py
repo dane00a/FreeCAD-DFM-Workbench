@@ -110,7 +110,7 @@ def make_pocket_with_corner_fillets() -> TopoDS_Shape:
     filleted = BRepFilletAPI_MakeFillet(pocket)
     from OCP.TopAbs import TopAbs_EDGE
     from OCP.TopExp import TopExp_Explorer
-    from OCP.TopoDS import TopoDS
+    from freecad.DFM.core.utils.occt import TopoDS
     from OCP.BRep import BRep_Tool
 
     explorer = TopExp_Explorer(pocket, TopAbs_EDGE)

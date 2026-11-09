@@ -38,11 +38,12 @@ from OCP.BRepPrimAPI import BRepPrimAPI_MakePrism, BRepPrimAPI_MakeRevol
 from OCP.GeomAbs import GeomAbs_SurfaceType
 from OCP.GeomAPI import GeomAPI_PointsToBSpline, GeomAPI_PointsToBSplineSurface
 from OCP.gp import gp_Ax1, gp_Dir, gp_Pnt, gp_Trsf, gp_Vec
-from OCP.TColgp import TColgp_Array1OfPnt, TColgp_Array2OfPnt
+from freecad.DFM.core.utils.occt import TColgp_Array1OfPnt, TColgp_Array2OfPnt
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
 from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopoDS import TopoDS, TopoDS_Shape
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
+from OCP.TopoDS import TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
+from freecad.DFM.core.utils.occt import TopTools_IndexedDataMapOfShapeListOfShape
 
 from . import fixture
 from .shapes import (

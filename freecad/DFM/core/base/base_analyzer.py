@@ -23,8 +23,9 @@ are the same as in one process, on any number of cores.
 import math
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional, Iterator
-from OCP.TopTools import TopTools_IndexedMapOfShape
-from OCP.TopoDS import TopoDS_Shape, TopoDS_Face, TopoDS, TopoDS_Edge
+from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
+from OCP.TopoDS import TopoDS_Shape, TopoDS_Face, TopoDS_Edge
+from freecad.DFM.core.utils.occt import TopoDS
 from OCP.TopExp import TopExp, TopExp_Explorer
 from OCP.TopAbs import TopAbs_FACE, TopAbs_EDGE
 from freecad.DFM.core.utils.geometry import EdgeIndex, FaceIndex

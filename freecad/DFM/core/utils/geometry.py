@@ -9,16 +9,17 @@ from OCP.BRep import BRep_Tool
 from OCP.BRepBndLib import BRepBndLib
 from OCP.BRepGProp import BRepGProp
 from OCP.Bnd import Bnd_Box
-from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+from freecad.DFM.core.utils.occt import BRepTopAdaptor_FClass2d
 from OCP.Geom import Geom_Surface
 from OCP.GeomLib import GeomLib_IsPlanarSurface
 from OCP.GeomLProp import GeomLProp_SLProps
 from OCP.gp import gp_Ax3, gp_Dir, gp_Pnt, gp_Pnt2d, gp_Trsf, gp_Vec
 from OCP.GProp import GProp_GProps
 from OCP.TopAbs import TopAbs_REVERSED, TopAbs_IN, TopAbs_ON
-from OCP.TopoDS import TopoDS_Shape, TopoDS_Face, TopoDS, TopoDS_Edge
+from OCP.TopoDS import TopoDS_Shape, TopoDS_Face, TopoDS_Edge
+from freecad.DFM.core.utils.occt import TopoDS
 from OCP.TopAbs import TopAbs_FACE, TopAbs_EDGE
-from OCP.TopTools import TopTools_IndexedMapOfShape
+from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
 from OCP.TopExp import TopExp, TopExp_Explorer
 
 from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform

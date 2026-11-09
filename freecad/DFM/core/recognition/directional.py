@@ -30,8 +30,9 @@ from typing import Iterable, Optional, Sequence
 from OCP.IntCurvesFace import IntCurvesFace_ShapeIntersector
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
 from OCP.TopExp import TopExp
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopTools_IndexedDataMapOfShapeListOfShape
+from OCP.TopoDS import TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
 from OCP.gp import gp_Dir
 
 from ..utils.geometry import FaceIndex
@@ -265,7 +266,7 @@ def _supports(result, shape, faces, adj, p, options, owner, report, new_features
     def level_range(face):
         from OCP.BRep import BRep_Tool
         from OCP.TopAbs import TopAbs_VERTEX
-        from OCP.TopTools import TopTools_IndexedMapOfShape
+        from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
 
         pts = []
         vmap = TopTools_IndexedMapOfShape()

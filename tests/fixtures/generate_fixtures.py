@@ -52,7 +52,7 @@ from OCP.STEPControl import STEPControl_AsIs, STEPControl_Writer
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_SOLID
 from OCP.TopExp import TopExp
 from OCP.TopoDS import TopoDS_Shape
-from OCP.TopTools import TopTools_IndexedMapOfShape
+from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
 
 from builders import load_all  # noqa: E402
 

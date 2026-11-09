@@ -32,8 +32,8 @@ from OCP.GeomAbs import GeomAbs_CurveType
 from OCP.gp import gp_Ax1, gp_Dir, gp_Vec
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
 from OCP.TopExp import TopExp
-from OCP.TopoDS import TopoDS
-from OCP.TopTools import (
+from freecad.DFM.core.utils.occt import TopoDS
+from freecad.DFM.core.utils.occt import (
     TopTools_IndexedDataMapOfShapeListOfShape,
     TopTools_IndexedMapOfShape,
 )

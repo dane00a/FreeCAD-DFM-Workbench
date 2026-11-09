@@ -26,8 +26,9 @@ from OCP.GeomAbs import GeomAbs_SurfaceType as ST
 from OCP.ShapeAnalysis import ShapeAnalysis_CanonicalRecognition
 from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp
-from OCP.TopTools import TopTools_IndexedMapOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
+from OCP.TopoDS import TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
 from OCP.gp import gp_Cone, gp_Cylinder, gp_Pln, gp_Pnt
 
 TOL = 1e-3

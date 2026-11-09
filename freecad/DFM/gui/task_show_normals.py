@@ -10,7 +10,7 @@ from OCP.TopExp import TopExp_Explorer
 from OCP.TopAbs import TopAbs_FACE, TopAbs_REVERSED
 from OCP.BRep import BRep_Tool
 from OCP.GeomLProp import GeomLProp_SLProps
-from OCP.TopoDS import TopoDS
+from freecad.DFM.core.utils.occt import TopoDS
 
 from ..core.utils.geometry import get_face_uv_center
 from ..core.utils.conversion import freecad_to_ocp

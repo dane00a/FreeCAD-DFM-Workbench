@@ -44,7 +44,8 @@ from typing import Dict, List, Optional, Tuple
 from OCP.IFSelect import IFSelect_ReturnStatus
 from OCP.STEPCAFControl import STEPCAFControl_Reader
 from OCP.TCollection import TCollection_ExtendedString
-from OCP.TDF import TDF_AttributeIterator, TDF_Label, TDF_LabelSequence
+from OCP.TDF import TDF_AttributeIterator, TDF_Label
+from freecad.DFM.core.utils.occt import OCCT_MAJOR, TDF_LabelSequence
 from OCP.TDataStd import TDataStd_Name
 from OCP.TDocStd import TDocStd_Document
 from OCP.TopAbs import TopAbs_FACE, TopAbs_SHELL, TopAbs_SOLID
@@ -770,8 +771,12 @@ class KernelBridge:
         because nothing ties an XCAF dimension label back to its entity: the
         common case across the file's nominal values -- the measure's unit
         where it is qualified (7.8 left it unconverted), 1 where it is not.
-        Angles are left alone.
+        Angles are left alone, and so is everything on OCCT 8, whose reader
+        applies the qualified unit itself: scaling again would read 12.7 mm
+        as 322.58.
         """
+        if OCCT_MAJOR >= 8:
+            return 1.0
         if kind in _ANGULAR_DIMENSIONS or kind == XCAFDimTolObjects_DimensionType_Size_Angular:
             return 1.0
         if self._dimension_factor is None:

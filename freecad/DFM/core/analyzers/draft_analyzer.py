@@ -7,7 +7,8 @@ from typing import Any, Callable, Optional
 
 import FreeCAD  # type: ignore
 
-from OCP.TopoDS import TopoDS_Shape, TopoDS_Face, TopoDS
+from OCP.TopoDS import TopoDS_Shape, TopoDS_Face
+from freecad.DFM.core.utils.occt import TopoDS
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopAbs import TopAbs_FACE
 from OCP.BRepAdaptor import BRepAdaptor_Surface

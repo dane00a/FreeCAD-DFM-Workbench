@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Optional
 
-from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+from freecad.DFM.core.utils.occt import BRepTopAdaptor_FClass2d
 from OCP.IntCurvesFace import IntCurvesFace_ShapeIntersector
 from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
 from OCP.gp import gp_Lin

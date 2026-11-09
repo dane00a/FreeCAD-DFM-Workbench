@@ -45,7 +45,7 @@ from OCP.GeomAbs import GeomAbs_CurveType
 from OCP.GeomAPI import GeomAPI_PointsToBSpline, GeomAPI_PointsToBSplineSurface
 from OCP.GeomConvert import GeomConvert
 from OCP.gp import gp_Ax1, gp_Dir, gp_Pnt, gp_Vec
-from OCP.TColgp import TColgp_Array1OfPnt, TColgp_Array2OfPnt
+from freecad.DFM.core.utils.occt import TColgp_Array1OfPnt, TColgp_Array2OfPnt
 from OCP.TopoDS import TopoDS_Shape
 
 from . import fixture

@@ -30,7 +30,7 @@ def shape_counts(shape):
     into every test that wants to know whether a read worked."""
     from OCP.TopAbs import TopAbs_FACE, TopAbs_SOLID
     from OCP.TopExp import TopExp
-    from OCP.TopTools import TopTools_IndexedMapOfShape
+    from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
 
     counts = []
     for kind in (TopAbs_FACE, TopAbs_SOLID):

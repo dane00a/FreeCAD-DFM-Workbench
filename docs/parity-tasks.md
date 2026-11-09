@@ -34,6 +34,18 @@ Seven fixture recipes carry sub-micron sliver-edge differences from the
 reference's STEP files (`_KNOWN_EDGE_DIFFERENCES` in
 `tests/fixtures/generate_fixtures.py`); none affects analysis.
 
+**OCCT 8.** FreeCAD is moving to OCCT 8.0.1, and the engine runs on it
+unchanged: OCP names that moved between 7.x and 8.x come from
+`core/utils/occt.py`, which also restores `Bnd_Box.Get()` (OCP 8.0.1 cannot
+return its limits struct). On `cadquery-ocp==8.0.1.1.0` all 280 goldens
+match, as on 7.8. Two behaviours are kernel-specific, and both are pinned by
+tests: the PMI dimension-scale bridge is a 7.x repair and stands down on 8
+(the 8.x reader already applies the unit), and an untriangulated spline
+face's bounding box is the surface's on 7.8 but its control points' on 8,
+which moves a spline louvre's reported height (4.5 → 5.24 mm in
+`test_machining_sheet`) without changing any finding. The plane-handedness
+bridge and the pre-analysis mesh are correct on either kernel.
+
 **Known divergences that do not show in the goldens.** The external-thread
 recognizer keeps a modelled-helix route the reference does not have (no
 golden contains EXTERNAL_THREAD). A few suspected reference quirks are ported

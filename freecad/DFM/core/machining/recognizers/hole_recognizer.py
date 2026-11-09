@@ -35,8 +35,8 @@ from OCP.gp import gp_Dir, gp_Lin, gp_Pnt, gp_Vec
 from OCP.ProjLib import ProjLib
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_IN, TopAbs_ON
 from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopoDS import TopoDS
-from OCP.TopTools import TopTools_IndexedMapOfShape
+from freecad.DFM.core.utils.occt import TopoDS
+from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
 
 from ..aag import AagNode, AttributedAdjacencyGraph, Concavity, SurfaceType
 from ..face_extent import extent_of_face, span_of_face

@@ -24,7 +24,7 @@ cheap and avoids adding cross-check architecture.
 
 from typing import Any, Optional
 
-from OCP.TopoDS import TopoDS
+from freecad.DFM.core.utils.occt import TopoDS
 
 from ...core.models import CheckResult, Severity
 from ...core.base.base_check import BaseCheck

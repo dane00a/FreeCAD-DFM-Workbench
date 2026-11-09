@@ -41,8 +41,9 @@ from OCP.TopAbs import (
     TopAbs_WIRE,
 )
 from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
+from OCP.TopoDS import TopoDS_Edge, TopoDS_Face, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
+from freecad.DFM.core.utils.occt import TopTools_IndexedDataMapOfShapeListOfShape
 
 from ..utils.geometry import FaceIndex
 from .canonical import apply_canonical_promotion, canonical_promotion_enabled
@@ -782,7 +783,7 @@ def _face_sample_point(face: TopoDS_Face) -> Optional[tuple[gp_Pnt, gp_Dir]]:
     centroid can fall in the hole. Parametric candidates are tried until one
     lands on the face itself.
     """
-    from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+    from freecad.DFM.core.utils.occt import BRepTopAdaptor_FClass2d
 
     try:
         u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(face)

@@ -34,8 +34,8 @@ from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRepBndLib import BRepBndLib
 from OCP.TopAbs import TopAbs_FACE
 from OCP.TopExp import TopExp
-from OCP.TopoDS import TopoDS
-from OCP.TopTools import TopTools_IndexedMapOfShape
+from freecad.DFM.core.utils.occt import TopoDS
+from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
 from OCP.gp import gp_Vec
 
 from ..aag import AagNode, AttributedAdjacencyGraph, Concavity, SurfaceType

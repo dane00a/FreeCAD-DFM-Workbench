@@ -45,7 +45,7 @@ from OCP.GC import GC_MakeArcOfCircle
 from OCP.GeomAPI import GeomAPI_PointsToBSpline
 from OCP.GeomConvert import GeomConvert
 from OCP.gp import gp_Ax1, gp_Ax2, gp_Dir, gp_Pnt, gp_Vec
-from OCP.TColgp import TColgp_Array1OfPnt
+from freecad.DFM.core.utils.occt import TColgp_Array1OfPnt
 from OCP.TopoDS import TopoDS_Shape
 
 from . import fixture

@@ -59,7 +59,8 @@ from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
 from OCP.GeomLProp import GeomLProp_SLProps
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_REVERSED
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS, TopoDS_Face
+from OCP.TopoDS import TopoDS_Face
+from freecad.DFM.core.utils.occt import TopoDS
 from OCP.gp import gp_Dir, gp_Lin, gp_Pnt, gp_Vec
 
 from ...machining.aag import AagNode, SurfaceType

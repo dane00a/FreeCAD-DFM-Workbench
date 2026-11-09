@@ -6,10 +6,14 @@ from typing import Any, Callable, Optional
 import math
 
 from OCP.BRepAdaptor import BRepAdaptor_Curve
-from OCP.TopoDS import TopoDS_Edge, TopoDS_Face, TopoDS_Shape, TopoDS
+from OCP.TopoDS import TopoDS_Edge, TopoDS_Face, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
 from OCP.TopExp import TopExp
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_IndexedMapOfShape
+from freecad.DFM.core.utils.occt import (
+    TopTools_IndexedDataMapOfShapeListOfShape,
+    TopTools_IndexedMapOfShape,
+)
 from OCP.BRep import BRep_Tool
 from OCP.BRep import BRep_Tool
 from OCP.GeomLProp import GeomLProp_CLProps

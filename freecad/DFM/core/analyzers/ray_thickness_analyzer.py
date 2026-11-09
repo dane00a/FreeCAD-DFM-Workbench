@@ -8,8 +8,9 @@ import math
 
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
 from OCP.TopExp import TopExp
-from OCP.TopoDS import TopoDS, TopoDS_Shape, TopoDS_Face
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
+from OCP.TopoDS import TopoDS_Shape, TopoDS_Face
+from freecad.DFM.core.utils.occt import TopoDS
+from freecad.DFM.core.utils.occt import TopTools_IndexedDataMapOfShapeListOfShape
 from OCP.gp import gp_Lin
 from OCP.IntCurvesFace import IntCurvesFace_ShapeIntersector
 from freecad.DFM.core.utils.geometry import EdgeIndex, FaceIndex

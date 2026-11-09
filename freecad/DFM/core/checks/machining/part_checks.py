@@ -22,8 +22,8 @@ from OCP.BRepBndLib import BRepBndLib
 from OCP.gp import gp_Pnt, gp_Vec
 from OCP.TopAbs import TopAbs_FACE, TopAbs_SHELL, TopAbs_VERTEX
 from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopoDS import TopoDS
-from OCP.TopTools import TopTools_IndexedMapOfShape
+from freecad.DFM.core.utils.occt import TopoDS
+from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
 
 from ...machining.aag import SurfaceType
 from ...machining.context import MachiningContext

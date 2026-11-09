@@ -159,7 +159,7 @@ def spline_seamed_tap_drill_hole(radius=3.4) -> TopoDS_Shape:
     from OCP.GeomConvert import GeomConvert
     from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
     from OCP.TopExp import TopExp_Explorer
-    from OCP.TopoDS import TopoDS
+    from freecad.DFM.core.utils.occt import TopoDS
 
     shape = plain_tap_drill_hole(radius)
     faces = TopExp_Explorer(shape, TopAbs_FACE)

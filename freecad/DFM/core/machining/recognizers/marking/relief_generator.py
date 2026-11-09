@@ -32,7 +32,7 @@ from OCP.BRepAdaptor import BRepAdaptor_Curve
 from OCP.GCPnts import GCPnts_QuasiUniformDeflection
 from OCP.TopAbs import TopAbs_EDGE
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS
+from freecad.DFM.core.utils.occt import TopoDS
 
 from ...aag import AagNode, AttributedAdjacencyGraph, SurfaceType
 from ...features import FeatureType

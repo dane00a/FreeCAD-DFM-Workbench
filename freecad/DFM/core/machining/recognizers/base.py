@@ -151,7 +151,7 @@ def cylinder_wrap_radians(graph: AttributedAdjacencyGraph, face_map, node: AagNo
         return 0.0
     from OCP.BRepAdaptor import BRepAdaptor_Surface
     from OCP.GeomAbs import GeomAbs_Cylinder
-    from OCP.TopoDS import TopoDS
+    from freecad.DFM.core.utils.occt import TopoDS
 
     origin = node.cyl_cone_axis.Location()
     direction = node.cyl_cone_axis.Direction()
@@ -222,8 +222,8 @@ def cone_rim_mean_radii(graph: AttributedAdjacencyGraph, face_map, node: AagNode
     from OCP.GeomAbs import GeomAbs_Cone, GeomAbs_Line
     from OCP.TopAbs import TopAbs_EDGE, TopAbs_WIRE
     from OCP.TopExp import TopExp, TopExp_Explorer
-    from OCP.TopoDS import TopoDS
-    from OCP.TopTools import TopTools_IndexedMapOfShape
+    from freecad.DFM.core.utils.occt import TopoDS
+    from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
 
     face = TopoDS.Face_s(face_map.FindKey(node.face_id))
     surface = BRepAdaptor_Surface(face)
@@ -303,7 +303,7 @@ def face_map_of(shape):
         return None
     from OCP.TopAbs import TopAbs_FACE
     from OCP.TopExp import TopExp
-    from OCP.TopTools import TopTools_IndexedMapOfShape
+    from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
 
     face_map = TopTools_IndexedMapOfShape()
     TopExp.MapShapes_s(shape, TopAbs_FACE, face_map)

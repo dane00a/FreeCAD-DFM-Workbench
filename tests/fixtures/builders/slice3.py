@@ -55,7 +55,7 @@ from OCP.Geom import Geom_OffsetSurface
 from OCP.GeomAPI import GeomAPI_Interpolate, GeomAPI_PointsToBSplineSurface
 from OCP.gp import gp_Ax3, gp_Dir, gp_Pnt, gp_Trsf, gp_Vec
 from OCP.Precision import Precision
-from OCP.TColgp import TColgp_Array2OfPnt, TColgp_HArray1OfPnt
+from freecad.DFM.core.utils.occt import TColgp_Array2OfPnt, TColgp_HArray1OfPnt
 from OCP.TopoDS import TopoDS_Shape
 
 from . import fixture

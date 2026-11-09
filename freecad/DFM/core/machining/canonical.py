@@ -47,7 +47,7 @@ from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepLProp import BRepLProp_SLProps
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
-from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+from freecad.DFM.core.utils.occt import BRepTopAdaptor_FClass2d
 from OCP.GeomAbs import (
     GeomAbs_BezierCurve,
     GeomAbs_BezierSurface,
@@ -71,7 +71,7 @@ from OCP.GeomAdaptor import GeomAdaptor_Curve, GeomAdaptor_Surface
 from OCP.GeomLib import GeomLib
 from OCP.GeomLProp import GeomLProp_CLProps, GeomLProp_SLProps
 from OCP.Precision import Precision
-from OCP.TColgp import TColgp_Array1OfPnt
+from freecad.DFM.core.utils.occt import TColgp_Array1OfPnt
 from OCP.TopAbs import TopAbs_OUT
 from OCP.TopLoc import TopLoc_Location
 from OCP.gp import gp, gp_Ax1, gp_Ax3, gp_Dir, gp_Pln, gp_Pnt, gp_Pnt2d, gp_Vec

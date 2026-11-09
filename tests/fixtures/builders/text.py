@@ -50,10 +50,13 @@ from OCP.BRepPrimAPI import (
 )
 from OCP.GC import GC_MakeArcOfCircle
 from OCP.gp import gp_Ax1, gp_Ax2, gp_Dir, gp_Pnt, gp_Trsf, gp_Vec
-from OCP.NCollection import NCollection_Utf8String
+try:  # OCCT 7.x
+    from OCP.NCollection import NCollection_Utf8String
+except ImportError:  # OCCT 8.x names the same string class NCollection_String
+    from OCP.NCollection import NCollection_String as NCollection_Utf8String
 from OCP.StdPrs import StdPrs_BRepFont
 from OCP.TopoDS import TopoDS_Shape, TopoDS_Wire
-from OCP.TopTools import TopTools_ListOfShape
+from freecad.DFM.core.utils.occt import TopTools_ListOfShape
 
 from . import fixture
 from .shapes import rounded_rect_prism, seam_ax2

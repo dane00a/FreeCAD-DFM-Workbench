@@ -288,8 +288,8 @@ class TestPocketCornerRadiusMeasurement(unittest.TestCase):
         from OCP.GeomAbs import GeomAbs_CurveType
         from OCP.TopAbs import TopAbs_EDGE
         from OCP.TopExp import TopExp
-        from OCP.TopoDS import TopoDS
-        from OCP.TopTools import TopTools_IndexedMapOfShape
+        from freecad.DFM.core.utils.occt import TopoDS
+        from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
 
         shape = _cut(
             BRepPrimAPI_MakeBox(80.0, 80.0, 40.0).Shape(),

@@ -23,8 +23,9 @@ from OCP.GeomLProp import GeomLProp_SLProps
 from OCP.ShapeAnalysis import ShapeAnalysis_CanonicalRecognition
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_REVERSED, TopAbs_WIRE
 from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
-from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopTools_IndexedDataMapOfShapeListOfShape
+from OCP.TopoDS import TopoDS_Edge, TopoDS_Face, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
 from OCP.gp import gp_Cone, gp_Cylinder, gp_Pln, gp_Pnt, gp_Sphere
 
 from ...utils.geometry import EdgeIndex, FaceIndex
@@ -194,7 +195,7 @@ def surface_normal(face: TopoDS_Face, u: float, v: float) -> Optional[V.Vec]:
 
 def _interior_sample(face: TopoDS_Face) -> tuple[Optional[V.Vec], Optional[V.Vec]]:
     """A point inside the face and the normal there."""
-    from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+    from freecad.DFM.core.utils.occt import BRepTopAdaptor_FClass2d
     from OCP.TopAbs import TopAbs_IN
     from OCP.gp import gp_Pnt2d
 
@@ -450,7 +451,7 @@ def _fit_curve(pts: list[V.Vec], tol: float):
 def _curvature_radius(face: TopoDS_Face) -> tuple[float, Optional[bool]]:
     """(radius, concave?) when the face has one principal curvature that is
     the same everywhere (and the other smaller): a blend in disguise."""
-    from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+    from freecad.DFM.core.utils.occt import BRepTopAdaptor_FClass2d
     from OCP.TopAbs import TopAbs_IN
     from OCP.gp import gp_Pnt2d
 

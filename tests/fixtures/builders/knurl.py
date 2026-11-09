@@ -28,7 +28,7 @@ from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
 from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
 from OCP.gp import gp_Ax1, gp_Dir, gp_Pnt, gp_Trsf
 from OCP.TopoDS import TopoDS_Shape
-from OCP.TopTools import TopTools_ListOfShape
+from freecad.DFM.core.utils.occt import TopTools_ListOfShape
 
 from . import fixture
 from .shapes import box_between, cut, cylinder, fuse

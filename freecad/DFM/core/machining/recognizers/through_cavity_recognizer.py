@@ -30,8 +30,8 @@ from OCP.Bnd import Bnd_Box
 from OCP.BRepTools import BRepTools
 from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_WIRE
 from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopoDS import TopoDS
-from OCP.TopTools import (
+from freecad.DFM.core.utils.occt import TopoDS
+from freecad.DFM.core.utils.occt import (
     TopTools_IndexedDataMapOfShapeListOfShape,
     TopTools_IndexedMapOfShape,
 )

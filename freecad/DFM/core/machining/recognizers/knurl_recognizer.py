@@ -53,7 +53,7 @@ from typing import Optional, Sequence
 from OCP.BRep import BRep_Tool
 from OCP.TopAbs import TopAbs_VERTEX
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS
+from freecad.DFM.core.utils.occt import TopoDS
 
 from ...utils.geometry import FaceIndex
 from ..aag import AagNode, AttributedAdjacencyGraph, SurfaceType

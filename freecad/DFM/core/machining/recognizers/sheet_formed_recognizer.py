@@ -39,7 +39,7 @@ from typing import Optional, Sequence
 from OCP.Bnd import Bnd_Box
 from OCP.BRep import BRep_Tool
 from OCP.BRepTools import BRepTools
-from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+from freecad.DFM.core.utils.occt import BRepTopAdaptor_FClass2d
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
 from OCP.gp import gp_Dir, gp_Pnt, gp_Pnt2d, gp_Vec
 from OCP.Precision import Precision

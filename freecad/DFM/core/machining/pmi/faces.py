@@ -43,8 +43,9 @@ from OCP.GeomAbs import GeomAbs_Cylinder
 from OCP.ShapeFix import ShapeFix_Shape, ShapeFix_Solid
 from OCP.TopAbs import TopAbs_COMPOUND, TopAbs_FACE, TopAbs_SHELL
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Shape
-from OCP.TopTools import TopTools_IndexedMapOfShape
+from OCP.TopoDS import TopoDS_Compound, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
+from freecad.DFM.core.utils.occt import TopTools_IndexedMapOfShape
 
 from ...utils.geometry import FaceIndex
 

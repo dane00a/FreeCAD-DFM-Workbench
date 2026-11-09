@@ -27,7 +27,8 @@ from OCP.BRepPrimAPI import (
 from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
 from OCP.TopAbs import TopAbs_EDGE
 from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Shape
+from OCP.TopoDS import TopoDS_Edge, TopoDS_Shape
+from freecad.DFM.core.utils.occt import TopoDS
 
 from freecad.DFM.core.analyzers.machining_analyzer import MachiningAnalyzer
 from freecad.DFM.core.machining.config import MachiningConfig, ToolEntry

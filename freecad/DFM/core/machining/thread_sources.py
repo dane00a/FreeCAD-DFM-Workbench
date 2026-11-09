@@ -1462,6 +1462,11 @@ class ConfirmationStore:
     def __len__(self) -> int:
         return len(self.records)
 
+    def __repr__(self) -> str:
+        # By content, in the form it is saved in: the machining cache keys
+        # on it, and a newly confirmed thread has to miss.
+        return f"ConfirmationStore({self.encode()!r})"
+
 
 def _find_store(document):
     """The document's answer sheet, if it has one.

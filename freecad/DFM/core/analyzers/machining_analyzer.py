@@ -22,6 +22,7 @@ from OCP.TopoDS import TopoDS_Shape
 from ...core.base.base_analyzer import BaseAnalyzer
 from ...core.machining.aag import SurfaceType
 from ...core.machining.aag_builder import AagBuilder
+from ...core.machining.cache import MACHINING_CACHE
 from ...core.machining.config import MachiningConfig
 from ...core.machining.context import MachiningContext
 from ...core.machining.features import FeatureType, RecognitionResult
@@ -134,6 +135,29 @@ class MachiningAnalyzer(BaseAnalyzer):
     ) -> dict[tuple[str, int], Any]:
         self.resolve_prefs(kwargs.get("prefs", {}))
 
+        # Read before recognition, because a bore the document calls tapped
+        # has to be one when the hole pass sees it. The target object is what
+        # carries the answer; an analysis handed nothing but a shape -- a
+        # test, or a caller with no document -- gets empty evidence and the
+        # bore's own spline edges to go on, exactly as before.
+        evidence = thread_evidence_for(kwargs.get("target_object"))
+        # A STEP file's PMI can link a thread callout to the bore it names;
+        # the hole pass reads that before any geometric guess.
+        annotations = kwargs.get("annotations")
+        pmi_threads = getattr(annotations, "threads", None)
+        if pmi_threads:
+            evidence.pmi = dict(pmi_threads)
+
+        # Recognition is shape-level: the same part, configuration and
+        # stated inputs give the same context, so a second analysis of an
+        # unchanged part (another process, a re-run) reads it back.
+        key = MACHINING_CACHE.key(shape, self.config, (evidence, annotations))
+        cached = MACHINING_CACHE.lookup(key)
+        if cached is not None:
+            if progress_cb:
+                progress_cb(len(face_index))
+            return {CONTEXT_KEY: cached}
+
         # Everything below reads a meshed copy, never the caller's shape.
         shape, face_index = _as_the_reference_reads_it(shape, face_index)
 
@@ -144,17 +168,6 @@ class MachiningAnalyzer(BaseAnalyzer):
             return {}
 
         part_process = classify_part_process(graph, self.config.thresholds, shape)
-        # Read before recognition, because a bore the document calls tapped
-        # has to be one when the hole pass sees it. The target object is what
-        # carries the answer; an analysis handed nothing but a shape -- a
-        # test, or a caller with no document -- gets empty evidence and the
-        # bore's own spline edges to go on, exactly as before.
-        evidence = thread_evidence_for(kwargs.get("target_object"))
-        # A STEP file's PMI can link a thread callout to the bore it names;
-        # the hole pass reads that before any geometric guess.
-        pmi_threads = getattr(kwargs.get("annotations"), "threads", None)
-        if pmi_threads:
-            evidence.pmi = dict(pmi_threads)
         recognition, part_process = self._recognize(
             graph, shape, part_process, check_abort, evidence
         )
@@ -169,8 +182,10 @@ class MachiningAnalyzer(BaseAnalyzer):
             # Tolerance and finish callouts that came with the shape -- the
             # PMI of a STEP file, read alongside it. Absent for a document
             # part, which then reads exactly as before.
-            annotations=kwargs.get("annotations"),
+            annotations=annotations,
         )
+        if not (check_abort and check_abort()):
+            MACHINING_CACHE.store(key, context)
         return {CONTEXT_KEY: context}
 
     def _recognize(

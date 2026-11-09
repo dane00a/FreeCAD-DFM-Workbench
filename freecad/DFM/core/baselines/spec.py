@@ -39,6 +39,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from ..machining._version import ENGINE_VERSION
+
 
 # The severity buckets, in the reference engine's spelling. Anything the
 # analysis reports that is not an error or a warning lands in `info`, which
@@ -82,8 +84,8 @@ FEATURE_DISCRIMINANTS = ("subtype", "open_edges", "is_hem", "bend_family")
 #: the port is resynchronised to a newer reference -- at which point every
 #: baseline recorded against the old target reports itself as needing a
 #: second look, exactly as the reference's own baselines do when its engine
-#: is versioned up.
-ENGINE_VERSION = "2.0.0"
+#: is versioned up. It lives with the engine, in machining/_version.py,
+#: where the machining cache keys on it too.
 
 #: What a run with no version stamp reports, in the reference's spelling.
 UNSTAMPED = "(unstamped)"

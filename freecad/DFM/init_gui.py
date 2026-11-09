@@ -5,11 +5,13 @@
 import FreeCADGui as Gui  # type: ignore
 
 from .gui import task_setup, task_show_normals, process_library
+from .gui import baseline_panel
 from .gui import preferences
 from .gui.machining_preferences import MachiningPreferences
 from .gui.machining_thresholds import MachiningThresholds
 from .gui.tool_library import MachiningTooling
 from .gui.preferences import DFMPreferencesGeneral, DFMPreferencesAnalyzers
+from .gui.preferences import fixture_baselines_enabled
 from .gui import tools as _dfm_contour_tools
 
 
@@ -29,6 +31,18 @@ class DFMWorkbench(Gui.Workbench):
             "DFM_DraftAnalysis",
             "DFM_ThicknessAnalysis",
         ]
+        # The fixture-baseline panel is a developer's tool: it runs the test
+        # corpus and rewrites the approved answers for it. Appending it only
+        # when the preference is on keeps it out of the toolbar entirely
+        # rather than showing a greyed entry nobody else can use -- the
+        # command registers either way, so a macro can still reach it, and
+        # its own IsActive answers the same preference.
+        #
+        # This is read once, here, because a workbench builds its toolbar
+        # once per session. Turning the preference on therefore needs a
+        # restart, which the preference's own tooltip says.
+        if fixture_baselines_enabled():
+            self.list.append("DFM_FixtureBaselines")
         self.appendToolbar("DFM Analysis", self.list)
         self.appendMenu("DFM", self.list)
 

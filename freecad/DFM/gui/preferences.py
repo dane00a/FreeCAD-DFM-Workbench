@@ -368,8 +368,27 @@ class BridgeSpanPanel(AnalyzerPanel):
 # =============================================================================
 
 
+#: Whether the fixture-baseline tools are offered at all. Off by default,
+#: and read from one place so the preference page, the workbench's command
+#: list and the command's own IsActive all agree about what it means.
+#:
+#: The panel it gates runs the whole two-hundred-part corpus and rewrites
+#: the approved answers for it. That is a developer's job on a working tree,
+#: not something a machinist should be able to reach by mis-clicking in a
+#: toolbar, and on a plain user install the fixture recipes are not even
+#: present for it to run.
+PREF_FIXTURE_BASELINES = "GeneralEnableFixtureBaselines"
+
+
+def fixture_baselines_enabled() -> bool:
+    return App.ParamGet("User parameter:BaseApp/Preferences/Mod/DFM").GetBool(
+        PREF_FIXTURE_BASELINES, False
+    )
+
+
 class DFMPreferencesGeneral:
     DEFAULT_PRINT_TIMING_REPORT = False
+    DEFAULT_FIXTURE_BASELINES = False
 
     def __init__(self):
         self.form = QtWidgets.QWidget()
@@ -384,9 +403,21 @@ class DFMPreferencesGeneral:
             "The report includes run-time for Analyzers, Checks, and total analysis run-time."
         )
 
+        self.fixture_baselines = _pref(
+            QtWidgets.QCheckBox("Fixture baselines"), PREF_FIXTURE_BASELINES
+        )
+        self.fixture_baselines.setToolTip(
+            "Adds the Fixture Baselines command, which runs the test corpus and\n"
+            "compares each part's findings against the approved answer for it.\n"
+            "Needs the repository's test fixtures, so it does nothing useful in\n"
+            "a plain install. Takes effect after FreeCAD is restarted."
+        )
+
         layout = QtWidgets.QVBoxLayout(self.form)
         group = QtWidgets.QGroupBox("Developer Options")
-        QtWidgets.QVBoxLayout(group).addWidget(self.print_timing_report)
+        group_layout = QtWidgets.QVBoxLayout(group)
+        group_layout.addWidget(self.print_timing_report)
+        group_layout.addWidget(self.fixture_baselines)
         layout.addWidget(group)
         layout.addStretch()
 
@@ -395,10 +426,14 @@ class DFMPreferencesGeneral:
         self.print_timing_report.setChecked(
             params.GetBool("GeneralPrintTimingReport", self.DEFAULT_PRINT_TIMING_REPORT)
         )
+        self.fixture_baselines.setChecked(
+            params.GetBool(PREF_FIXTURE_BASELINES, self.DEFAULT_FIXTURE_BASELINES)
+        )
 
     def saveSettings(self):
         params = App.ParamGet("User parameter:BaseApp/Preferences/Mod/DFM")
         params.SetBool("GeneralPrintTimingReport", self.print_timing_report.isChecked())
+        params.SetBool(PREF_FIXTURE_BASELINES, self.fixture_baselines.isChecked())
 
 
 class DFMPreferencesAnalyzers:

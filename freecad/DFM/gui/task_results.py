@@ -17,6 +17,62 @@ from ..gui.results.visuals import severity_color
 from ..core.rules import Criticality
 from ..gui.results.utils import CSVExportConfig, CSVResultExporter
 
+#: How many face names a merged finding's tooltip spells out before it stops.
+#: A turbine disk's broached-slot row covers a hundred and forty-four faces,
+#: and a tooltip that lists all of them is a wall of text nobody reads and
+#: that Qt will happily paint off the bottom of the screen.
+_TOOLTIP_REF_LIMIT = 24
+
+
+def _finding_label(finding: CheckResult) -> str:
+    """What a finding's row in the tree is called.
+
+    This used to be the first reference's label and nothing else, which was
+    already a small lie -- a machining finding names the three faces of a
+    slot, and the row claimed one of them -- and became a large one once
+    identical findings started arriving merged. A row standing for
+    forty-eight slots across a hundred and forty-four faces has to say so;
+    naming one face and leaving the reader to discover the rest by clicking
+    is worse than the noise the merge removed.
+
+    The first label still leads, because it is the one thing here that
+    points at somewhere specific on the part, and because for the great
+    majority of findings -- one occurrence, one face -- it is the whole
+    answer and nothing is appended to it at all.
+    """
+    if not finding.refs:
+        return "Unknown"
+
+    label = finding.refs[0].label
+    if len(finding.refs) > 1:
+        label = f"{label} +{len(finding.refs) - 1} more"
+    if finding.occurrence_count > 1:
+        label = f"{finding.occurrence_count}x {label}"
+    return label
+
+
+def _finding_tooltip(finding: CheckResult) -> str:
+    """The geometry behind the row's summary, for the reader who wants it.
+
+    The row can only afford a count. Hovering is where the count turns back
+    into face names, which is what someone checking whether the merge
+    swallowed something it should not have actually needs to see.
+    """
+    if not finding.refs:
+        return ""
+
+    labels = [ref.label for ref in finding.refs]
+    shown = ", ".join(labels[:_TOOLTIP_REF_LIMIT])
+    if len(labels) > _TOOLTIP_REF_LIMIT:
+        shown += f", and {len(labels) - _TOOLTIP_REF_LIMIT} more"
+
+    if finding.occurrence_count > 1:
+        return (
+            f"{finding.occurrence_count} identical findings, "
+            f"naming {len(labels)} sub-elements:\n{shown}"
+        )
+    return shown
+
 
 class TaskResults(QtCore.QObject):
     """Passive View: Only handles Widgets and Signals."""
@@ -186,9 +242,10 @@ class TaskResults(QtCore.QObject):
                 )
 
                 for finding in findings:
-                    name = finding.refs[0].label if finding.refs else "Unknown"
+                    name = _finding_label(finding)
                     child = QStandardItem()
                     child.setEditable(False)
+                    child.setToolTip(_finding_tooltip(finding))
                     child.setData(finding, QtCore.Qt.ItemDataRole.UserRole)
                     child.setData("finding", QtCore.Qt.ItemDataRole.UserRole + 1)
                     child.setData(name, QtCore.Qt.ItemDataRole.UserRole + 2)

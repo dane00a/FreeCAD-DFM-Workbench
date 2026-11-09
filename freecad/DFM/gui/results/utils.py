@@ -58,7 +58,14 @@ class CSVResultExporter:
                 headers = ["Status", "Rule"]
                 if config.include_criticality:
                     headers.append("Criticality")
-                headers += ["Face", "Value", "Comparison", "Limit"]
+                # "Count" is not optional the way the other columns are.
+                # Once identical findings are merged, a row without it is
+                # ambiguous in a way no toggle should be able to reintroduce:
+                # forty-eight slots and one slot become the same line, and
+                # the Face column -- which does list all of them -- is the
+                # only place the difference survives, in a cell too long for
+                # anyone to count by eye.
+                headers += ["Count", "Face", "Value", "Comparison", "Limit"]
                 if config.include_unit:
                     headers.append("Unit")
                 if config.include_feedback:
@@ -102,6 +109,7 @@ class CSVResultExporter:
                         if config.include_criticality:
                             row.append(criticality_label)
                         row += [
+                            str(result.occurrence_count),
                             face,
                             f"{result.value:.2f}" if result.value is not None else "N/A",
                             result.comparison,
@@ -122,7 +130,7 @@ class CSVResultExporter:
                         if config.include_criticality:
                             crit = get_criticality(rule).label if get_criticality else ""
                             row.append(crit)
-                        row += ["", "N/A", "", "N/A"]
+                        row += ["", "", "N/A", "", "N/A"]
                         if config.include_unit:
                             row.append("")
                         if config.include_feedback:

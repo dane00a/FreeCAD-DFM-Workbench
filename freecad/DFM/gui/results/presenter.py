@@ -146,12 +146,23 @@ class TaskResultsPresenter:
             icon = self.view._get_icon(worst_severity)
             icon_html = icon_to_html(icon, size=16)
 
+            # Rows and occurrences are the same number until identical
+            # findings start merging, and then they are not: one row can
+            # stand for forty-eight slots. Both are said when they differ,
+            # because "1 finding" over a part with forty-eight bad slots is
+            # true about the tree and misleading about the part.
+            rows = len(active)
+            occurrences = sum(r.occurrence_count for r in active)
+            counted = f"{rows} finding{'s' if rows != 1 else ''}"
+            if occurrences != rows:
+                counted += f" covering {occurrences} occurrences"
+
             self.view.form.tbDetails.setHtml(
                 f"<table cellspacing='0' cellpadding='0'><tr>"
                 f"<td valign='middle' style='padding-right:4px'>{icon_html}</td>"
                 f"<td valign='middle'><b>{rule_name}</b></td>"
                 f"</tr></table>"
-                f"<p style='margin-top:4px'>Showing all {len(active)} finding{'s' if len(active) != 1 else ''}.</p>"
+                f"<p style='margin-top:4px'>Showing all {counted}.</p>"
             )
 
             face_pairs = [
@@ -181,6 +192,7 @@ class TaskResultsPresenter:
                 f"<td valign='middle'><b>{overview}</b></td>"
                 f"</tr></table>"
                 f"<p style='margin-top:4px'>{data.message}</p>"
+                f"{self._merge_note(data)}"
             )
 
             face_refs = [ref for ref in data.refs if ref.type == "Face"]
@@ -198,6 +210,28 @@ class TaskResultsPresenter:
                 self.bridge.annotate_edge_by_index(edge_refs[0].index, data.overview, color)
 
         self.view.adjust_details_height()
+
+    @staticmethod
+    def _merge_note(result: CheckResult) -> str:
+        """The footnote a merged finding needs and an ordinary one must not get.
+
+        The message already opens with `48x:`, which says how many places
+        the problem is in but not which. This says which -- or rather, how
+        many pieces of geometry are lit up in the viewport right now, so
+        that what the reader sees highlighted and what they are reading
+        agree on their arithmetic.
+
+        Empty for an unmerged finding. A line reading "1 occurrence" under
+        every one of two hundred findings is noise of exactly the kind this
+        whole pass was written to delete.
+        """
+        if result.occurrence_count <= 1:
+            return ""
+        return (
+            f"<p style='margin-top:4px; opacity:0.7'>"
+            f"{result.occurrence_count} identical findings merged; "
+            f"all {len(result.refs)} highlighted.</p>"
+        )
 
     def handle_zoom_to_rule(self, findings: list[CheckResult]):
         face_pairs = [
@@ -274,15 +308,32 @@ class TaskResultsPresenter:
         recent_runs = runs[-10:]  # Last 10 runs
         e_hist, w_hist, s_hist, n_hist = [], [], [], []
 
+        # Occurrences, for the same reason the verdict counts them: this
+        # line sits beside the verdict and has to agree with it. Runs
+        # recorded before findings were merged come back with a count of
+        # one on every finding, which is what they were, so the trend does
+        # not put a cliff in itself on the day the merge landed.
         for run in recent_runs:
             e_hist.append(
-                sum(1 for f in run.findings if not f.ignore and f.severity == Severity.ERROR)
+                sum(
+                    f.occurrence_count
+                    for f in run.findings
+                    if not f.ignore and f.severity == Severity.ERROR
+                )
             )
             w_hist.append(
-                sum(1 for f in run.findings if not f.ignore and f.severity == Severity.WARNING)
+                sum(
+                    f.occurrence_count
+                    for f in run.findings
+                    if not f.ignore and f.severity == Severity.WARNING
+                )
             )
             s_hist.append(
-                sum(1 for f in run.findings if not f.ignore and f.severity == Severity.SUCCESS)
+                sum(
+                    f.occurrence_count
+                    for f in run.findings
+                    if not f.ignore and f.severity == Severity.SUCCESS
+                )
             )
             n_hist.append(run.run)
 

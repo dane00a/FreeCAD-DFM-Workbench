@@ -44,8 +44,19 @@ class DFMReportModel:
         return dict(sorted(grouped.items(), key=rule_sort_key))
 
     def get_verdict(self) -> tuple[str, str]:
-        errors = sum(1 for r in self.active_results if r.severity == Severity.ERROR)
-        warnings = sum(1 for r in self.active_results if r.severity == Severity.WARNING)
+        # Occurrences, not rows. The tree counts rows because a row is what
+        # you click; the verdict is a statement about the part, and a part
+        # with forty-eight unmachinable slots has forty-eight problems on it
+        # however few paragraphs it takes to describe them. Counting rows
+        # here would have made the headline number drop by a factor of
+        # forty-eight on the day findings started merging, which reads as
+        # the workbench having gone quiet rather than having got tidier.
+        errors = sum(
+            r.occurrence_count for r in self.active_results if r.severity == Severity.ERROR
+        )
+        warnings = sum(
+            r.occurrence_count for r in self.active_results if r.severity == Severity.WARNING
+        )
 
         parts = []
         if errors:

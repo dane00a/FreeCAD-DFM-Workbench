@@ -10,6 +10,7 @@ import Part  # type: ignore
 from OCP.TopoDS import TopoDS_Shape
 from OCP.gp import gp_Dir
 
+from ..core.aggregation import aggregate_findings
 from ..core.machining.blank_declaration import (
     apply_declaration,
     material_family_of,
@@ -151,7 +152,12 @@ class AnalysisRunner:
             timing.stop_total()
             timing.report()
 
-        return results
+        # Last, and after an abort as well as after a clean finish: a run
+        # the machinist cut short still shows its partial results, and
+        # showing them un-collapsed would make the aborted panel look
+        # unlike every other panel. The timing report is taken first so it
+        # measures the rules rather than the tidying up after them.
+        return aggregate_findings(results)
 
     def _load_prefs(self) -> dict:
         params = App.ParamGet("User parameter:BaseApp/Preferences/Mod/DFM")

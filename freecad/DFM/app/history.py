@@ -175,6 +175,10 @@ class HistoryManager:
             "unit": result.unit,
             "comparison": result.comparison,
             "ignore": result.ignore,
+            # Written and read back because the message on disk already
+            # begins "48x:" and a run reloaded without the number would
+            # render a row that says one thing and reads as another.
+            "occurrence_count": result.occurrence_count,
             "refs": [
                 {"type": ref.type, "index": ref.index, "label": ref.label} for ref in result.refs
             ],
@@ -192,6 +196,9 @@ class HistoryManager:
             comparison=d.get("comparison", ""),
             unit=d.get("unit", ""),
             ignore=d.get("ignore", False),
+            # Absent from every run recorded before findings were merged,
+            # and one is the right answer for all of them.
+            occurrence_count=d.get("occurrence_count", 1),
             refs=[
                 GeometryRef(
                     type=ref["type"],

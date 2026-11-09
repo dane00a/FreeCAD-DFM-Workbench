@@ -1,0 +1,8003 @@
+{
+ "aerospace_bracket_l": {
+  "by_category": {
+   "part": 2,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 8,
+  "features": {
+   "type_FILLET": 1,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 6
+  },
+  "fixture": "aerospace_bracket_l",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "aerospace_hydraulic_servo_valve_body": {
+  "by_category": {
+   "hole": 6,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 4,
+   "HOLE_FLAT_BOTTOM": 1,
+   "HOLE_INTERSECTS_CAVITY": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 20,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_BREAKTHROUGH_HOLE": 5,
+   "type_FILLET": 4,
+   "type_O_RING_GLAND": 4,
+   "type_PATTERN": 1,
+   "type_RETAINING_RING_GROOVE": 3,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "aerospace_hydraulic_servo_valve_body",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 3,
+   "warn": 3
+  }
+ },
+ "aerospace_pocket_pyramid": {
+  "by_category": {
+   "part": 1,
+   "pocket": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "type_POCKET": 3
+  },
+  "fixture": "aerospace_pocket_pyramid",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "aerospace_tensioner_pulley": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "type_GROOVE": 2,
+   "type_RETAINING_RING_GROOVE": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "aerospace_tensioner_pulley",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "aerospace_tensioner_pulley__seam37": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "type_GROOVE": 2,
+   "type_RETAINING_RING_GROOVE": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "aerospace_tensioner_pulley__seam37",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "as_cast_no_draft": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "CASTING_DRAFT_ANGLE": 1,
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_BOSS": 2
+  },
+  "fixture": "as_cast_no_draft",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "billet_reservoir_cap": {
+  "by_category": {
+   "part": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_MARKING": 1,
+   "RAISED_TEXT_MACHINED_FACE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 7,
+  "features": {
+   "type_BLIND_HOLE": 3,
+   "type_CHAMFER": 1,
+   "type_GROOVE": 1,
+   "type_MARKING_TEXT": 1,
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "billet_reservoir_cap",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "blind_hole": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_BLIND_HOLE": 1
+  },
+  "fixture": "blind_hole",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "blind_hole_drill_point": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_BLIND_HOLE": 1
+  },
+  "fixture": "blind_hole_drill_point",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "blind_hole_drill_point__seam37": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_BLIND_HOLE": 1
+  },
+  "fixture": "blind_hole_drill_point__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "bolt_circle_4x": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "bolt_circle_4x",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "bolt_circle_4x__seam37": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "bolt_circle_4x__seam37",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "boss_field_tall_and_thin": {
+  "by_category": {
+   "boss": 2,
+   "part": 2
+  },
+  "by_rule": {
+   "BOSS_HEIGHT_RATIO": 1,
+   "BOSS_WALL_THICKNESS": 1,
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_BOSS": 2
+  },
+  "fixture": "boss_field_tall_and_thin",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "boss_flush_corner": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_STEP": 1
+  },
+  "fixture": "boss_flush_corner",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "boss_flush_edge": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_STEP": 1
+  },
+  "fixture": "boss_flush_edge",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "boss_on_plate": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_BOSS": 2
+  },
+  "fixture": "boss_on_plate",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "boss_on_plate__seam37": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_BOSS": 2
+  },
+  "fixture": "boss_on_plate__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "boss_on_stepped_plate": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_BOSS": 1,
+   "type_STEP": 1
+  },
+  "fixture": "boss_on_stepped_plate",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "boss_undercut": {
+  "by_category": {
+   "boss": 1,
+   "part": 2,
+   "tool_access": 1
+  },
+  "by_rule": {
+   "BOSS_UNDERCUT": 1,
+   "FEATURE_COMPLEXITY": 1,
+   "SHARP_INTERNAL_EDGE": 1,
+   "TOOL_ACCESS_SPECIAL_SETUP": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_BOSS": 1
+  },
+  "fixture": "boss_undercut",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "boss_wall_thickness": {
+  "by_category": {
+   "boss": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "BOSS_WALL_THICKNESS": 1,
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_BOSS": 1
+  },
+  "fixture": "boss_wall_thickness",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "bracket_with_thread_array": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 8,
+  "features": {
+   "type_BLIND_HOLE": 4,
+   "type_FILLET": 1,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "bracket_with_thread_array",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "bracket_with_undercut_pocket": {
+  "by_category": {
+   "part": 5,
+   "pocket": 1,
+   "setup": 1,
+   "tool_access": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "SHARP_INTERNAL_EDGE": 4,
+   "UNDERCUT_PRESENT": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "type_POCKET": 1,
+   "type_THROUGH_HOLE": 2,
+   "type_UNDERCUT": 2
+  },
+  "fixture": "bracket_with_undercut_pocket",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 7
+  }
+ },
+ "cf_knife_edge_flange": {
+  "by_category": {
+   "blend": 3,
+   "hole": 1,
+   "part": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "CHAMFER_NONSTANDARD_ANGLE": 2,
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_EDGE_DISTANCE": 1,
+   "METAL_SEAL_WITNESS": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 10,
+  "features": {
+   "type_CHAMFER": 2,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 7
+  },
+  "fixture": "cf_knife_edge_flange",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 4,
+   "warn": 2
+  }
+ },
+ "chamfer_edges": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "type_CHAMFER": 5
+  },
+  "fixture": "chamfer_edges",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "clamp_jaw_assembly_half": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "type_COUNTERBORE": 1,
+   "type_STEP": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "clamp_jaw_assembly_half",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "cnc_router_test_fixture": {
+  "by_category": {
+   "part": 2,
+   "pocket": 1,
+   "slot": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 8,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_PATTERN": 1,
+   "type_POCKET": 1,
+   "type_SLOT": 1,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "cnc_router_test_fixture",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "cnc_test_part_dfm_violation": {
+  "by_category": {
+   "hole": 3,
+   "part": 1,
+   "pocket": 3,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "HOLE_EDGE_DISTANCE": 1,
+   "HOLE_WEB_THICKNESS": 1,
+   "POCKET_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "POCKET_DEPTH_RATIO": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "type_POCKET": 2,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "cnc_test_part_dfm_violation",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 3,
+   "info": 1,
+   "warn": 4
+  }
+ },
+ "compact_mountain_block": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "type_STEP": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "compact_mountain_block",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "complex_undercut_part_v2": {
+  "by_category": {
+   "part": 16,
+   "pocket": 2,
+   "tool_access": 4
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 2,
+   "SHARP_INTERNAL_EDGE": 15,
+   "UNDERCUT_PRESENT": 4
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "type_POCKET": 1,
+   "type_THROUGH_CAVITY": 1,
+   "type_UNDERCUT": 4
+  },
+  "fixture": "complex_undercut_part_v2",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 21
+  }
+ },
+ "counterbore": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_COUNTERBORE": 1
+  },
+  "fixture": "counterbore",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "counterbore__seam37": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_COUNTERBORE": 1
+  },
+  "fixture": "counterbore__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "counterbore_drill_point": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_COUNTERBORE": 1
+  },
+  "fixture": "counterbore_drill_point",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "counterbore_stack_plate": {
+  "by_category": {
+   "hole": 2,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_EDGE_DISTANCE": 1,
+   "HOLE_WEB_THICKNESS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "type_COUNTERBORE": 5
+  },
+  "fixture": "counterbore_stack_plate",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "countersink": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_COUNTERSINK": 1
+  },
+  "fixture": "countersink",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "countersink__seam37": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_COUNTERSINK": 1
+  },
+  "fixture": "countersink__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "countersink_drill_point": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_COUNTERSINK": 1
+  },
+  "fixture": "countersink_drill_point",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "cutter_radius_infeasible": {
+  "by_category": {
+   "blend": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "CUTTER_RADIUS_INFEASIBLE": 1,
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "cutter_radius_infeasible",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "cutter_radius_suboptimal": {
+  "by_category": {
+   "blend": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "CUTTER_RADIUS_SUBOPTIMAL": 1,
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "cutter_radius_suboptimal",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "deep_hole": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "deep_hole",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "deep_pocket": {
+  "by_category": {
+   "part": 1,
+   "pocket": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "POCKET_DEPTH_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "deep_pocket",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "deep_slot": {
+  "by_category": {
+   "part": 1,
+   "slot": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SLOT_DEPTH_RATIO": 1,
+   "SLOT_OVERHANG": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_SLOT": 1
+  },
+  "fixture": "deep_slot",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "die_cast_pattern_block": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "type_BLIND_HOLE": 4,
+   "type_BOSS": 1,
+   "type_PATTERN": 1
+  },
+  "fixture": "die_cast_pattern_block",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "door_closer_body": {
+  "by_category": {
+   "hole": 2,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "HOLE_INTERSECTING": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 9,
+  "features": {
+   "type_COUNTERBORE": 4,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "door_closer_body",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "drafted_fin_channel": {
+  "by_category": {
+   "part": 3,
+   "slot": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SHARP_INTERNAL_EDGE": 2,
+   "SLOT_DEPTH_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 9,
+  "features": {
+   "type_CHANNEL": 1,
+   "type_DRAFT_FACE": 8
+  },
+  "fixture": "drafted_fin_channel",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "dual_marking_control_plate": {
+  "by_category": {
+   "part": 4,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 2,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_MARKING_TEXT": 2
+  },
+  "fixture": "dual_marking_control_plate",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 4,
+   "warn": 1
+  }
+ },
+ "electronics_enclosure_billet": {
+  "by_category": {
+   "part": 1,
+   "setup": 1,
+   "thin_feature": 8
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "THIN_WALL": 8
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 21,
+  "features": {
+   "type_BLIND_HOLE": 4,
+   "type_CHAMFER": 4,
+   "type_COUNTERSINK": 4,
+   "type_FILLET": 5,
+   "type_O_RING_GLAND": 1,
+   "type_PATTERN": 2,
+   "type_POCKET": 1
+  },
+  "fixture": "electronics_enclosure_billet",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 8
+  }
+ },
+ "euro_lock_cylinder": {
+  "by_category": {
+   "hole": 2,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "HOLE_INTERSECTING": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 9,
+  "features": {
+   "type_BREAKTHROUGH_HOLE": 5,
+   "type_PATTERN": 1,
+   "type_SLOT": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "euro_lock_cylinder",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 1
+  }
+ },
+ "euro_lock_cylinder__seam37": {
+  "by_category": {
+   "hole": 2,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "HOLE_INTERSECTING": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 9,
+  "features": {
+   "type_BREAKTHROUGH_HOLE": 5,
+   "type_PATTERN": 1,
+   "type_SLOT": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "euro_lock_cylinder__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 1
+  }
+ },
+ "extruded_grip_rail": {
+  "by_category": {
+   "freeform": 1,
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FREEFORM_FINISHING": 1,
+   "PART_ASPECT_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "type_FREEFORM_SURFACE": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "extruded_grip_rail",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "fillet_edges": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "type_FILLET": 5
+  },
+  "fixture": "fillet_edges",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "five_axis_compound_angles": {
+  "by_category": {
+   "hole": 4,
+   "part": 1,
+   "setup": 1,
+   "thin_feature": 1,
+   "tool_access": 7
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_EDGE_DISTANCE": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "HOLE_INTERSECTING": 2,
+   "SETUP_COUNT_HIGH": 1,
+   "THIN_WALL": 1,
+   "TOOL_ACCESS_SPECIAL_SETUP": 4,
+   "UNDERCUT_PRESENT": 3
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 8,
+  "features": {
+   "type_BLIND_HOLE": 4,
+   "type_UNDERCUT": 4
+  },
+  "fixture": "five_axis_compound_angles",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 5,
+   "warn": 7
+  }
+ },
+ "fixture_plate_dowels": {
+  "by_category": {
+   "hole": 3,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "HOLE_INTERSECTING": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 18,
+  "features": {
+   "type_BLIND_HOLE": 4,
+   "type_PATTERN": 2,
+   "type_THROUGH_HOLE": 12
+  },
+  "fixture": "fixture_plate_dowels",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "flexure_thin_blade": {
+  "by_category": {
+   "part": 1,
+   "slot": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FLEXURE_SLIT_PROCESS": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_FLEXURE_SLIT": 2
+  },
+  "fixture": "flexure_thin_blade",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "floorless_engraved_logo": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_MARKING": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_MARKING_TEXT": 1
+  },
+  "fixture": "floorless_engraved_logo",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "four_axis_hex_block": {
+  "by_category": {
+   "part": 1,
+   "setup": 1,
+   "tool_access": 4
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "TOOL_ACCESS_SPECIAL_SETUP": 4
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "type_BLIND_HOLE": 6
+  },
+  "fixture": "four_axis_hex_block",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 5,
+   "warn": 0
+  }
+ },
+ "four_axis_hex_block__seam37": {
+  "by_category": {
+   "part": 1,
+   "setup": 1,
+   "tool_access": 4
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "TOOL_ACCESS_SPECIAL_SETUP": 4
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "type_BLIND_HOLE": 6
+  },
+  "fixture": "four_axis_hex_block__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 5,
+   "warn": 0
+  }
+ },
+ "four_sided_milled_block": {
+  "by_category": {
+   "part": 1,
+   "pocket": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "type_POCKET": 4,
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "four_sided_milled_block",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "freeform_revolved_nozzle": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_TURNED_PROFILE": 1
+  },
+  "fixture": "freeform_revolved_nozzle",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "freeform_transition_bracket": {
+  "by_category": {
+   "freeform": 1,
+   "part": 1,
+   "pocket": 1,
+   "setup": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FREEFORM_FINISHING": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "type_FREEFORM_SURFACE": 1,
+   "type_POCKET": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "freeform_transition_bracket",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 2
+  }
+ },
+ "gearbox_flange": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 9,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_CHAMFER": 1,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 6
+  },
+  "fixture": "gearbox_flange",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "gearbox_flange__seam37": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 9,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_CHAMFER": 1,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 6
+  },
+  "fixture": "gearbox_flange__seam37",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "grid_3x3": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 10,
+  "features": {
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 9
+  },
+  "fixture": "grid_3x3",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "grid_with_outliers": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 19,
+  "features": {
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 18
+  },
+  "fixture": "grid_with_outliers",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "heat_exchanger_tube_sheet": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "setup": 1,
+   "slot": 1,
+   "thin_feature": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "GROOVE_SQUARE_CORNER": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "THIN_WALL": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 242,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_CHAMFER": 116,
+   "type_O_RING_GLAND": 1,
+   "type_PATTERN": 2,
+   "type_STEP": 1,
+   "type_THROUGH_HOLE": 121
+  },
+  "fixture": "heat_exchanger_tube_sheet",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "heat_sink_finned_block": {
+  "by_category": {
+   "part": 1,
+   "rib": 1,
+   "slot": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "RIB_HEIGHT_ASPECT": 1,
+   "SLOT_NONSTANDARD_WIDTH": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 9,
+  "features": {
+   "type_RIB": 5,
+   "type_SLOT": 4
+  },
+  "fixture": "heat_sink_finned_block",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "high_removal": {
+  "by_category": {
+   "part": 2,
+   "pocket": 1,
+   "thin_feature": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "THIN_WALL": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "high_removal",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 4
+  }
+ },
+ "hole_breakout_into_pocket": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "tool_access": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_INTERSECTS_CAVITY": 1,
+   "SPHERICAL_POCKET_UNDERCUT": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_BREAKTHROUGH_HOLE": 1,
+   "type_SPHERICAL_POCKET": 1
+  },
+  "fixture": "hole_breakout_into_pocket",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "hole_breakout_into_pocket__seam37": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "tool_access": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_INTERSECTS_CAVITY": 1,
+   "SPHERICAL_POCKET_UNDERCUT": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_BREAKTHROUGH_HOLE": 1,
+   "type_SPHERICAL_POCKET": 1
+  },
+  "fixture": "hole_breakout_into_pocket__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "hole_countersink_angle": {
+  "by_category": {
+   "hole": 2,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_COUNTERSINK_ANGLE": 1,
+   "HOLE_DEPTH_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_COUNTERSINK": 1
+  },
+  "fixture": "hole_countersink_angle",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "hole_crosses_wide_cavity": {
+  "by_category": {
+   "hole": 2,
+   "part": 5
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "HOLE_MULTI_PASS": 1,
+   "SHARP_INTERNAL_EDGE": 4
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "hole_crosses_wide_cavity",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 5
+  }
+ },
+ "hole_intersecting": {
+  "by_category": {
+   "hole": 2,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "HOLE_INTERSECTING": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "hole_intersecting",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "hole_intersecting__seam37": {
+  "by_category": {
+   "hole": 2,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "HOLE_INTERSECTING": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "hole_intersecting__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "hole_partial_entry": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "hole_partial_entry",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "hole_partial_entry_blind": {
+  "by_category": {
+   "hole": 2,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "HOLE_PARTIAL_ENTRY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_BLIND_HOLE": 1
+  },
+  "fixture": "hole_partial_entry_blind",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "holes_near_edges": {
+  "by_category": {
+   "part": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "holes_near_edges",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "hydraulic_actuator_end_cap": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_EDGE_DISTANCE": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 8,
+  "features": {
+   "type_BLIND_HOLE": 5,
+   "type_COUNTERBORE": 1,
+   "type_O_RING_GLAND": 1,
+   "type_PATTERN": 1
+  },
+  "fixture": "hydraulic_actuator_end_cap",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "hydraulic_actuator_end_cap__seam37": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_EDGE_DISTANCE": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 8,
+  "features": {
+   "type_BLIND_HOLE": 5,
+   "type_COUNTERBORE": 1,
+   "type_O_RING_GLAND": 1,
+   "type_PATTERN": 1
+  },
+  "fixture": "hydraulic_actuator_end_cap__seam37",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "hydraulic_manifold_block": {
+  "by_category": {
+   "hole": 6,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 2,
+   "HOLE_FLAT_BOTTOM": 1,
+   "HOLE_INTERSECTING": 3,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_THROUGH_HOLE": 3
+  },
+  "fixture": "hydraulic_manifold_block",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 7
+  }
+ },
+ "hydraulic_manifold_block_v2": {
+  "by_category": {
+   "hole": 6,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 3,
+   "HOLE_INTERSECTING": 1,
+   "HOLE_WEB_THICKNESS": 2,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 51,
+  "features": {
+   "type_BLIND_HOLE": 40,
+   "type_BREAKTHROUGH_HOLE": 4,
+   "type_COUNTERBORE": 4,
+   "type_PATTERN": 3
+  },
+  "fixture": "hydraulic_manifold_block_v2",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 2,
+   "warn": 4
+  }
+ },
+ "hygienic_manifold_plate": {
+  "by_category": {
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 20,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_CHAMFER": 4,
+   "type_FILLET": 6,
+   "type_GROOVE": 1,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 6
+  },
+  "fixture": "hygienic_manifold_plate",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "hygienic_manifold_plate__seam37": {
+  "by_category": {
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 20,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_CHAMFER": 4,
+   "type_FILLET": 6,
+   "type_GROOVE": 1,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 6
+  },
+  "fixture": "hygienic_manifold_plate__seam37",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "impeller_blade_hub": {
+  "by_category": {
+   "freeform": 2,
+   "hole": 1,
+   "part": 1,
+   "tool_access": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FREEFORM_FINISHING": 1,
+   "FREEFORM_INTERNAL_RADIUS": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "TOOL_ACCESS_BLOCKED": 1,
+   "UNDERCUT_PRESENT": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 7,
+  "features": {
+   "type_FREEFORM_SURFACE": 3,
+   "type_THROUGH_HOLE": 1,
+   "type_UNDERCUT": 3
+  },
+  "fixture": "impeller_blade_hub",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 2,
+   "warn": 3
+  }
+ },
+ "inertial_sensor_housing": {
+  "by_category": {
+   "hole": 2,
+   "part": 5,
+   "pocket": 1,
+   "setup": 1,
+   "tool_access": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "HOLE_EDGE_DISTANCE": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "SHARP_INTERNAL_EDGE": 4,
+   "TOOL_ACCESS_SPECIAL_SETUP": 1,
+   "UNDERCUT_PRESENT": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 16,
+  "features": {
+   "type_BLIND_HOLE": 6,
+   "type_COUNTERBORE": 4,
+   "type_GROOVE": 1,
+   "type_PATTERN": 2,
+   "type_POCKET": 1,
+   "type_UNDERCUT": 2
+  },
+  "fixture": "inertial_sensor_housing",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 9
+  }
+ },
+ "injection_mold_cavity_pattern": {
+  "by_category": {
+   "blend": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "CUTTER_RADIUS_SUBOPTIMAL": 1,
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "type_PATTERN": 1,
+   "type_POCKET": 1,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "injection_mold_cavity_pattern",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "injection_mold_cavity_plate": {
+  "by_category": {
+   "hole": 5,
+   "part": 2,
+   "pocket": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 4,
+   "HOLE_INTERSECTING": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "SHARP_INTERNAL_EDGE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 26,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_BREAKTHROUGH_HOLE": 8,
+   "type_PATTERN": 2,
+   "type_POCKET": 4,
+   "type_THROUGH_HOLE": 10
+  },
+  "fixture": "injection_mold_cavity_plate",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 4,
+   "info": 2,
+   "warn": 3
+  }
+ },
+ "inspection_test_block": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "type_CHAMFER": 1,
+   "type_FILLET": 1,
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "inspection_test_block",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "inspection_test_block__seam37": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "type_CHAMFER": 1,
+   "type_FILLET": 1,
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "inspection_test_block__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "instrument_chassis": {
+  "by_category": {
+   "hole": 2,
+   "part": 1,
+   "pocket": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 2,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 25,
+  "features": {
+   "type_BLIND_HOLE": 12,
+   "type_PATTERN": 4,
+   "type_POCKET": 1,
+   "type_THROUGH_HOLE": 8
+  },
+  "fixture": "instrument_chassis",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 4
+  }
+ },
+ "instrument_front_panel": {
+  "by_category": {
+   "sheet": 4
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_HOLE_SMALL": 2,
+   "SHEET_THICKNESS_OUT_OF_RANGE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 12,
+  "features": {
+   "type_COUNTERSINK": 4,
+   "type_MARKING_TEXT": 3,
+   "type_PATTERN": 1,
+   "type_THROUGH_CAVITY": 1,
+   "type_THROUGH_HOLE": 3
+  },
+  "fixture": "instrument_front_panel",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "interacting_features": {
+  "by_category": {
+   "part": 1,
+   "pocket": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_POCKET": 1,
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "interacting_features",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "iso_k_vacuum_flange": {
+  "by_category": {
+   "blend": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "CHAMFER_NONSTANDARD_ANGLE": 1,
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 45,
+  "features": {
+   "type_BLIND_HOLE": 4,
+   "type_CHAMFER": 23,
+   "type_FILLET": 2,
+   "type_GROOVE": 5,
+   "type_PATTERN": 2,
+   "type_THROUGH_HOLE": 9
+  },
+  "fixture": "iso_k_vacuum_flange",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "kitchen_sink": {
+  "by_category": {
+   "part": 1,
+   "pocket": 1,
+   "slot": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 2,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 7,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_CHAMFER": 1,
+   "type_FILLET": 1,
+   "type_POCKET": 1,
+   "type_SLOT": 1,
+   "type_STEP": 1,
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "kitchen_sink",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "knurl_neg_flatted_shaft": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "KNURL_PRESENT": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "subtype_straight": 1,
+   "type_KNURL": 1,
+   "type_STEP": 2
+  },
+  "fixture": "knurl_neg_flatted_shaft",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "knurl_neg_flatted_shaft__seam73": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "KNURL_PRESENT": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "subtype_straight": 1,
+   "type_KNURL": 1,
+   "type_STEP": 2
+  },
+  "fixture": "knurl_neg_flatted_shaft__seam73",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "knurled_grip_shaft": {
+  "by_category": {
+   "part": 4,
+   "thin_feature": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "KNURL_PRESENT": 2,
+   "PART_ASPECT_RATIO": 1,
+   "THIN_WALL": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "subtype_straight": 2,
+   "type_KNURL": 2,
+   "type_O_RING_GLAND": 1,
+   "type_SLOT": 1
+  },
+  "fixture": "knurled_grip_shaft",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 3,
+   "warn": 1
+  }
+ },
+ "knurled_grip_shaft__seam37": {
+  "by_category": {
+   "part": 4,
+   "thin_feature": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "KNURL_PRESENT": 2,
+   "PART_ASPECT_RATIO": 1,
+   "THIN_WALL": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "subtype_straight": 2,
+   "type_KNURL": 2,
+   "type_O_RING_GLAND": 1,
+   "type_SLOT": 1
+  },
+  "fixture": "knurled_grip_shaft__seam37",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 3,
+   "warn": 1
+  }
+ },
+ "l_slot": {
+  "by_category": {
+   "part": 1,
+   "slot": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_SLOT": 1
+  },
+  "fixture": "l_slot",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "lightweight_grid_panel": {
+  "by_category": {
+   "part": 9
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1,
+   "PART_ASPECT_RATIO": 1,
+   "SHARP_INTERNAL_EDGE": 6
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 9,
+  "features": {
+   "type_STEP": 9
+  },
+  "fixture": "lightweight_grid_panel",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 8
+  }
+ },
+ "linear_array_3x": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 3
+  },
+  "fixture": "linear_array_3x",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "linear_rail_block": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_EDGE_DISTANCE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 10,
+  "features": {
+   "type_COUNTERBORE": 6,
+   "type_PATTERN": 1,
+   "type_SLOT": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "linear_rail_block",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "long_slot": {
+  "by_category": {
+   "part": 1,
+   "slot": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_SLOT": 1
+  },
+  "fixture": "long_slot",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "machine_base_angle_plate": {
+  "by_category": {
+   "part": 1,
+   "rib": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "RIB_HEIGHT_ASPECT": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_RIB": 1
+  },
+  "fixture": "machine_base_angle_plate",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "micro_fluidic_channels": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "pocket": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "POCKET_NARROW_OPENING": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 18,
+  "features": {
+   "type_PATTERN": 2,
+   "type_POCKET": 4,
+   "type_THROUGH_HOLE": 12
+  },
+  "fixture": "micro_fluidic_channels",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "minimum_feature_size": {
+  "by_category": {
+   "part": 2,
+   "pocket": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "MINIMUM_FEATURE_SIZE": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "POCKET_DEPTH_RATIO": 1,
+   "POCKET_NARROW_OPENING": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "minimum_feature_size",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "molded_style_cover": {
+  "by_category": {
+   "freeform": 1,
+   "part": 9
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FREEFORM_FINISHING": 1,
+   "SHARP_INTERNAL_EDGE": 8
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "type_FREEFORM_SURFACE": 2,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "molded_style_cover",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 8
+  }
+ },
+ "mtb_handlebar_stem": {
+  "by_category": {
+   "part": 1,
+   "pocket": 1,
+   "setup": 1,
+   "slot": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FLEXURE_SLIT_PROCESS": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 11,
+  "features": {
+   "type_BLIND_HOLE": 4,
+   "type_FLEXURE_SLIT": 1,
+   "type_PARTIAL_BORE": 1,
+   "type_PATTERN": 1,
+   "type_POCKET": 1,
+   "type_THROUGH_HOLE": 3
+  },
+  "fixture": "mtb_handlebar_stem",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "multi_pocket_stepped": {
+  "by_category": {
+   "part": 1,
+   "pocket": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_POCKET": 2
+  },
+  "fixture": "multi_pocket_stepped",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "nist_ctc_01": {
+  "by_category": {
+   "part": 2,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 34,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_CHAMFER": 1,
+   "type_FILLET": 19,
+   "type_PATTERN": 2,
+   "type_THROUGH_CAVITY": 2,
+   "type_THROUGH_HOLE": 8
+  },
+  "fixture": "nist_ctc_01",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {
+   "datum_resolved": 3,
+   "dimension_drawing_only": 5,
+   "dimension_valued": 8,
+   "tol_flatness": 1,
+   "tol_perpendicularity": 1,
+   "tol_position": 2,
+   "tol_profile_surface": 2
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "nist_ctc_02": {
+  "by_category": {
+   "freeform": 1,
+   "part": 2,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FREEFORM_FINISHING": 1,
+   "MATERIAL_REMOVAL": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 180,
+  "features": {
+   "type_BLIND_HOLE": 74,
+   "type_BOSS": 5,
+   "type_COUNTERBORE": 10,
+   "type_FILLET": 87,
+   "type_FREEFORM_SURFACE": 2,
+   "type_GROOVE": 1,
+   "type_THROUGH_CAVITY": 1
+  },
+  "fixture": "nist_ctc_02",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {
+   "datum_resolved": 6,
+   "datum_target": 9,
+   "dimension_valued": 7,
+   "note": 1,
+   "tol_flatness": 1,
+   "tol_perpendicularity": 3,
+   "tol_position": 4,
+   "tol_profile_line": 1,
+   "tol_profile_surface": 13
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "nist_ctc_02_logo": {
+  "by_category": {
+   "freeform": 1,
+   "part": 3,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FREEFORM_FINISHING": 1,
+   "MATERIAL_REMOVAL": 1,
+   "PART_MARKING": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 177,
+  "features": {
+   "type_BLIND_HOLE": 74,
+   "type_BOSS": 5,
+   "type_COUNTERBORE": 10,
+   "type_DRAFT_FACE": 2,
+   "type_FILLET": 81,
+   "type_FREEFORM_SURFACE": 2,
+   "type_GROOVE": 1,
+   "type_MARKING_TEXT": 1,
+   "type_THROUGH_CAVITY": 1
+  },
+  "fixture": "nist_ctc_02_logo",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 3,
+   "warn": 1
+  }
+ },
+ "nist_ctc_03": {
+  "by_category": {
+   "sheet": 1
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 27,
+  "features": {
+   "bend_family_cylindrical": 7,
+   "is_hem_false": 7,
+   "type_BEND": 7,
+   "type_PATTERN": 3,
+   "type_THROUGH_CAVITY": 2,
+   "type_THROUGH_HOLE": 15
+  },
+  "fixture": "nist_ctc_03",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {
+   "datum_resolved": 5,
+   "dimension_drawing_only": 1,
+   "dimension_valued": 9,
+   "tol_angularity": 1,
+   "tol_perpendicularity": 2,
+   "tol_position": 6,
+   "tol_profile_surface": 3
+  },
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "nist_ctc_04": {
+  "by_category": {
+   "part": 1,
+   "setup": 1,
+   "tool_access": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "TOOL_ACCESS_SPECIAL_SETUP": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 181,
+  "features": {
+   "type_BLIND_HOLE": 14,
+   "type_CHAMFER": 62,
+   "type_COUNTERBORE": 4,
+   "type_FILLET": 62,
+   "type_PATTERN": 3,
+   "type_THREADED_HOLE": 4,
+   "type_THROUGH_HOLE": 32
+  },
+  "fixture": "nist_ctc_04",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {
+   "datum_resolved": 8,
+   "dimension_valued": 9,
+   "tol_position": 3,
+   "tol_profile_surface": 3
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 1
+  }
+ },
+ "nist_ctc_05": {
+  "by_category": {
+   "part": 3,
+   "setup": 1,
+   "thread": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1,
+   "PART_MARKING": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "THREAD_RUNOUT": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 38,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_COUNTERBORE": 10,
+   "type_FILLET": 12,
+   "type_MARKING_TEXT": 1,
+   "type_PATTERN": 2,
+   "type_STEP": 2,
+   "type_THREADED_HOLE": 10
+  },
+  "fixture": "nist_ctc_05",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {
+   "datum_resolved": 2,
+   "datum_target": 2,
+   "dimension_valued": 6,
+   "note": 2,
+   "tol_circular_runout": 3,
+   "tol_circularity": 1,
+   "tol_concentricity": 1,
+   "tol_perpendicularity": 2,
+   "tol_straightness": 1,
+   "tol_total_runout": 2
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "nist_ftc_06": {
+  "by_category": {
+   "part": 2,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_MARKING": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 43,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_BOSS": 4,
+   "type_COUNTERBORE": 10,
+   "type_FILLET": 21,
+   "type_MARKING_TEXT": 1,
+   "type_PATTERN": 2,
+   "type_SLOT": 2,
+   "type_SPHERICAL_POCKET": 1
+  },
+  "fixture": "nist_ftc_06",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {
+   "datum_resolved": 6,
+   "datum_target": 6,
+   "dimension_valued": 24,
+   "note": 1,
+   "tol_flatness": 3,
+   "tol_perpendicularity": 2,
+   "tol_position": 11,
+   "tol_profile_surface": 11
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "nist_ftc_07": {
+  "by_category": {
+   "freeform": 1,
+   "part": 2,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FREEFORM_INTERNAL_RADIUS": 1,
+   "MATERIAL_REMOVAL": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 76,
+  "features": {
+   "type_BLIND_HOLE": 8,
+   "type_BOSS": 4,
+   "type_COUNTERBORE": 4,
+   "type_FILLET": 45,
+   "type_PATTERN": 4,
+   "type_THROUGH_HOLE": 11
+  },
+  "fixture": "nist_ftc_07",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {
+   "datum_resolved": 5,
+   "dimension_valued": 17,
+   "tol_parallelism": 1,
+   "tol_perpendicularity": 1,
+   "tol_position": 12,
+   "tol_profile_surface": 11
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "nist_ftc_08": {
+  "by_category": {
+   "part": 3,
+   "setup": 1,
+   "thin_feature": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1,
+   "PART_MARKING": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "THIN_WALL": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 74,
+  "features": {
+   "type_FILLET": 46,
+   "type_MARKING_TEXT": 1,
+   "type_PATTERN": 1,
+   "type_THROUGH_CAVITY": 4,
+   "type_THROUGH_HOLE": 22
+  },
+  "fixture": "nist_ftc_08",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {
+   "datum_resolved": 11,
+   "dimension_valued": 6,
+   "note": 2,
+   "tol_flatness": 2,
+   "tol_parallelism": 5,
+   "tol_perpendicularity": 1,
+   "tol_position": 5,
+   "tol_profile_surface": 10
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 3,
+   "warn": 2
+  }
+ },
+ "nist_ftc_09": {
+  "by_category": {
+   "gdt": 25,
+   "sheet": 1
+  },
+  "by_rule": {
+   "GDT_SURFACE_FINISH_CONFLICT": 1,
+   "GDT_TOLERANCE_ACHIEVABLE": 24,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 37,
+  "features": {
+   "type_MARKING_TEXT": 1,
+   "type_PATTERN": 2,
+   "type_THROUGH_CAVITY": 5,
+   "type_THROUGH_HOLE": 29
+  },
+  "fixture": "nist_ftc_09",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {
+   "datum_resolved": 8,
+   "dimension_valued": 22,
+   "note": 3,
+   "tol_flatness": 1,
+   "tol_perpendicularity": 4,
+   "tol_position": 23,
+   "tol_profile_surface": 3
+  },
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 25
+  }
+ },
+ "nist_ftc_10": {
+  "by_category": {
+   "freeform": 1,
+   "hole": 3,
+   "part": 1,
+   "setup": 1,
+   "thin_feature": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FREEFORM_INTERNAL_RADIUS": 1,
+   "HOLE_DEPTH_RATIO": 2,
+   "HOLE_INTERSECTING": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "THIN_WALL": 3
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 67,
+  "features": {
+   "type_BLIND_HOLE": 8,
+   "type_BOSS": 4,
+   "type_BREAKTHROUGH_HOLE": 14,
+   "type_COUNTERBORE": 8,
+   "type_FILLET": 26,
+   "type_PATTERN": 3,
+   "type_SLOT": 4
+  },
+  "fixture": "nist_ftc_10",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {
+   "datum_resolved": 11,
+   "dimension_valued": 23,
+   "tol_cylindricity": 2,
+   "tol_flatness": 1,
+   "tol_perpendicularity": 6,
+   "tol_position": 16,
+   "tol_profile_surface": 9,
+   "tol_symmetry": 1
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 2,
+   "warn": 6
+  }
+ },
+ "nist_ftc_11": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_MARKING": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "type_FILLET": 2,
+   "type_MARKING_TEXT": 1,
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "nist_ftc_11",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {
+   "datum_resolved": 2,
+   "dimension_valued": 6,
+   "note": 2,
+   "tol_circular_runout": 1,
+   "tol_circularity": 1,
+   "tol_flatness": 1,
+   "tol_profile_surface": 1
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "nonstandard_hole": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_NONSTANDARD_DIAMETER": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "nonstandard_hole",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "off_cardinal_viz_block": {
+  "by_category": {
+   "boss": 1,
+   "hole": 3,
+   "part": 2,
+   "setup": 1,
+   "tool_access": 9
+  },
+  "by_rule": {
+   "BOSS_UNDERCUT": 1,
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "HOLE_EDGE_DISTANCE": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "SHARP_INTERNAL_EDGE": 1,
+   "SPHERICAL_POCKET_UNDERCUT": 1,
+   "TOOL_ACCESS_SPECIAL_SETUP": 5,
+   "UNDERCUT_PRESENT": 3
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 12,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_BOSS": 1,
+   "type_COUNTERBORE": 1,
+   "type_COUNTERSINK": 1,
+   "type_FILLET": 1,
+   "type_SPHERICAL_POCKET": 2,
+   "type_THROUGH_HOLE": 1,
+   "type_UNDERCUT": 4
+  },
+  "fixture": "off_cardinal_viz_block",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 6,
+   "warn": 9
+  }
+ },
+ "off_cardinal_viz_block__seam37": {
+  "by_category": {
+   "boss": 1,
+   "hole": 3,
+   "part": 2,
+   "setup": 1,
+   "tool_access": 9
+  },
+  "by_rule": {
+   "BOSS_UNDERCUT": 1,
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "HOLE_EDGE_DISTANCE": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "SHARP_INTERNAL_EDGE": 1,
+   "SPHERICAL_POCKET_UNDERCUT": 1,
+   "TOOL_ACCESS_SPECIAL_SETUP": 5,
+   "UNDERCUT_PRESENT": 3
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 12,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_BOSS": 1,
+   "type_COUNTERBORE": 1,
+   "type_COUNTERSINK": 1,
+   "type_FILLET": 1,
+   "type_SPHERICAL_POCKET": 2,
+   "type_THROUGH_HOLE": 1,
+   "type_UNDERCUT": 4
+  },
+  "fixture": "off_cardinal_viz_block__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 6,
+   "warn": 9
+  }
+ },
+ "optical_periscope_housing": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "pocket": 1,
+   "setup": 1,
+   "slot": 3,
+   "thin_feature": 3,
+   "tool_access": 8
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 2,
+   "SETUP_COUNT_HIGH": 1,
+   "SLOT_DEPTH_RATIO": 1,
+   "SLOT_OVERHANG": 1,
+   "THIN_WALL": 3,
+   "TOOL_ACCESS_SPECIAL_SETUP": 2,
+   "UNDERCUT_PRESENT": 6
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 31,
+  "features": {
+   "type_BLIND_HOLE": 5,
+   "type_PATTERN": 2,
+   "type_POCKET": 1,
+   "type_SLOT": 10,
+   "type_THROUGH_HOLE": 5,
+   "type_UNDERCUT": 8
+  },
+  "fixture": "optical_periscope_housing",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 3,
+   "warn": 13
+  }
+ },
+ "optics_spider_mount": {
+  "by_category": {
+   "part": 2,
+   "rib": 1,
+   "setup": 1,
+   "slot": 2,
+   "thin_feature": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FLEXURE_SLIT_PROCESS": 1,
+   "MATERIAL_REMOVAL": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "RIB_HEIGHT_ASPECT": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "THIN_WALL": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 16,
+  "features": {
+   "type_COUNTERBORE": 5,
+   "type_FLEXURE_SLIT": 4,
+   "type_PATTERN": 1,
+   "type_RIB": 4,
+   "type_SLOT": 2
+  },
+  "fixture": "optics_spider_mount",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 3,
+   "warn": 3
+  }
+ },
+ "photonic_fiber_v_groove_array": {
+  "by_category": {
+   "part": 2,
+   "setup": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SHARP_INTERNAL_EDGE": 1,
+   "SMALL_PART_HOLDING": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 10,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_V_GROOVE": 8
+  },
+  "fixture": "photonic_fiber_v_groove_array",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "pmi_casting_datum_plate": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "pmi_casting_datum_plate",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {
+   "datum_resolved": 1,
+   "datum_target": 3,
+   "tol_position": 1
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "pmi_flatness_cover_plate": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "pmi_flatness_cover_plate",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {
+   "datum_resolved": 1,
+   "tol_flatness": 1,
+   "tol_parallelism": 1
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "pmi_position_flange_plate": {
+  "by_category": {
+   "gdt": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "GDT_TOLERANCE_ACHIEVABLE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 5
+  },
+  "fixture": "pmi_position_flange_plate",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {
+   "datum_resolved": 2,
+   "tol_position": 1
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "pmi_torture_gauntlet": {
+  "by_category": {
+   "gdt": 7,
+   "hole": 4,
+   "part": 1,
+   "pocket": 1,
+   "thread": 9
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "GDT_SURFACE_FINISH_CONFLICT": 2,
+   "GDT_TOLERANCE_ACHIEVABLE": 5,
+   "HOLE_FLAT_BOTTOM": 4,
+   "POCKET_CORNER_RADIUS": 1,
+   "THREAD_PMI_GEOMETRY_MISMATCH": 1,
+   "THREAD_RELIEF_WIDTH": 1,
+   "THREAD_RUNOUT": 4,
+   "THREAD_SHOULDER_PROXIMITY": 2,
+   "THREAD_WALL_THICKNESS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 18,
+  "features": {
+   "type_BOSS": 1,
+   "type_CHAMFER": 2,
+   "type_COUNTERBORE": 1,
+   "type_PATTERN": 1,
+   "type_POCKET": 1,
+   "type_THREADED_HOLE": 6,
+   "type_THREAD_RELIEF_GROOVE": 1,
+   "type_THROUGH_HOLE": 5
+  },
+  "fixture": "pmi_torture_gauntlet",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {
+   "datum_resolved": 2,
+   "datum_target": 3,
+   "dimension_valued": 7,
+   "tol_angularity": 1,
+   "tol_circularity": 1,
+   "tol_concentricity": 1,
+   "tol_cylindricity": 1,
+   "tol_flatness": 1,
+   "tol_parallelism": 1,
+   "tol_perpendicularity": 1,
+   "tol_position": 1,
+   "tol_profile_surface": 1,
+   "tol_straightness": 1,
+   "tol_symmetry": 1,
+   "tol_total_runout": 1
+  },
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 1,
+   "warn": 19
+  }
+ },
+ "pocket_aspect_ratio": {
+  "by_category": {
+   "part": 1,
+   "pocket": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "POCKET_DEPTH_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "pocket_aspect_ratio",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "pocket_chamfered_top": {
+  "by_category": {
+   "part": 1,
+   "pocket": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_CHAMFER": 1,
+   "type_POCKET": 1
+  },
+  "fixture": "pocket_chamfered_top",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "pocket_edm_inner_corner": {
+  "by_category": {
+   "blend": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "CUTTER_RADIUS_INFEASIBLE": 1,
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "pocket_edm_inner_corner",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "pocket_filleted_corners": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "pocket_filleted_corners",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "pocket_island": {
+  "by_category": {
+   "part": 1,
+   "pocket": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_BOSS": 1,
+   "type_POCKET": 1
+  },
+  "fixture": "pocket_island",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "pocket_multiple_floor_levels": {
+  "by_category": {
+   "part": 1,
+   "pocket": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_POCKET": 2
+  },
+  "fixture": "pocket_multiple_floor_levels",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "pocket_narrow_opening": {
+  "by_category": {
+   "part": 1,
+   "slot": 4
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SLOT_DEPTH_RATIO": 1,
+   "SLOT_NONSTANDARD_WIDTH": 1,
+   "SLOT_OVERHANG": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_SLOT": 1
+  },
+  "fixture": "pocket_narrow_opening",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 4
+  }
+ },
+ "precision_optical_mount": {
+  "by_category": {
+   "hole": 2,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "HOLE_FLAT_BOTTOM": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 11,
+  "features": {
+   "type_BLIND_HOLE": 4,
+   "type_FILLET": 1,
+   "type_PATTERN": 2,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "precision_optical_mount",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "precision_spindle_end_cap": {
+  "by_category": {
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 17,
+  "features": {
+   "type_BOSS": 1,
+   "type_CHAMFER": 2,
+   "type_COUNTERSINK": 4,
+   "type_FILLET": 2,
+   "type_GROOVE": 2,
+   "type_O_RING_GLAND": 1,
+   "type_PATTERN": 1,
+   "type_RETAINING_RING_GROOVE": 1,
+   "type_SPHERICAL_POCKET": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "precision_spindle_end_cap",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "profiled_spindle_tight_valley": {
+  "by_category": {
+   "freeform": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "TURNED_PROFILE_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_TURNED_PROFILE": 1
+  },
+  "fixture": "profiled_spindle_tight_valley",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "progressive_die_punch": {
+  "by_category": {
+   "hole": 1,
+   "part": 21,
+   "pocket": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SHARP_INTERNAL_EDGE": 20
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 8,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_PATTERN": 1,
+   "type_THROUGH_CAVITY": 1,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "progressive_die_punch",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 22
+  }
+ },
+ "pump_cover_part_marking": {
+  "by_category": {
+   "part": 5,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 2,
+   "RAISED_TEXT_MACHINED_FACE": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 19,
+  "features": {
+   "type_CHAMFER": 10,
+   "type_MARKING_TEXT": 2,
+   "type_PATTERN": 1,
+   "type_POCKET": 1,
+   "type_THROUGH_HOLE": 5
+  },
+  "fixture": "pump_cover_part_marking",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 4,
+   "warn": 2
+  }
+ },
+ "radial_bolt_pattern_hub": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 11,
+  "features": {
+   "type_BLIND_HOLE": 8,
+   "type_CHAMFER": 1,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "radial_bolt_pattern_hub",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "rectangular_pocket": {
+  "by_category": {
+   "part": 1,
+   "pocket": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "rectangular_pocket",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "relieved_logo_plaque": {
+  "by_category": {
+   "part": 4
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 1,
+   "RAISED_TEXT_MACHINED_FACE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_MARKING_TEXT": 1
+  },
+  "fixture": "relieved_logo_plaque",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "rib_on_plate": {
+  "by_category": {
+   "part": 2,
+   "rib": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1,
+   "RIB_HEIGHT_ASPECT": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_RIB": 1
+  },
+  "fixture": "rib_on_plate",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "robotic_gripper_finger": {
+  "by_category": {
+   "hole": 6,
+   "part": 1,
+   "pocket": 1,
+   "setup": 1,
+   "thin_feature": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_EDGE_DISTANCE": 1,
+   "HOLE_FLAT_BOTTOM": 4,
+   "HOLE_WEB_THICKNESS": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "THIN_WALL": 3
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 18,
+  "features": {
+   "type_BLIND_HOLE": 9,
+   "type_PARTIAL_BORE": 6,
+   "type_PATTERN": 1,
+   "type_POCKET": 2
+  },
+  "fixture": "robotic_gripper_finger",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 1,
+   "warn": 9
+  }
+ },
+ "sculpted_lid_thin_web": {
+  "by_category": {
+   "freeform": 1,
+   "part": 1,
+   "pocket": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FREEFORM_FINISHING": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "type_FREEFORM_SURFACE": 1,
+   "type_POCKET": 2
+  },
+  "fixture": "sculpted_lid_thin_web",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "sealed_void": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SEALED_VOID": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 0,
+  "features": {},
+  "fixture": "sealed_void",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "sealed_void__seam37": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SEALED_VOID": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 0,
+  "features": {},
+  "fixture": "sealed_void__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "sensor_housing": {
+  "by_category": {
+   "part": 1,
+   "pocket": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 10,
+  "features": {
+   "type_PATTERN": 1,
+   "type_POCKET": 1,
+   "type_THROUGH_HOLE": 8
+  },
+  "fixture": "sensor_housing",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "servo_coupling_clamp": {
+  "by_category": {
+   "hole": 2,
+   "part": 1,
+   "setup": 1,
+   "slot": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FLEXURE_SLIT_PROCESS": 1,
+   "HOLE_INTERSECTING": 2,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_COUNTERBORE": 2,
+   "type_FLEXURE_SLIT": 2
+  },
+  "fixture": "servo_coupling_clamp",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 3
+  }
+ },
+ "servo_coupling_clamp__seam37": {
+  "by_category": {
+   "hole": 2,
+   "part": 1,
+   "setup": 1,
+   "slot": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "FLEXURE_SLIT_PROCESS": 1,
+   "HOLE_INTERSECTING": 2,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_COUNTERBORE": 2,
+   "type_FLEXURE_SLIT": 2
+  },
+  "fixture": "servo_coupling_clamp__seam37",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 3
+  }
+ },
+ "setup_count_high": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "type_BLIND_HOLE": 4
+  },
+  "fixture": "setup_count_high",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "shaft_endcap": {
+  "by_category": {
+   "hole": 2,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "HOLE_INTERSECTING": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 8,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_CHAMFER": 1,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "shaft_endcap",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "shaft_endcap__seam37": {
+  "by_category": {
+   "hole": 2,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "HOLE_INTERSECTING": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 8,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_CHAMFER": 1,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "shaft_endcap__seam37",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "sheet_metal_bracket": {
+  "by_category": {
+   "sheet": 1
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "sheet_metal_bracket",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "sheet_metal_channel": {
+  "by_category": {
+   "sheet": 1
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "bend_family_cylindrical": 2,
+   "is_hem_false": 2,
+   "type_BEND": 2,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 3
+  },
+  "fixture": "sheet_metal_channel",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "simple_box": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 0,
+  "features": {},
+  "fixture": "simple_box",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "single_datum_dome": {
+  "by_category": {
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "NO_PARALLEL_DATUM_PAIR": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 0,
+  "features": {},
+  "fixture": "single_datum_dome",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "single_datum_dome__seam37": {
+  "by_category": {
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "NO_PARALLEL_DATUM_PAIR": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 0,
+  "features": {},
+  "fixture": "single_datum_dome__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "slot_filleted_corner": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_SLOT": 1
+  },
+  "fixture": "slot_filleted_corner",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "slot_nonstandard_width": {
+  "by_category": {
+   "part": 1,
+   "slot": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SLOT_NONSTANDARD_WIDTH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_SLOT": 1
+  },
+  "fixture": "slot_nonstandard_width",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "sm_bend_angle_135": {
+  "by_category": {
+   "sheet": 1
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1
+  },
+  "fixture": "sm_bend_angle_135",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "sm_bend_angle_heavy": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_BEND_ANGLE_EXTREME": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1
+  },
+  "fixture": "sm_bend_angle_heavy",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "sm_bend_radius_pair": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_BEND_RADIUS_SMALL": 2,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "bend_family_cylindrical": 2,
+   "is_hem_false": 2,
+   "type_BEND": 2
+  },
+  "fixture": "sm_bend_radius_pair",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "sm_closed_channel": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_CLOSED_FLANGE_LOOP": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "bend_family_cylindrical": 4,
+   "is_hem_false": 4,
+   "type_BEND": 4
+  },
+  "fixture": "sm_closed_channel",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "sm_corner_box": {
+  "by_category": {
+   "sheet": 4
+  },
+  "by_rule": {
+   "SHEET_BEND_RELIEF_MISSING": 2,
+   "SHEET_CORNER_RELIEF_MISSING": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "bend_family_cylindrical": 2,
+   "is_hem_false": 2,
+   "type_BEND": 2
+  },
+  "fixture": "sm_corner_box",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "sm_corner_relief_round": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_BEND_RELIEF_MISSING": 2,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "bend_family_cylindrical": 2,
+   "is_hem_false": 2,
+   "type_BEND": 2,
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "sm_corner_relief_round",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "sm_countersunk_panel": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_COUNTERSINK_DEEP": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1,
+   "type_COUNTERSINK": 2
+  },
+  "fixture": "sm_countersunk_panel",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "sm_csk_knife_edge": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_COUNTERSINK_DEEP": 2,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1,
+   "type_COUNTERSINK": 3,
+   "type_PATTERN": 1
+  },
+  "fixture": "sm_csk_knife_edge",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "sm_curved_bead": {
+  "by_category": {
+   "sheet": 4
+  },
+  "by_rule": {
+   "SHEET_EMBOSS_DEEP": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_0": 2,
+   "subtype_emboss": 2,
+   "type_BEND": 1,
+   "type_SHEET_FORMED": 2
+  },
+  "fixture": "sm_curved_bead",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 1
+  }
+ },
+ "sm_diagonal_bend": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_BEND_LONGER_THAN_BODY": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1
+  },
+  "fixture": "sm_diagonal_bend",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "sm_e_chassis": {
+  "by_category": {
+   "sheet": 8
+  },
+  "by_rule": {
+   "SHEET_BEND_RELIEF_MISSING": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 2,
+   "SHEET_HOLE_NEAR_BEND": 1,
+   "SHEET_HOLE_PITCH": 1,
+   "SHEET_HOLE_SMALL": 1,
+   "SHEET_LOUVER_TALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 39,
+  "features": {
+   "bend_family_cylindrical": 5,
+   "is_hem_false": 4,
+   "is_hem_true": 1,
+   "open_edges_1": 5,
+   "subtype_louver": 5,
+   "type_BEND": 5,
+   "type_FREEFORM_SURFACE": 10,
+   "type_NOTCH": 1,
+   "type_PATTERN": 1,
+   "type_SHEET_FORMED": 5,
+   "type_THROUGH_CAVITY": 3,
+   "type_THROUGH_HOLE": 14
+  },
+  "fixture": "sm_e_chassis",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 5
+  }
+ },
+ "sm_emboss_field": {
+  "by_category": {
+   "sheet": 5
+  },
+  "by_rule": {
+   "SHEET_EMBOSS_DEEP": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 2,
+   "SHEET_FORMED_PITCH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 5,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_0": 4,
+   "subtype_emboss": 4,
+   "type_BEND": 1,
+   "type_SHEET_FORMED": 4
+  },
+  "fixture": "sm_emboss_field",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 2
+  }
+ },
+ "sm_emboss_freeform": {
+  "by_category": {
+   "sheet": 4
+  },
+  "by_rule": {
+   "SHEET_EMBOSS_DEEP": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 7,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_0": 2,
+   "subtype_emboss": 2,
+   "type_BEND": 1,
+   "type_FREEFORM_SURFACE": 4,
+   "type_SHEET_FORMED": 2
+  },
+  "fixture": "sm_emboss_freeform",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 1
+  }
+ },
+ "sm_emboss_gallery": {
+  "by_category": {
+   "sheet": 4
+  },
+  "by_rule": {
+   "SHEET_EMBOSS_DEEP": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_0": 3,
+   "subtype_emboss": 3,
+   "type_BEND": 1,
+   "type_SHEET_FORMED": 3
+  },
+  "fixture": "sm_emboss_gallery",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 1
+  }
+ },
+ "sm_flange_ladder": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FLANGE_SHORT": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "bend_family_cylindrical": 2,
+   "is_hem_false": 2,
+   "type_BEND": 2
+  },
+  "fixture": "sm_flange_ladder",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "sm_fold_conical": {
+  "by_category": {
+   "sheet": 1
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "bend_family_conical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1
+  },
+  "fixture": "sm_fold_conical",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "sm_fold_conical_and_brake": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_BEND_RADIUS_SMALL": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "bend_family_conical": 1,
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 2,
+   "type_BEND": 2
+  },
+  "fixture": "sm_fold_conical_and_brake",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "sm_fold_curl_225": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_BEND_OPERATIONS": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FLANGE_SHORT": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1
+  },
+  "fixture": "sm_fold_curl_225",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "sm_fold_rolled": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_BEND_OPERATIONS": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "bend_family_rolled": 3,
+   "type_BEND": 3
+  },
+  "fixture": "sm_fold_rolled",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "sm_fold_rolled_and_brake": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_BEND_OPERATIONS": 1,
+   "SHEET_BEND_RADIUS_SMALL": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "bend_family_rolled": 3,
+   "is_hem_false": 1,
+   "type_BEND": 4
+  },
+  "fixture": "sm_fold_rolled_and_brake",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "sm_fold_u_channel": {
+  "by_category": {
+   "sheet": 1
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "bend_family_cylindrical": 2,
+   "is_hem_false": 2,
+   "type_BEND": 2
+  },
+  "fixture": "sm_fold_u_channel",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "sm_fold_z_bracket": {
+  "by_category": {
+   "sheet": 1
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "bend_family_cylindrical": 2,
+   "is_hem_false": 2,
+   "type_BEND": 2
+  },
+  "fixture": "sm_fold_z_bracket",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "sm_formed_shapes": {
+  "by_category": {
+   "sheet": 6
+  },
+  "by_rule": {
+   "SHEET_EMBOSS_DEEP": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 2,
+   "SHEET_FORMED_NEAR_BEND": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_0": 3,
+   "subtype_emboss": 3,
+   "type_BEND": 1,
+   "type_SHEET_FORMED": 3
+  },
+  "fixture": "sm_formed_shapes",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 3
+  }
+ },
+ "sm_gauge_below_floor": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_THICKNESS_OUT_OF_RANGE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1
+  },
+  "fixture": "sm_gauge_below_floor",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "sm_gauge_range": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_THICKNESS_OUT_OF_RANGE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1
+  },
+  "fixture": "sm_gauge_range",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "sm_gauge_steel_ceiling": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_THICKNESS_OUT_OF_RANGE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1
+  },
+  "fixture": "sm_gauge_steel_ceiling",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "sm_hd_bracket": {
+  "by_category": {
+   "sheet": 8
+  },
+  "by_rule": {
+   "SHEET_BEND_ANGLE_EXTREME": 1,
+   "SHEET_BEND_OPERATIONS": 1,
+   "SHEET_BEND_RELIEF_MISSING": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_HEM_DIMENSIONS": 1,
+   "SHEET_HOLE_SMALL": 1,
+   "SHEET_SHARP_FOLD": 1,
+   "SHEET_TAB_NARROW": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 17,
+  "features": {
+   "bend_family_cylindrical": 5,
+   "bend_family_sharp": 1,
+   "is_hem_false": 3,
+   "is_hem_true": 2,
+   "type_BEND": 6,
+   "type_NOTCH": 2,
+   "type_PATTERN": 1,
+   "type_TAB": 1,
+   "type_THROUGH_CAVITY": 2,
+   "type_THROUGH_HOLE": 5
+  },
+  "fixture": "sm_hd_bracket",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 5
+  }
+ },
+ "sm_hem_pair": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_BEND_ANGLE_EXTREME": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_HEM_DIMENSIONS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "bend_family_cylindrical": 3,
+   "is_hem_false": 1,
+   "is_hem_true": 2,
+   "type_BEND": 3
+  },
+  "fixture": "sm_hem_pair",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "sm_hem_teardrop": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_BEND_ANGLE_EXTREME": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_HEM_DIMENSIONS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "bend_family_cylindrical": 3,
+   "is_hem_false": 1,
+   "is_hem_true": 2,
+   "type_BEND": 3
+  },
+  "fixture": "sm_hem_teardrop",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "sm_hem_thin_gauge": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_HEM_DIMENSIONS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "bend_family_cylindrical": 3,
+   "is_hem_false": 1,
+   "is_hem_true": 2,
+   "type_BEND": 3
+  },
+  "fixture": "sm_hem_thin_gauge",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "sm_hole_bend_field": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_HOLE_NEAR_BEND": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "sm_hole_bend_field",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "sm_hybrid_milled_pocket": {
+  "by_category": {
+   "part": 2,
+   "pocket": 1,
+   "process": 1,
+   "setup": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1,
+   "NO_PARALLEL_DATUM_PAIR": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SHEET_INTENT_SHARP_CORNERS": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "sm_hybrid_milled_pocket",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 2,
+   "warn": 3
+  }
+ },
+ "sm_lance_bridge": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_2": 1,
+   "subtype_lance": 1,
+   "type_BEND": 1,
+   "type_SHEET_FORMED": 1
+  },
+  "fixture": "sm_lance_bridge",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "sm_lookalike_billet": {
+  "by_category": {
+   "part": 9,
+   "pocket": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SHARP_INTERNAL_EDGE": 8
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_THROUGH_CAVITY": 1
+  },
+  "fixture": "sm_lookalike_billet",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 9
+  }
+ },
+ "sm_louver_angular": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_1": 1,
+   "subtype_louver": 1,
+   "type_BEND": 1,
+   "type_SHEET_FORMED": 1
+  },
+  "fixture": "sm_louver_angular",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "sm_louver_angular_sym": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_1": 1,
+   "subtype_louver": 1,
+   "type_BEND": 1,
+   "type_SHEET_FORMED": 1
+  },
+  "fixture": "sm_louver_angular_sym",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "sm_louver_bank": {
+  "by_category": {
+   "sheet": 4
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 2,
+   "SHEET_LOUVER_TALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 7,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_1": 2,
+   "subtype_louver": 2,
+   "type_BEND": 1,
+   "type_FREEFORM_SURFACE": 4,
+   "type_SHEET_FORMED": 2
+  },
+  "fixture": "sm_louver_bank",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 1
+  }
+ },
+ "sm_louver_bank_curved": {
+  "by_category": {
+   "sheet": 6
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 1,
+   "SHEET_FORMED_PITCH": 3,
+   "SHEET_LOUVER_TALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 16,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_1": 5,
+   "subtype_louver": 5,
+   "type_BEND": 1,
+   "type_FREEFORM_SURFACE": 10,
+   "type_SHEET_FORMED": 5
+  },
+  "fixture": "sm_louver_bank_curved",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 4
+  }
+ },
+ "sm_louver_dome": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 1,
+   "SHEET_LOUVER_TALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_1": 1,
+   "subtype_louver": 1,
+   "type_BEND": 1,
+   "type_FREEFORM_SURFACE": 2,
+   "type_SHEET_FORMED": 1
+  },
+  "fixture": "sm_louver_dome",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "sm_louver_standard": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 1,
+   "SHEET_LOUVER_TALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_1": 1,
+   "subtype_louver": 1,
+   "type_BEND": 1,
+   "type_FREEFORM_SURFACE": 2,
+   "type_SHEET_FORMED": 1
+  },
+  "fixture": "sm_louver_standard",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "sm_louver_standard_sym": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 1,
+   "SHEET_LOUVER_TALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_1": 1,
+   "subtype_louver": 1,
+   "type_BEND": 1,
+   "type_FREEFORM_SURFACE": 2,
+   "type_SHEET_FORMED": 1
+  },
+  "fixture": "sm_louver_standard_sym",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "sm_notch_baits": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_NOTCH_NARROW": 2
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1,
+   "type_NOTCH": 2
+  },
+  "fixture": "sm_notch_baits",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "sm_punch_grid": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_HOLE_PITCH": 1,
+   "SHEET_HOLE_SMALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 7,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1,
+   "type_THROUGH_HOLE": 6
+  },
+  "fixture": "sm_punch_grid",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "sm_punch_grid__seam37": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_HOLE_PITCH": 1,
+   "SHEET_HOLE_SMALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 7,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1,
+   "type_THROUGH_HOLE": 6
+  },
+  "fixture": "sm_punch_grid__seam37",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "sm_relief_bait": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_BEND_RELIEF_MISSING": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1,
+   "type_NOTCH": 1
+  },
+  "fixture": "sm_relief_bait",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "sm_relief_shapes": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_BEND_OPERATIONS": 1,
+   "SHEET_BEND_RELIEF_MISSING": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "bend_family_cylindrical": 3,
+   "is_hem_false": 3,
+   "type_BEND": 3
+  },
+  "fixture": "sm_relief_shapes",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "sm_sharp_fold_shell": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_BEND_OPERATIONS": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_SHARP_FOLD": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "bend_family_sharp": 1,
+   "type_BEND": 1
+  },
+  "fixture": "sm_sharp_fold_shell",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "sm_tab_notch_comb": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_TAB_NARROW": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1,
+   "type_NOTCH": 2,
+   "type_TAB": 1
+  },
+  "fixture": "sm_tab_notch_comb",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "sm_tall_lance": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 1,
+   "SHEET_LOUVER_TALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_2": 1,
+   "subtype_lance": 1,
+   "type_BEND": 1,
+   "type_SHEET_FORMED": 1
+  },
+  "fixture": "sm_tall_lance",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "sm_torture_combo": {
+  "by_category": {
+   "sheet": 5
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 1,
+   "SHEET_FORMED_NEAR_BEND": 1,
+   "SHEET_HOLE_NEAR_BEND": 1,
+   "SHEET_HOLE_SMALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "open_edges_0": 2,
+   "subtype_emboss": 2,
+   "type_BEND": 1,
+   "type_NOTCH": 1,
+   "type_SHEET_FORMED": 2,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "sm_torture_combo",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 3
+  }
+ },
+ "sm_torture_curved_outline": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_BEND_RELIEF_MISSING": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_TAB_NARROW": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "is_hem_false": 1,
+   "type_BEND": 1,
+   "type_NOTCH": 1,
+   "type_TAB": 1,
+   "type_THROUGH_CAVITY": 1
+  },
+  "fixture": "sm_torture_curved_outline",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "sm_torture_mixed_folds": {
+  "by_category": {
+   "sheet": 3
+  },
+  "by_rule": {
+   "SHEET_BEND_OPERATIONS": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_SHARP_FOLD": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "bend_family_cylindrical": 1,
+   "bend_family_sharp": 1,
+   "is_hem_false": 1,
+   "type_BEND": 2
+  },
+  "fixture": "sm_torture_mixed_folds",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "sm_vent_pan": {
+  "by_category": {
+   "sheet": 8
+  },
+  "by_rule": {
+   "SHEET_COUNTERSINK_DEEP": 1,
+   "SHEET_EMBOSS_DEEP": 1,
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 3,
+   "SHEET_FORMED_NEAR_BEND": 1,
+   "SHEET_FORMED_PITCH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 46,
+  "features": {
+   "bend_family_cylindrical": 4,
+   "is_hem_false": 4,
+   "open_edges_0": 5,
+   "open_edges_1": 3,
+   "subtype_emboss": 5,
+   "subtype_louver": 3,
+   "type_BEND": 4,
+   "type_CHANNEL": 1,
+   "type_COUNTERSINK": 4,
+   "type_PATTERN": 2,
+   "type_SHEET_FORMED": 8,
+   "type_THROUGH_CAVITY": 1,
+   "type_THROUGH_HOLE": 26
+  },
+  "fixture": "sm_vent_pan",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 4,
+   "warn": 4
+  }
+ },
+ "small_part": {
+  "by_category": {
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "NO_DATUM_FACE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 0,
+  "features": {},
+  "fixture": "small_part",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "spline_shaft_blank": {
+  "by_category": {
+   "part": 1,
+   "setup": 1,
+   "slot": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_SLOT": 1
+  },
+  "fixture": "spline_shaft_blank",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "step_feature": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_STEP": 1
+  },
+  "fixture": "step_feature",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "structural_rib_panel": {
+  "by_category": {
+   "part": 1,
+   "rib": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "RIB_HEIGHT_ASPECT": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "type_RIB": 4
+  },
+  "fixture": "structural_rib_panel",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "surgical_handpiece_body": {
+  "by_category": {
+   "hole": 1,
+   "part": 2,
+   "setup": 1,
+   "slot": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "PART_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_COUNTERBORE": 1,
+   "type_SLOT": 1
+  },
+  "fixture": "surgical_handpiece_body",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "tall_boss": {
+  "by_category": {
+   "boss": 1,
+   "part": 2
+  },
+  "by_rule": {
+   "BOSS_HEIGHT_RATIO": 1,
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_BOSS": 1
+  },
+  "fixture": "tall_boss",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "tall_boss__seam37": {
+  "by_category": {
+   "boss": 1,
+   "part": 2
+  },
+  "by_rule": {
+   "BOSS_HEIGHT_RATIO": 1,
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_BOSS": 1
+  },
+  "fixture": "tall_boss__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "tap_drill_index_plate": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_NONSTANDARD_DIAMETER": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "type_BLIND_HOLE": 6
+  },
+  "fixture": "tap_drill_index_plate",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "text_bold_heavy_engraved": {
+  "by_category": {
+   "part": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_MARKING_TEXT": 1
+  },
+  "fixture": "text_bold_heavy_engraved",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "text_bold_midweight_engraved": {
+  "by_category": {
+   "part": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_MARKING_TEXT": 1
+  },
+  "fixture": "text_bold_midweight_engraved",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "text_cyl_rotary_engraved": {
+  "by_category": {
+   "part": 2,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_MARKING": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_MARKING_TEXT": 1,
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "text_cyl_rotary_engraved",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "text_dejavu_serial_engraved": {
+  "by_category": {
+   "part": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_MARKING_TEXT": 1
+  },
+  "fixture": "text_dejavu_serial_engraved",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "text_mono_micro_engraved": {
+  "by_category": {
+   "part": 3,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "NO_PARALLEL_DATUM_PAIR": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_MARKING_TEXT": 1
+  },
+  "fixture": "text_mono_micro_engraved",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "text_neg_decor_groove": {
+  "by_category": {
+   "part": 2,
+   "slot": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SLOT_NONSTANDARD_WIDTH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "type_GROOVE": 2,
+   "type_PATTERN": 1,
+   "type_SLOT": 3
+  },
+  "fixture": "text_neg_decor_groove",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "text_neg_decor_groove__seam37": {
+  "by_category": {
+   "part": 2,
+   "slot": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SLOT_NONSTANDARD_WIDTH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "type_GROOVE": 2,
+   "type_PATTERN": 1,
+   "type_SLOT": 3
+  },
+  "fixture": "text_neg_decor_groove__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "text_neg_knurl_patch": {
+  "by_category": {
+   "part": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "KNURL_PRESENT": 1,
+   "PART_ASPECT_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "subtype_diamond": 1,
+   "type_KNURL": 1
+  },
+  "fixture": "text_neg_knurl_patch",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "text_neg_louver_row": {
+  "by_category": {
+   "sheet": 2
+  },
+  "by_rule": {
+   "SHEET_FEATURE_COMPLEXITY": 1,
+   "SHEET_FORMED_FEATURE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 6,
+  "features": {
+   "open_edges_0": 6,
+   "subtype_emboss": 6,
+   "type_SHEET_FORMED": 6
+  },
+  "fixture": "text_neg_louver_row",
+  "material": "Default",
+  "part_process_type": "SHEET_METAL",
+  "pmi": {},
+  "process": "Sheet Metal Fabrication",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "text_neg_pocket_row": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 10,
+  "features": {
+   "type_POCKET": 10
+  },
+  "fixture": "text_neg_pocket_row",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "text_sans_deep_engraved": {
+  "by_category": {
+   "part": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_MARKING_TEXT": 1
+  },
+  "fixture": "text_sans_deep_engraved",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "text_sans_large_engraved": {
+  "by_category": {
+   "part": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_MARKING_TEXT": 1
+  },
+  "fixture": "text_sans_large_engraved",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "text_sans_raised_cast": {
+  "by_category": {
+   "part": 4
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 1,
+   "RAISED_TEXT_MACHINED_FACE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_MARKING_TEXT": 1
+  },
+  "fixture": "text_sans_raised_cast",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "text_serif_hairline_engraved": {
+  "by_category": {
+   "part": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_MARKING_TEXT": 1
+  },
+  "fixture": "text_serif_hairline_engraved",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "text_serif_mixedcase_engraved": {
+  "by_category": {
+   "part": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_MARKING_TEXT": 1
+  },
+  "fixture": "text_serif_mixedcase_engraved",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "text_serif_relief_plaque": {
+  "by_category": {
+   "part": 4
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "PART_MARKING": 1,
+   "RAISED_TEXT_MACHINED_FACE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_MARKING_TEXT": 1
+  },
+  "fixture": "text_serif_relief_plaque",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 2
+  }
+ },
+ "thin_sheet": {
+  "by_category": {
+   "part": 2,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "THIN_CLAMPING_DIMENSION": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 0,
+  "features": {},
+  "fixture": "thin_sheet",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "thin_threshold_3_1mm": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 0,
+  "features": {},
+  "fixture": "thin_threshold_3_1mm",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "thin_wall": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_WEB_THICKNESS": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "thin_wall",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "thin_wall__seam37": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_WEB_THICKNESS": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "thin_wall__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "thread_m6_approx": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_BLIND_HOLE": 1
+  },
+  "fixture": "thread_m6_approx",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "thread_shoulder_proximity": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "pocket": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_POCKET": 1
+  },
+  "fixture": "thread_shoulder_proximity",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "thread_wall_thickness": {
+  "by_category": {
+   "hole": 2,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_EDGE_DISTANCE": 1,
+   "HOLE_FLAT_BOTTOM": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_BLIND_HOLE": 1
+  },
+  "fixture": "thread_wall_thickness",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "threshold_hole_5_9x": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "threshold_hole_5_9x",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "threshold_hole_6_1x": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "threshold_hole_6_1x",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "threshold_hole_deep_10_1x": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "threshold_hole_deep_10_1x",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "threshold_hole_deep_9_9x": {
+  "by_category": {
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "threshold_hole_deep_9_9x",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "threshold_pocket_3_9x": {
+  "by_category": {
+   "part": 1,
+   "pocket": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "threshold_pocket_3_9x",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "threshold_pocket_4_1x": {
+  "by_category": {
+   "part": 1,
+   "pocket": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "POCKET_DEPTH_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "threshold_pocket_4_1x",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "threshold_pocket_5_9x": {
+  "by_category": {
+   "part": 1,
+   "pocket": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "POCKET_DEPTH_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "threshold_pocket_5_9x",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "threshold_pocket_6_1x": {
+  "by_category": {
+   "part": 1,
+   "pocket": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "POCKET_DEPTH_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "threshold_pocket_6_1x",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "threshold_removal_69pct": {
+  "by_category": {
+   "part": 2,
+   "pocket": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "threshold_removal_69pct",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "threshold_removal_71pct": {
+  "by_category": {
+   "part": 3,
+   "pocket": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "MATERIAL_REMOVAL": 1,
+   "PART_ASPECT_RATIO": 1,
+   "POCKET_CORNER_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_POCKET": 1
+  },
+  "fixture": "threshold_removal_71pct",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 3
+  }
+ },
+ "threshold_wall_0_7mm": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_WEB_THICKNESS": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "threshold_wall_0_7mm",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "threshold_wall_0_9mm": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_WEB_THICKNESS": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "threshold_wall_0_9mm",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "threshold_wall_1_4mm": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_WEB_THICKNESS": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "threshold_wall_1_4mm",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 2
+  }
+ },
+ "threshold_wall_1_6mm": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 2,
+  "features": {
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "threshold_wall_1_6mm",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "through_hole": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "through_hole",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "through_hole__seam37": {
+  "by_category": {
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "through_hole__seam37",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "tilted_hole_block": {
+  "by_category": {
+   "hole": 2,
+   "part": 1,
+   "pocket": 1,
+   "setup": 1,
+   "tool_access": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_EDGE_DISTANCE": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "TOOL_ACCESS_SPECIAL_SETUP": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_POCKET": 1,
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "tilted_hole_block",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 2,
+   "warn": 3
+  }
+ },
+ "tool_access_blocked": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SEALED_VOID": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 7,
+  "features": {
+   "type_POCKET": 1,
+   "type_UNDERCUT": 6
+  },
+  "fixture": "tool_access_blocked",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 1,
+   "warn": 0
+  }
+ },
+ "tool_access_special_setup": {
+  "by_category": {
+   "part": 1,
+   "tool_access": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "TOOL_ACCESS_SPECIAL_SETUP": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "tool_access_special_setup",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "torture_casting_ribfield": {
+  "by_category": {
+   "boss": 1,
+   "part": 3,
+   "rib": 3,
+   "setup": 1,
+   "slot": 3,
+   "thin_feature": 1
+  },
+  "by_rule": {
+   "BOSS_HEIGHT_RATIO": 1,
+   "FEATURE_COMPLEXITY": 1,
+   "GROOVE_SQUARE_CORNER": 1,
+   "RIB_DRAFT_ANGLE": 1,
+   "RIB_HEIGHT_ASPECT": 2,
+   "SETUP_COUNT_HIGH": 1,
+   "SHARP_INTERNAL_EDGE": 2,
+   "SLOT_DEPTH_RATIO": 2,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 19,
+  "features": {
+   "type_BOSS": 4,
+   "type_CHANNEL": 3,
+   "type_DRAFT_FACE": 6,
+   "type_GROOVE": 1,
+   "type_O_RING_GLAND": 1,
+   "type_RIB": 4
+  },
+  "fixture": "torture_casting_ribfield",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 3,
+   "warn": 9
+  }
+ },
+ "torture_freeform_leviathan": {
+  "by_category": {
+   "freeform": 1,
+   "hole": 2,
+   "part": 1,
+   "pocket": 1,
+   "rib": 1,
+   "setup": 2,
+   "thin_feature": 1,
+   "tool_access": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_BREAKOUT_SCAR": 2,
+   "NO_ORTHOGONAL_DATUM_TRIO": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "RIB_HEIGHT_ASPECT": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "THIN_WALL": 1,
+   "TURNED_PROFILE_RADIUS": 1,
+   "UNDERCUT_PRESENT": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 12,
+  "features": {
+   "type_COUNTERSINK": 4,
+   "type_PATTERN": 1,
+   "type_POCKET": 1,
+   "type_RIB": 1,
+   "type_TURNED_PROFILE": 1,
+   "type_UNDERCUT": 4
+  },
+  "fixture": "torture_freeform_leviathan",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 8
+  }
+ },
+ "torture_hole_labyrinth": {
+  "by_category": {
+   "hole": 10,
+   "part": 3,
+   "pocket": 1,
+   "setup": 1,
+   "slot": 4,
+   "thin_feature": 1,
+   "tool_access": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_COUNTERSINK_ANGLE": 1,
+   "HOLE_DEPTH_RATIO": 4,
+   "HOLE_FLAT_BOTTOM": 1,
+   "HOLE_INTERSECTING": 1,
+   "HOLE_INTERSECTS_CAVITY": 1,
+   "HOLE_NONSTANDARD_DIAMETER": 2,
+   "MINIMUM_FEATURE_SIZE": 2,
+   "POCKET_CORNER_RADIUS": 2,
+   "SETUP_COUNT_HIGH": 1,
+   "SLOT_DEPTH_RATIO": 1,
+   "SLOT_NONSTANDARD_WIDTH": 1,
+   "SLOT_OVERHANG": 1,
+   "SPHERICAL_POCKET_UNDERCUT": 1,
+   "THIN_WALL": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 14,
+  "features": {
+   "type_BLIND_HOLE": 2,
+   "type_BREAKTHROUGH_HOLE": 3,
+   "type_COUNTERBORE": 1,
+   "type_COUNTERSINK": 1,
+   "type_POCKET": 1,
+   "type_SLOT": 1,
+   "type_SPHERICAL_POCKET": 1,
+   "type_THROUGH_HOLE": 4
+  },
+  "fixture": "torture_hole_labyrinth",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 2,
+   "warn": 17
+  }
+ },
+ "torture_machinists_maze": {
+  "by_category": {
+   "hole": 1,
+   "part": 21,
+   "pocket": 2,
+   "rib": 1,
+   "setup": 1,
+   "slot": 3,
+   "tool_access": 6
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "POCKET_CORNER_RADIUS": 3,
+   "RIB_HEIGHT_ASPECT": 1,
+   "SEALED_VOID": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "SHARP_INTERNAL_EDGE": 19,
+   "SLOT_DEPTH_RATIO": 1,
+   "SLOT_OVERHANG": 1,
+   "SPHERICAL_POCKET_UNDERCUT": 1,
+   "TOOL_ACCESS_SPECIAL_SETUP": 1,
+   "UNDERCUT_PRESENT": 4
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 14,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_POCKET": 3,
+   "type_RIB": 1,
+   "type_SLOT": 1,
+   "type_SPHERICAL_POCKET": 2,
+   "type_STEP": 1,
+   "type_THROUGH_CAVITY": 1,
+   "type_UNDERCUT": 4
+  },
+  "fixture": "torture_machinists_maze",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 1,
+   "info": 3,
+   "warn": 31
+  }
+ },
+ "transaxle_housing_cover": {
+  "by_category": {
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 32,
+  "features": {
+   "type_CHAMFER": 8,
+   "type_COUNTERBORE": 1,
+   "type_DRAFT_FACE": 8,
+   "type_FILLET": 4,
+   "type_O_RING_GLAND": 1,
+   "type_PATTERN": 1,
+   "type_POCKET": 1,
+   "type_THROUGH_HOLE": 8
+  },
+  "fixture": "transaxle_housing_cover",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 0
+  }
+ },
+ "tslot_carrier_plate": {
+  "by_category": {
+   "part": 2
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "PART_ASPECT_RATIO": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "type_STEP": 2,
+   "type_THROUGH_CAVITY": 1
+  },
+  "fixture": "tslot_carrier_plate",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "turbine_compressor_disk": {
+  "by_category": {
+   "part": 1,
+   "slot": 1
+  },
+  "by_rule": {
+   "BROACHED_SLOT_PROCESS": 1,
+   "FEATURE_COMPLEXITY": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 63,
+  "features": {
+   "type_BLIND_HOLE": 12,
+   "type_BROACHED_SLOT": 48,
+   "type_PATTERN": 2,
+   "type_THROUGH_HOLE": 1
+  },
+  "fixture": "turbine_compressor_disk",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "turbo_compressor_housing": {
+  "by_category": {
+   "hole": 1,
+   "part": 3,
+   "setup": 1,
+   "thin_feature": 3,
+   "tool_access": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_INTERSECTING": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "SHARP_INTERNAL_EDGE": 2,
+   "THIN_WALL": 3,
+   "TOOL_ACCESS_BLOCKED": 1,
+   "TOOL_ACCESS_SPECIAL_SETUP": 1,
+   "UNDERCUT_PRESENT": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 18,
+  "features": {
+   "type_BLIND_HOLE": 9,
+   "type_BOSS": 1,
+   "type_CHAMFER": 1,
+   "type_PATTERN": 2,
+   "type_THROUGH_HOLE": 3,
+   "type_UNDERCUT": 2
+  },
+  "fixture": "turbo_compressor_housing",
+  "material": "Default",
+  "part_process_type": "MILL_TURN",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 2,
+   "info": 2,
+   "warn": 7
+  }
+ },
+ "turned_freeform_handle": {
+  "by_category": {
+   "hole": 1,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_DEPTH_RATIO": 1,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 3,
+  "features": {
+   "type_BLIND_HOLE": 1,
+   "type_THROUGH_HOLE": 1,
+   "type_TURNED_PROFILE": 1
+  },
+  "fixture": "turned_freeform_handle",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ },
+ "turned_valley_tight_radius": {
+  "by_category": {
+   "freeform": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "TURNED_PROFILE_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_TURNED_PROFILE": 1
+  },
+  "fixture": "turned_valley_tight_radius",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "turned_valley_tight_radius__seam37": {
+  "by_category": {
+   "freeform": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "TURNED_PROFILE_RADIUS": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 1,
+  "features": {
+   "type_TURNED_PROFILE": 1
+  },
+  "fixture": "turned_valley_tight_radius__seam37",
+  "material": "Default",
+  "part_process_type": "TURNED",
+  "pmi": {},
+  "process": "CNC Turning",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 1
+  }
+ },
+ "undercut_part": {
+  "by_category": {
+   "part": 5,
+   "pocket": 1,
+   "tool_access": 3
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SHARP_INTERNAL_EDGE": 4,
+   "UNDERCUT_PRESENT": 3
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 4,
+  "features": {
+   "type_THROUGH_CAVITY": 1,
+   "type_UNDERCUT": 3
+  },
+  "fixture": "undercut_part",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 8
+  }
+ },
+ "valve_body_mini": {
+  "by_category": {
+   "hole": 3,
+   "part": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_FLAT_BOTTOM": 1,
+   "HOLE_INTERSECTING": 2,
+   "SETUP_COUNT_HIGH": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 8,
+  "features": {
+   "type_BLIND_HOLE": 4,
+   "type_BREAKTHROUGH_HOLE": 1,
+   "type_PATTERN": 1,
+   "type_THROUGH_HOLE": 2
+  },
+  "fixture": "valve_body_mini",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 4
+  }
+ },
+ "worm_gearbox_housing": {
+  "by_category": {
+   "part": 5,
+   "pocket": 1,
+   "setup": 1
+  },
+  "by_rule": {
+   "FEATURE_COMPLEXITY": 1,
+   "POCKET_CORNER_RADIUS": 1,
+   "SETUP_COUNT_HIGH": 1,
+   "SHARP_INTERNAL_EDGE": 4
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 20,
+  "features": {
+   "type_BLIND_HOLE": 8,
+   "type_COUNTERBORE": 2,
+   "type_PATTERN": 2,
+   "type_POCKET": 1,
+   "type_THROUGH_HOLE": 7
+  },
+  "fixture": "worm_gearbox_housing",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 1,
+   "warn": 6
+  }
+ },
+ "wr90_waveguide_flange": {
+  "by_category": {
+   "blend": 1,
+   "hole": 1,
+   "part": 1
+  },
+  "by_rule": {
+   "CUTTER_RADIUS_SUBOPTIMAL": 1,
+   "FEATURE_COMPLEXITY": 1,
+   "HOLE_EDGE_DISTANCE": 1
+  },
+  "engine_version": "2.0.0",
+  "feature_count": 9,
+  "features": {
+   "type_PATTERN": 1,
+   "type_SLOT": 1,
+   "type_THROUGH_CAVITY": 1,
+   "type_THROUGH_HOLE": 6
+  },
+  "fixture": "wr90_waveguide_flange",
+  "material": "Default",
+  "part_process_type": "MILLED",
+  "pmi": {},
+  "process": "CNC Milling",
+  "severity": {
+   "error": 0,
+   "info": 2,
+   "warn": 1
+  }
+ }
+}

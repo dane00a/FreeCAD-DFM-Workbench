@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: 2026 Dane Andrews <dane.andrews99@gmail.com>
+# SPDX-FileNotice: Part of the DFM addon.
+#
+# This is test-runner and dev-environment config, not a packaging manifest.
+# There is deliberately no [build-system] table: the workbench is loaded by
+# FreeCAD from a Mod directory (see package.xml, which the Addon Manager
+# reads instead of this file), not installed with pip, and adding a build
+# backend here would invite exactly that. The [project] table below exists
+# only because [project.optional-dependencies] requires one to hang off of.
+
+[project]
+name = "freecad-dfm-workbench"
+version = "0.1.18"
+requires-python = ">=3.11"
+
+[project.optional-dependencies]
+# What `.venv311` needs: OCP for the geometry core, pyyaml for the rule
+# tables, pytest to run the suite. cadquery-ocp is pinned rather than left
+# floating because it has to match the OpenCascade build FreeCAD 1.1 itself
+# bundles -- a newer OCP can read/write geometry subtly differently, which
+# is exactly the kind of drift geometry_oracle.json exists to catch, so
+# skip the false positives by matching the kernel instead of chasing them.
+dev = [
+    "cadquery-ocp==7.8.1.1",
+    "pyyaml",
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
